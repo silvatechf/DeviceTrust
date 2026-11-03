@@ -37,6 +37,8 @@ DeviceTrust is an evidence-oriented platform prototype for tracking IoT device i
 
 The project starts as a **modular monolith**: FastAPI API layer, Pydantic validation, SQLAlchemy persistence, domain services and an evidence-oriented audit trail. SQLite is used by default; configuration is PostgreSQL-ready.
 
+The [Visual Technical Architecture](docs/architecture.md) documents the implemented components and data flows with editable Mermaid diagrams, including trust boundaries, posture assessment, SBOM processing, audit verification and CI validation. The diagrams describe the current prototype and explicitly distinguish planned capabilities.
+
 ## Quick start
 
 ```bash
@@ -79,6 +81,14 @@ pytest -q
 4. Hash chains provide tamper evidence, not immutable storage against a privileged database attacker.
 5. Internet exposure and management access are separate from device-reported posture.
 6. DeviceTrust is an assessment and evidence platform, not an inline IDS/IPS or OT safety controller.
+
+## Technical documentation
+
+- [Visual architecture and data flows](docs/architecture.md)
+- [Security controls and evidence model](docs/security-controls.md)
+- [Threat model and residual risks](docs/threat-model.md)
+- [Prototype limitations](docs/prototype-limitations.md)
+- [Roadmap](docs/roadmap.md)
 
 ## References
 
