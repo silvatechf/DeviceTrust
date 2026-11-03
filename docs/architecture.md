@@ -4,16 +4,18 @@
 
 ## 1. System architecture
 
-DeviceTrust is a modular monolith. HTTP requests enter FastAPI, Pydantic validates request bodies, route handlers coordinate domain services, and SQLAlchemy persists device, vulnerability and audit records.
+DeviceTrust is a modular monolith. HTTP requests enter FastAPI, authentication dependencies and request validation are resolved at the API boundary, route handlers coordinate domain services, and SQLAlchemy persists device, vulnerability and audit records. Typed endpoints use the Pydantic models in `app/schemas.py`; the SBOM endpoint accepts a raw `Request` and applies bounded JSON and CycloneDX validation explicitly.
 
 ```mermaid
 flowchart TB
     C["API client / operator"] -->|"HTTPS deployment-dependent; X-API-Key"| API["FastAPI application"]
     API --> AUTH["Shared API-key dependency"]
-    AUTH --> ROUTES["HTTP route handlers"]
-    ROUTES --> SCHEMA["Pydantic request schemas"]
+    AUTH --> VALID["FastAPI request validation boundary"]
+    VALID --> ROUTES["HTTP route handlers"]
+    VALID -.-> SCHEMA["Pydantic models for typed endpoints"]
     ROUTES --> POSTURE["Posture assessment service"]
     ROUTES --> SBOM["SBOM parser and matching service"]
+    SBOM --> SBOMVALID["Manual bounded JSON / CycloneDX validation"]
     ROUTES --> TRIAGE["Vulnerability triage"]
     ROUTES --> AUDIT["Audit service"]
     ROUTES --> REPORT["JSON / Markdown report assembly"]
@@ -48,7 +50,7 @@ flowchart LR
     end
     subgraph APP["Application trust boundary"]
       AUTH["Shared API-key check"]
-      VALID["Pydantic / JSON / PURL validation"]
+      VALID["Bounded JSON / CycloneDX / PURL validation"]
       ROUTE["FastAPI routes and domain services"]
       DB[("Application database")]
     end
@@ -68,7 +70,7 @@ flowchart LR
 
 - The API uses one shared `DEVICETRUST_API_KEY`; it is not user identity, role-based authorization or tenant isolation.
 - Missing server-side API-key configuration fails closed with HTTP 503; a wrong key receives HTTP 401.
-- SBOM input is untrusted. The request body is capped at 2 MiB, then JSON and a bounded subset of CycloneDX components are validated.
+- SBOM input is untrusted. The endpoint reads a raw request body capped at 2 MiB, then manually validates JSON and a bounded subset of CycloneDX components; it does not use a dedicated Pydantic SBOM request model.
 - Device security and management-interface attributes are declared evidence. DeviceTrust does not independently probe device reachability or attest that submitted claims are true.
 - OSV is an optional external dependency. Network and response errors are skipped; a missing result is not proof that a component is safe.
 - The database is inside the application trust boundary. The current audit hash chain does not provide immutable/WORM storage or an external checkpoint.
