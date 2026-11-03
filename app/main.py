@@ -1,4 +1,5 @@
 import hmac
+import json
 import os
 from contextlib import asynccontextmanager
 
@@ -13,6 +14,7 @@ from .db import AuditEntry, Device, SessionLocal, Vulnerability, init_db
 from .schemas import DeviceIn, SecurityProfile, TriageIn
 
 SEV = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
+MAX_SBOM_BYTES = 2 * 1024 * 1024
 
 
 @asynccontextmanager
@@ -66,6 +68,21 @@ def _vulns(db: Session, device_id: str) -> list[dict]:
         (_vuln_dict(item) for item in rows),
         key=lambda item: (item["status"] in ("fixed", "not_affected"), SEV.get(item["severity"], 4)),
     )
+
+
+async def _read_sbom_document(request: Request) -> dict:
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > MAX_SBOM_BYTES:
+            raise HTTPException(413, "SBOM request exceeds the 2 MiB limit")
+        body.extend(chunk)
+    try:
+        document = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(422, "Request body must contain valid UTF-8 JSON") from None
+    if not isinstance(document, dict):
+        raise HTTPException(422, "SBOM document must be a JSON object")
+    return document
 
 
 @app.get("/health")
@@ -137,10 +154,10 @@ async def import_sbom(
     actor: str = Depends(auth),
 ):
     _device(db, device_id)
+    document = await _read_sbom_document(request)
     try:
-        document = await request.json()
         components = sbom.parse_cyclonedx(document)
-    except (ValueError, UnicodeDecodeError) as error:
+    except ValueError as error:
         raise HTTPException(422, str(error)) from None
 
     new_findings = 0
