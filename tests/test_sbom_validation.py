@@ -53,8 +53,8 @@ def test_local_demo_match_does_not_flag_fixed_version():
 
 
 def test_sample_sbom_has_two_expected_demo_matches():
-    from pathlib import Path
     import json
+    from pathlib import Path
 
     from app.sbom import scan
 
