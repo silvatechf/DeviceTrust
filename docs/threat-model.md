@@ -21,18 +21,31 @@ The prototype manages device metadata, posture evidence, SBOM documents, vulnera
 - Application to external vulnerability intelligence services.
 - Application database to backup and audit-storage systems.
 
-## Threats and gaps
+## Threats and current evidence
 
-| Threat | Current mitigation | Gap / planned work |
+| Threat | Current mitigation | Evidence / limitation |
 |---|---|---|
-| Unauthorized API access | Shared API key | Per-client identities, rotation, RBAC |
-| Malformed or oversized SBOM | Component-count limit | Body-size limit and full CycloneDX schema validation |
-| Incorrect CVE matching | Local matcher and optional OSV | Version-range and ecosystem-aware matching |
-| False compliance from missing data | `unverified` state | Evidence source, timestamp and confidence |
-| Internet-exposed management | Explicit posture fields | Evidence source and observation timestamp |
-| Unsupported firmware | `support_until` | Vendor-backed product/model lifecycle records |
-| Audit database rewriting | Hash chain | External signed checkpoints and append-only storage |
-| Compromised API key | Constant-time comparison | Identity-scoped credentials and least privilege |
+| Unauthorized API access | Shared API key, constant-time comparison, fail-closed configuration | API tests cover missing/invalid credentials; no identity-scoped authorization or tenant isolation |
+| Device identifier injection | Strict Pydantic pattern and extra-field rejection | API tests cover traversal-like identifiers and unknown fields |
+| Malformed or oversized SBOM | 2 MiB streaming body cap; component count and field limits; JSON/PURL validation | Input-limit and SBOM validation tests; full CycloneDX schema validation remains absent |
+| Incorrect CVE matching | PURL type/name matching for local demo records; version-specific OSV query | Tests cover ecosystem/package mismatch and fixed versions; local feed is synthetic |
+| False compliance from missing data | `unverified` state | Posture tests cover unknown exposure and management interfaces |
+| Internet-exposed management | Separate management-plane posture assessment | API test covers exposed admin interface even when authentication is required; exposure is declared metadata |
+| Audit database rewriting | SHA-256 hash chain | Tests detect mutation; final-entry deletion and privileged recomputation are not detectable without external checkpoints |
+| Compromised API key | Shared key and constant-time comparison | No per-client revocation, scopes, rotation workflow or RBAC |
+| Resource exhaustion | SBOM body and component limits | No global request rate limit, concurrency quota or reverse-proxy policy |
+
+## Abuse cases to test
+
+1. Call protected routes without a key, with a wrong key, and when the server key is unset.
+2. Submit traversal-like device IDs, unexpected fields, malformed JSON and oversized SBOM bodies.
+3. Submit non-object SBOM components, invalid PURLs, PURL/version mismatches and package-name collisions across ecosystems.
+4. Verify that unknown exposure remains unverified and an exposed management interface is high risk.
+5. Mutate retained audit entries and document the final-suffix deletion limitation.
+
+## Residual risk
+
+The prototype is a single trust domain. Any valid API key can read and modify all inventory and triage records. Do not expose it as a multi-customer service or use it as the sole source of security decisions.
 
 ## Safety boundary
 
