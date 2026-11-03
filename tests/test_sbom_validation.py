@@ -50,3 +50,15 @@ def test_local_demo_match_uses_package_identity_and_version():
 def test_local_demo_match_does_not_flag_fixed_version():
     component = _component(version="3.0.8", purl="pkg:generic/openssl@3.0.8")
     assert scan_local([component]) == []
+
+
+def test_sample_sbom_has_two_expected_demo_matches():
+    from pathlib import Path
+    import json
+
+    from app.sbom import scan
+
+    sample = json.loads((Path(__file__).parent.parent / "samples" / "sensor_sbom.json").read_text())
+    parsed = parse_cyclonedx(sample)
+    findings = scan(parsed)
+    assert {finding["vuln_id"] for finding in findings} == {"DT-DEMO-0001", "DT-DEMO-0002"}
