@@ -1,5 +1,5 @@
 [
-  {"id": "DT-DEMO-0001", "package": "busybox", "fixed": "1.36.0", "severity": "high"},
-  {"id": "DT-DEMO-0002", "package": "openssl", "fixed": "3.0.8", "severity": "critical"},
-  {"id": "DT-DEMO-0003", "package": "mosquitto", "fixed": "2.0.15", "severity": "medium"}
+  {"id": "DT-DEMO-0001", "purl_type": "generic", "package": "busybox", "fixed": "1.36.0", "severity": "high"},
+  {"id": "DT-DEMO-0002", "purl_type": "generic", "package": "openssl", "fixed": "3.0.8", "severity": "critical"},
+  {"id": "DT-DEMO-0003", "purl_type": "generic", "package": "mosquitto", "fixed": "2.0.15", "severity": "medium"}
 ]
