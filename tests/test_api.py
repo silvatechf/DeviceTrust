@@ -127,12 +127,24 @@ def test_api_fails_closed_when_server_key_is_unset(client, monkeypatch):
     assert response.status_code == 503
 
 
-def test_audit_chain_cannot_detect_deleted_tail_without_checkpoint(client):
-    assert client.get("/devices", headers=H).status_code == 200
-    with SessionLocal() as db:
+def test_audit_chain_cannot_detect_deleted_tail_without_checkpoint(tmp_path):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.audit import record, verify
+    from app.db import Base
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'audit-tail.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        record(db, "test", "device.create", "DEVICE-1", {"id": 1})
+        db.commit()
+        record(db, "test", "device.update", "DEVICE-1", {"id": 1})
+        db.commit()
         last = db.query(AuditEntry).order_by(AuditEntry.id.desc()).first()
         assert last is not None
         db.delete(last)
         db.commit()
-    # Documents the known limitation: no external anchor exists to prove the tail was deleted.
-    assert client.get("/audit/verify", headers=H).json()["valid"] is True
+        # No external anchor exists to prove the final entry was deleted.
+        assert verify(db)["valid"] is True
+    engine.dispose()
