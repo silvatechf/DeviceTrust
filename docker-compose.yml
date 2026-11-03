@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: devicetrust
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-only-local}
+      POSTGRES_DB: devicetrust
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devicetrust -d devicetrust"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://devicetrust:${POSTGRES_PASSWORD:-dev-only-local}@db/devicetrust
+      DEVICETRUST_API_KEY: ${DEVICETRUST_API_KEY:?Set DEVICETRUST_API_KEY in the environment}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
