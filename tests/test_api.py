@@ -119,3 +119,32 @@ def test_unknown_exposure_is_not_assumed_safe(client):
     exposure = next(item for item in posture["controls"] if item["control"] == "network_exposure")
     assert exposure["status"] == "unverified"
     assert exposure["risk"] == "unknown"
+
+
+def test_api_fails_closed_when_server_key_is_unset(client, monkeypatch):
+    monkeypatch.delenv("DEVICETRUST_API_KEY")
+    response = client.get("/devices", headers=H)
+    assert response.status_code == 503
+
+
+def test_audit_chain_cannot_detect_deleted_tail_without_checkpoint(tmp_path):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.audit import record, verify
+    from app.db import Base
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'audit-tail.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        record(db, "test", "device.create", "DEVICE-1", {"id": 1})
+        db.commit()
+        record(db, "test", "device.update", "DEVICE-1", {"id": 1})
+        db.commit()
+        last = db.query(AuditEntry).order_by(AuditEntry.id.desc()).first()
+        assert last is not None
+        db.delete(last)
+        db.commit()
+        # No external anchor exists to prove the final entry was deleted.
+        assert verify(db)["valid"] is True
+    engine.dispose()

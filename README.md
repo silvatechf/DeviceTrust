@@ -12,7 +12,7 @@ DeviceTrust is an evidence-oriented platform prototype for tracking IoT device i
 - Device registration and retrieval.
 - Evidence-oriented security posture; missing evidence remains `unverified`.
 - CycloneDX JSON component import.
-- Local advisory matching and optional OSV lookup.
+- PURL-scoped local demonstration advisories and optional version-scoped OSV lookup (not a comprehensive vulnerability feed).
 - Vulnerability triage with mandatory justification.
 - JSON and Markdown device reports.
 - SHA-256 hash-chained audit entries and integrity verification.
@@ -67,6 +67,7 @@ The API is available at `http://127.0.0.1:8000`; interactive documentation is at
 ```bash
 ruff check .
 bandit -q -r app
+pip-audit -r requirements.txt
 pytest -q
 ```
 
