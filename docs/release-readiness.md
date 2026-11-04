@@ -4,15 +4,17 @@
 
 **Status: public repository, unreleased prototype; not production-ready.**
 
-The repository is publicly visible, but no versioned release has been published and no license has been selected. It may be discussed as an engineering prototype once the validation and disclosure gates below are satisfied. Do not describe it as a production security platform, CRA conformity assessment, active device scanner or protective control.
+The repository is publicly visible, but no versioned release has been published and no license has been selected. Claims must be tied to code and validation evidence. Do not describe it as a production security platform, CRA conformity assessment, active device scanner or protective control.
+
+A documented test or configured CI workflow is not proof that it passed on the current candidate. Record the exact commit SHA and observed workflow results before marking a validation gate complete.
 
 ## Public disclosure gates
-
-- [x] README states the implemented scope and major non-goals.
+- [x] README states implemented scope and major non-goals.
 - [x] Threat model, prototype limitations and security controls are documented.
 - [x] Security reporting policy is present.
 - [x] Contribution guidance is present.
 - [x] Changelog and reproducible local demo runbook are present.
+- [x] Engineering decisions and test-to-control mapping are documented.
 - [ ] Select and add an explicit open-source license, or clearly decide to retain all rights.
 - [ ] Set an accurate repository description and relevant topics.
 - [ ] Review the full Git history and confirm no secrets, private data, customer data or unintended material are present.
@@ -25,9 +27,8 @@ The repository is publicly visible, but no versioned release has been published 
 - [ ] Publish a versioned release only after all required gates are satisfied.
 
 ## Demo acceptance gates
-
 - [ ] Install dependencies from the documented development requirements in a clean environment.
-- [ ] Pass Ruff, Bandit, pip-audit, Node syntax and pytest.
+- [ ] Pass Ruff, Bandit, pip-audit, Node syntax and pytest on the exact candidate commit.
 - [ ] Start the API against a disposable SQLite database.
 - [ ] Seed synthetic records and verify the documented walkthrough.
 - [ ] Open the operator console at desktop and mobile widths.
@@ -38,8 +39,22 @@ The repository is publicly visible, but no versioned release has been published 
 - [ ] Confirm /docs remains usable and the console CSP is applied only to console/assets.
 - [ ] Confirm no local database, credentials, environment files or generated artifacts are committed.
 
-## Production blockers
+## Control-to-test evidence
 
+The automated test inventory is maintained in Test Matrix. This mapping identifies test files; it does not claim that tests passed on the current branch head.
+
+| Area | Automated evidence | Remaining validation |
+|---|---|---|
+| API authentication and fail-closed config | tests/test_api.py | Per-user authorization and key rotation are not implemented |
+| Evidence input and verification boundary | tests/test_api.py | Source-specific identity and independent attestation |
+| Normalization rules and projection | tests/test_evidence_normalization.py, tests/test_api.py | Stale/conflicting source behavior and expanded adapters |
+| SBOM body limits and parsing | tests/test_sbom_input_limits.py, tests/test_sbom_validation.py | Full CycloneDX schema and ecosystem range semantics |
+| Posture unknown/exposure behavior | tests/test_api.py, tests/test_posture_evidence_boundaries.py | Evidence-driven posture integration remains disabled |
+| Audit integrity boundaries | tests/test_api.py, tests/test_audit_chain_boundaries.py | External checkpoint and concurrent chain-head serialization |
+| Operator console headers and browser storage | tests/test_operator_console.py | Real-browser functional and responsive validation |
+| CI quality gates | .github/workflows/ci.yml | Exact candidate workflow result must be checked |
+
+## Production blockers
 - Shared API key; no individual identity, RBAC, scopes, key rotation workflow or tenant isolation.
 - The operator console receives the shared API key in browser memory. It is intended only for a trusted local operator workflow.
 - No server-side browser session or backend-for-frontend.
@@ -55,19 +70,17 @@ The repository is publicly visible, but no versioned release has been published 
 ## Claims suitable for a technical portfolio
 
 Use only claims supported by the current code and exact validation evidence:
-
 - Built a FastAPI modular-monolith prototype for IoT inventory and evidence-based security posture.
 - Implemented bounded CycloneDX JSON ingestion and PURL-scoped synthetic advisory matching, with optional best-effort OSV lookup.
 - Added justified vulnerability triage, JSON/Markdown reporting and SHA-256 hash-chain audit verification.
 - Added bounded evidence ingestion and an initial read-only normalized projection for selected attributes.
 - Integrated Ruff, Bandit, pip-audit, JavaScript syntax checks and pytest into GitHub Actions.
-- Documented trust boundaries, threat scenarios and residual risks.
+- Documented trust boundaries, threat scenarios, engineering trade-offs and residual risks.
 - Added a local same-origin operator console that consumes the existing API.
 
 Avoid claims that imply production readiness, complete CVE coverage, independent device attestation, CRA certification, immutable audit storage, multi-tenant security or attack prevention.
 
 ## Publication sequence
-
 1. Complete review and merge only after human review, required CI and signature-policy resolution.
 2. Validate the merged revision locally and record its exact commit SHA.
 3. Select and add the license before inviting reuse or contributions.
