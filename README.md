@@ -119,6 +119,8 @@ Please read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Contrib
 
 ## Technical documentation
 
+- [Engineering decisions](docs/engineering-decisions.md)
+- [Test matrix and verification evidence](docs/test-matrix.md)
 - [Architecture and data flows](docs/architecture.md)
 - [Security controls and evidence model](docs/security-controls.md)
 - [Threat model and residual risks](docs/threat-model.md)
