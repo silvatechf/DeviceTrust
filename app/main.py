@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import PlainTextResponse
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -229,7 +229,12 @@ def report(
         {"ts": entry.ts, "action": entry.action, "payload": entry.payload}
         for entry in db.scalars(
             select(AuditEntry)
-            .where(AuditEntry.entity.like(f"{device_id}%"))
+            .where(
+                or_(
+                    AuditEntry.entity == device_id,
+                    AuditEntry.entity.startswith(f"{device_id}/", autoescape=True),
+                )
+            )
             .order_by(AuditEntry.id)
         )
     ]

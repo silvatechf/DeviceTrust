@@ -97,19 +97,37 @@ def scan_osv(components: list[dict]) -> list[dict]:
                     },
                 )
                 response.raise_for_status()
-                vulnerabilities = response.json().get("vulns", [])
+                payload = response.json()
             except (httpx.HTTPError, ValueError, TypeError):
                 continue
+
+            if not isinstance(payload, dict):
+                continue
+            vulnerabilities = payload.get("vulns", [])
+            if not isinstance(vulnerabilities, list):
+                continue
+
             for vulnerability in vulnerabilities:
-                vuln_id = vulnerability.get("id")
-                if not isinstance(vuln_id, str):
+                if not isinstance(vulnerability, dict):
                     continue
-                severity = str(vulnerability.get("database_specific", {}).get("severity", "unknown")).lower()
+                vuln_id = vulnerability.get("id")
+                if not isinstance(vuln_id, str) or not vuln_id.strip():
+                    continue
+
+                database_specific = vulnerability.get("database_specific")
+                severity = (
+                    database_specific.get("severity", "unknown")
+                    if isinstance(database_specific, dict)
+                    else "unknown"
+                )
+                if not isinstance(severity, str):
+                    severity = "unknown"
+
                 hits.append({
                     "component": component["name"],
                     "version": component["version"],
                     "vuln_id": vuln_id,
-                    "severity": severity,
+                    "severity": severity.lower(),
                     "fixed_in": None,
                     "source": "osv",
                 })
