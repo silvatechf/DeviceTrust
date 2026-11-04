@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --create-home --uid 10001 appuser
 
 COPY app ./app
+COPY web ./web
 COPY samples ./samples
 USER appuser
 
