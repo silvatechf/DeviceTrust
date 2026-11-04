@@ -69,11 +69,9 @@ def assess(device: dict) -> dict:
         "open_interfaces": security.get("open_interfaces"),
         "insecure_interfaces": insecure,
     }
-    if security.get("default_credentials") is None:
-        findings.append(_unknown(
-            "secure_configuration", ["default_credentials", "open_interfaces"]
-        ))
-    elif security["default_credentials"]:
+    default_credentials = security.get("default_credentials")
+    open_interfaces = security.get("open_interfaces")
+    if default_credentials is True:
         findings.append(_finding(
             "secure_configuration", "non_compliant", config_evidence,
             "Shipped with default credentials.", "high",
@@ -84,6 +82,10 @@ def assess(device: dict) -> dict:
             "secure_configuration", "partial", config_evidence,
             f"Insecure interfaces declared: {', '.join(insecure)}.",
             "medium", "Disable or replace with encrypted equivalents.",
+        ))
+    elif default_credentials is None or open_interfaces is None:
+        findings.append(_unknown(
+            "secure_configuration", ["default_credentials", "open_interfaces"]
         ))
     else:
         findings.append(_finding(
