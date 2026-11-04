@@ -1,4 +1,4 @@
-services:
+﻿services:
   db:
     image: postgres:16-alpine
     environment:
@@ -18,7 +18,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      DATABASE_URL: postgresql+psycopg://devicetrust:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db/devicetrust
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
       DEVICETRUST_API_KEY: ${DEVICETRUST_API_KEY:?Set DEVICETRUST_API_KEY in the environment}
     depends_on:
       db:
