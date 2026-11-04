@@ -15,6 +15,62 @@ def test_auth_required(client):
     assert client.get("/devices").status_code == 401
     assert client.get("/devices", headers={"X-API-Key": "bad"}).status_code == 401
     assert client.get("/health").status_code == 200
+    assert client.get("/evidence").status_code == 401
+    assert client.get("/evidence/normalized").status_code == 401
+
+
+def test_evidence_observation_lifecycle(client):
+    device = {
+        "device_id": "EVIDENCE-001",
+        "manufacturer": "Example IoT",
+        "model": "Gateway",
+        "firmware_version": "1.0.0",
+    }
+    assert client.post("/devices", json=device, headers=H).status_code == 201
+    payload = {
+        "device_id": "EVIDENCE-001",
+        "source_type": "router_import",
+        "attribute": "firmware_version",
+        "value": "2.4.1",
+        "confidence": "medium",
+        "evidence_reference": "router-export:devices.csv#row-8",
+    }
+    created = client.post("/evidence", json=payload, headers=H)
+    assert created.status_code == 201
+    observation = created.json()
+    assert observation["verification_status"] == "unverified"
+    assert observation["confidence"] == "medium"
+    assert observation["device_id"] == "EVIDENCE-001"
+    assert observation["recorded_at"].endswith("+00:00")
+    assert observation["observed_at"].endswith("+00:00")
+    assert isinstance(observation["id"], int)
+    assert len(client.get("/evidence?device_id=EVIDENCE-001", headers=H).json()) == 1
+    assert client.get("/evidence?device_id=TEMP-UNKNOWN", headers=H).status_code == 404
+    audit = client.get("/audit", headers=H).json()
+    assert any(item["action"] == "evidence.record" for item in audit)
+
+
+def test_unassigned_evidence_and_input_boundaries(client):
+    payload = {
+        "source_type": "manual",
+        "attribute": "manufacturer",
+        "value": "Unknown vendor",
+    }
+    created = client.post("/evidence", json=payload, headers=H)
+    assert created.status_code == 201
+    assert created.json()["device_id"] is None
+    assert created.json()["verification_status"] == "unverified"
+
+    invalid_hash = {**payload, "evidence_hash": "not-a-sha256"}
+    assert client.post("/evidence", json=invalid_hash, headers=H).status_code == 422
+    unknown_source = {**payload, "source_type": "random_importer"}
+    assert client.post("/evidence", json=unknown_source, headers=H).status_code == 422
+    extra = {**payload, "verification_status": "verified"}
+    assert client.post("/evidence", json=extra, headers=H).status_code == 422
+    oversized_value = {**payload, "value": "x" * 1001}
+    assert client.post("/evidence", json=oversized_value, headers=H).status_code == 422
+    naive_timestamp = {**payload, "observed_at": "2026-11-04T10:30:00"}
+    assert client.post("/evidence", json=naive_timestamp, headers=H).status_code == 422
 
 
 def test_device_lifecycle_and_validation(client):
@@ -148,3 +204,85 @@ def test_audit_chain_cannot_detect_deleted_tail_without_checkpoint(tmp_path):
         # No external anchor exists to prove the final entry was deleted.
         assert verify(db)["valid"] is True
     engine.dispose()
+
+
+
+def test_evidence_listing_is_paginated_and_bounded(client):
+    device_id = "PAGINATION-001"
+
+    device = {
+        "device_id": device_id,
+        "manufacturer": "Example IoT",
+        "model": "Pagination Gateway",
+        "firmware_version": "1.0.0",
+    }
+    created_device = client.post("/devices", json=device, headers=H)
+    assert created_device.status_code == 201
+
+    for index in range(3):
+        response = client.post(
+            "/evidence",
+            json={
+                "device_id": device_id,
+                "source_type": "manual",
+                "attribute": "inventory_note",
+                "value": f"observation-{index}",
+            },
+            headers=H,
+        )
+        assert response.status_code == 201
+
+    endpoint = f"/evidence?device_id={device_id}"
+
+    first_page = client.get(f"{endpoint}&limit=2&offset=0", headers=H)
+    second_page = client.get(f"{endpoint}&limit=2&offset=2", headers=H)
+
+    assert first_page.status_code == 200
+    assert second_page.status_code == 200
+    assert len(first_page.json()) == 2
+    assert len(second_page.json()) == 1
+
+    assert first_page.json()[0]["id"] < first_page.json()[1]["id"]
+    assert first_page.json()[1]["id"] < second_page.json()[0]["id"]
+
+    assert client.get("/evidence?limit=201", headers=H).status_code == 422
+    assert client.get("/evidence?limit=0", headers=H).status_code == 422
+    assert client.get("/evidence?offset=-1", headers=H).status_code == 422
+
+
+def test_normalized_evidence_projection_preserves_raw_and_unknown_values(client):
+    payloads = [
+        {"source_type": "network_observation", "attribute": "mac_address", "value": "AA-BB-CC-DD-EE-FF"},
+        {"source_type": "network_observation", "attribute": "ip_address", "value": "192.0.2.10"},
+        {"source_type": "manual", "attribute": "vendor.custom_field", "value": "unclassified"},
+        {"source_type": "manual", "attribute": "secure_boot", "value": "maybe"},
+    ]
+    for payload in payloads:
+        assert client.post("/evidence", json=payload, headers=H).status_code == 201
+
+    response = client.get("/evidence/normalized?limit=10", headers=H)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["normalizer_version"] == "1.0.0"
+    by_attribute = {item["attribute"]: item for item in body["items"]}
+
+    mac = by_attribute["mac_address"]
+    assert mac["value"] == "AA-BB-CC-DD-EE-FF"
+    assert mac["canonical_attribute"] == "network.mac_address"
+    assert mac["normalized_value"] == "aa:bb:cc:dd:ee:ff"
+    assert mac["verification_status"] == "unverified"
+
+    assert by_attribute["ip_address"]["normalized_value"] == "192.0.2.10"
+
+    unknown = by_attribute["vendor.custom_field"]
+    assert unknown["canonical_attribute"] is None
+    assert unknown["normalized_value"] is None
+    assert unknown["value"] == "unclassified"
+
+    invalid = by_attribute["secure_boot"]
+    assert invalid["canonical_attribute"] == "security.secure_boot"
+    assert invalid["normalized_value"] is None
+    assert invalid["normalization_error"] == "ambiguous boolean value"
+
+    assert client.get("/evidence/normalized?limit=201", headers=H).status_code == 422
+    assert client.get("/evidence/normalized?offset=-1", headers=H).status_code == 422

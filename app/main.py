@@ -2,16 +2,20 @@ import hmac
 import json
 import os
 from contextlib import asynccontextmanager
+from datetime import timezone
+from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import PlainTextResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import audit, posture, sbom
-from .db import AuditEntry, Device, SessionLocal, Vulnerability, init_db
-from .schemas import DeviceIn, SecurityProfile, TriageIn
+from .db import AuditEntry, Device, EvidenceObservation, SessionLocal, Vulnerability, init_db
+from .evidence_normalization import NORMALIZER_VERSION, normalize_observation
+from .schemas import DeviceIn, EvidenceObservationIn, SecurityProfile, TriageIn
 
 SEV = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
 MAX_SBOM_BYTES = 2 * 1024 * 1024
@@ -24,6 +28,31 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="DeviceTrust", version="0.2.0", lifespan=lifespan)
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if request.url.path == "/" or request.url.path.startswith("/assets/"):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            "connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/", include_in_schema=False)
+def operator_console():
+    return FileResponse(WEB_DIR / "index.html")
+
+
+app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")
 
 
 def get_db():
@@ -58,6 +87,43 @@ def _dev_dict(device: Device) -> dict:
     }
 
 
+def _evidence_dict(item: EvidenceObservation) -> dict:
+    return {
+        "id": item.id,
+        "device_id": item.device_id,
+        "source_type": item.source_type,
+        "attribute": item.attribute,
+        "value": item.value,
+        "observed_at": (
+            item.observed_at.replace(tzinfo=timezone.utc)
+            if item.observed_at.tzinfo is None
+            else item.observed_at.astimezone(timezone.utc)
+        ),
+        "recorded_at": (
+            item.recorded_at.replace(tzinfo=timezone.utc)
+            if item.recorded_at.tzinfo is None
+            else item.recorded_at.astimezone(timezone.utc)
+        ),
+        "confidence": item.confidence,
+        "verification_status": item.verification_status,
+        "evidence_reference": item.evidence_reference,
+        "evidence_hash": item.evidence_hash,
+    }
+
+
+def _normalized_evidence_dict(item: EvidenceObservation) -> dict:
+    raw = _evidence_dict(item)
+    normalized = normalize_observation(item.attribute, item.value)
+    return {
+        **raw,
+        "source_attribute": normalized.source_attribute,
+        "canonical_attribute": normalized.canonical_attribute,
+        "normalized_value": normalized.normalized_value,
+        "normalizer_version": normalized.normalizer_version,
+        "normalization_error": normalized.error,
+    }
+
+
 def _vuln_dict(vulnerability: Vulnerability) -> dict:
     return {column.name: getattr(vulnerability, column.name) for column in Vulnerability.__table__.columns}
 
@@ -88,6 +154,81 @@ async def _read_sbom_document(request: Request) -> dict:
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/evidence", status_code=201)
+def record_evidence(
+    body: EvidenceObservationIn,
+    db: Session = Depends(get_db),
+    actor: str = Depends(auth),
+):
+    if body.device_id is not None:
+        _device(db, body.device_id)
+    observation = EvidenceObservation(
+        **body.model_dump(),
+        verification_status="unverified",
+    )
+    db.add(observation)
+    db.flush()
+    audit.record(
+        db,
+        actor,
+        "evidence.record",
+        body.device_id or "unassigned",
+        {
+            "observation_id": observation.id,
+            "source_type": body.source_type,
+            "attribute": body.attribute,
+            "confidence": body.confidence,
+            "evidence_hash": body.evidence_hash,
+        },
+    )
+    db.commit()
+    db.refresh(observation)
+    return _evidence_dict(observation)
+
+
+@app.get("/evidence")
+def list_evidence(
+    device_id: str | None = None,
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    statement = select(EvidenceObservation)
+    if device_id is not None:
+        _device(db, device_id)
+        statement = statement.where(EvidenceObservation.device_id == device_id)
+    rows = db.scalars(
+        statement.order_by(EvidenceObservation.recorded_at, EvidenceObservation.id)
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return [_evidence_dict(item) for item in rows]
+
+
+@app.get("/evidence/normalized")
+def list_normalized_evidence(
+    device_id: str | None = None,
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    statement = select(EvidenceObservation)
+    if device_id is not None:
+        _device(db, device_id)
+        statement = statement.where(EvidenceObservation.device_id == device_id)
+    rows = db.scalars(
+        statement.order_by(EvidenceObservation.recorded_at, EvidenceObservation.id)
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return {
+        "normalizer_version": NORMALIZER_VERSION,
+        "items": [_normalized_evidence_dict(item) for item in rows],
+    }
 
 
 @app.post("/devices", status_code=201)

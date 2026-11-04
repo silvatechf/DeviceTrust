@@ -1,7 +1,7 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ManagementInterface(BaseModel):
@@ -40,6 +40,27 @@ class DeviceIn(BaseModel):
     firmware_version: str = Field(min_length=1, max_length=50)
     support_until: date | None = None
     security: SecurityProfile = Field(default_factory=SecurityProfile)
+
+
+class EvidenceObservationIn(BaseModel):
+    """A bounded observation; clients cannot self-assert verification."""
+
+    model_config = ConfigDict(extra="forbid")
+    device_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_.-]{1,64}$")
+    source_type: Literal["manual", "router_import", "network_observation", "sbom", "firmware", "vendor_api"]
+    attribute: str = Field(pattern=r"^[a-z][a-z0-9_.-]{0,79}$")
+    value: str = Field(min_length=1, max_length=1000)
+    observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    confidence: Literal["low", "medium", "high"] = "low"
+    evidence_reference: str | None = Field(default=None, max_length=500)
+    evidence_hash: str | None = Field(default=None, pattern=r"^[a-fA-F0-9]{64}$")
+
+    @field_validator("observed_at")
+    @classmethod
+    def observed_at_must_be_timezone_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("observed_at must include a timezone")
+        return value.astimezone(timezone.utc)
 
 
 class TriageIn(BaseModel):

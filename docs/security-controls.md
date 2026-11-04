@@ -15,6 +15,8 @@ A control must never become compliant solely because a field was omitted. The AP
 |---|---|---|---|
 | API authentication | Shared API key, constant-time comparison; missing server key fails closed | `tests/test_api.py` | No per-user identity, scopes, tenant isolation, RBAC or rotation workflow |
 | Device input validation | Pydantic models, strict extra-field rejection, bounded identifiers and metadata | `tests/test_api.py` | No rate limiting or request-wide API gateway quotas |
+| Evidence ingestion | Authenticated endpoints, source allowlist, bounded fields, opaque references, SHA-256 format validation | `tests/test_api.py` | Shared key is broad; no source-specific identity or rate limiting |
+| Evidence verification boundary | Server assigns `unverified`; clients cannot set verification state | `tests/test_api.py` | No independent source attestation or review workflow |
 | SBOM request boundary | Streaming 2 MiB body cap; malformed UTF-8/JSON and non-object JSON rejected | `tests/test_sbom_input_limits.py` | Full CycloneDX JSON Schema validation is not implemented |
 | SBOM component validation | Bounded component count and field lengths; component object/name/version and PURL validation | `tests/test_sbom_validation.py` | Does not validate every CycloneDX property or dependency graph |
 | Local advisory matching | Exact PURL package type/name plus version-before-fixed comparison | `tests/test_sbom_validation.py` | Local records are synthetic demonstration advisories, not vulnerability intelligence |
@@ -24,6 +26,21 @@ A control must never become compliant solely because a field was omitted. The AP
 | Audit integrity | SHA-256 hash chain with verification endpoint | `tests/test_api.py`, `tests/test_audit_chain_boundaries.py` | No protection against privileged rewrite/recomputation or deletion of the final entries without external checkpoint |
 | Vulnerability triage | Enumerated statuses and mandatory justification | `tests/test_api.py` | No approval workflow or separation of duties |
 
+## Evidence ingestion
+
+The first evidence API increment stores observations separately from the existing device security profile:
+
+- Sources are allowlisted: manual, router import, network observation, SBOM, firmware and vendor API.
+- Each observation records source observation time and server recording time.
+- Confidence is descriptive metadata, not a probability or verification state.
+- The server always assigns `unverified`; clients cannot mark their own evidence verified.
+- Observations may remain unassigned when the asset is not yet identified.
+- References are opaque and are never dereferenced by the API.
+- An optional SHA-256 digest checks consistency only when the referenced artifact is independently available; it does not prove authenticity.
+- Evidence audit events omit raw values to reduce unnecessary disclosure.
+
+The observation store is not yet consumed by posture assessment, device matching or conflict resolution.
+
 ## Internet exposure
 
 Internet exposure is modeled separately from ordinary open interfaces:
@@ -31,7 +48,7 @@ Internet exposure is modeled separately from ordinary open interfaces:
 - `internet_exposed`: nullable boolean; `null` means unknown.
 - `management_interfaces`: declared management plane, protocol, internet exposure and authentication requirement.
 
-An internet-exposed management interface is a high-risk finding even when authentication is required. Authentication does not remove the attack surface. The prototype accepts declared evidence; it does not independently discover public reachability. Evidence provenance and observation timestamps remain planned.
+An internet-exposed management interface is a high-risk finding even when authentication is required. Authentication does not remove the attack surface. The prototype accepts declared evidence; it does not independently discover public reachability.
 
 ## SBOM and vulnerability matching boundaries
 

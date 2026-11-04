@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: devicetrust
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-only-local}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: devicetrust
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U devicetrust -d devicetrust"]

@@ -31,6 +31,23 @@ class Device(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class EvidenceObservation(Base):
+    __tablename__ = "evidence_observations"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    device_id: Mapped[str | None] = mapped_column(
+        ForeignKey("devices.device_id"), nullable=True, index=True
+    )
+    source_type: Mapped[str] = mapped_column(String(32))
+    attribute: Mapped[str] = mapped_column(String(80), index=True)
+    value: Mapped[str] = mapped_column(String(1000))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    confidence: Mapped[str] = mapped_column(String(10), default="low")
+    verification_status: Mapped[str] = mapped_column(String(16), default="unverified")
+    evidence_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    evidence_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
 class Vulnerability(Base):
     __tablename__ = "vulnerabilities"
     __table_args__ = (UniqueConstraint("device_id", "component", "version", "vuln_id"),)

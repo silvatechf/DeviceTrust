@@ -4,27 +4,25 @@
 
 ## 1. System architecture
 
-DeviceTrust is a modular monolith. HTTP requests enter FastAPI, authentication dependencies and request validation are resolved at the API boundary, route handlers coordinate domain services, and SQLAlchemy persists device, vulnerability and audit records. Typed endpoints use the Pydantic models in `app/schemas.py`; the SBOM endpoint accepts a raw `Request` and applies bounded JSON and CycloneDX validation explicitly.
+DeviceTrust is a modular monolith. HTTP requests enter FastAPI, authentication dependencies and request validation are resolved at the API boundary, route handlers coordinate domain services, and SQLAlchemy persists device, evidence, vulnerability and audit records. Typed endpoints use the Pydantic models in `app/schemas.py`; the SBOM endpoint accepts a raw `Request` and applies bounded JSON and CycloneDX validation explicitly.
 
 ```mermaid
 flowchart TB
-    C["API client / operator"] -->|"HTTPS deployment-dependent; X-API-Key"| API["FastAPI application"]
+    SOURCES["Manual / router / network / SBOM / firmware / vendor"] --> INGEST["Evidence API: bounded validation"]
+    C["API client / operator"] --> API["FastAPI application"]
     API --> AUTH["Shared API-key dependency"]
-    AUTH --> VALID["FastAPI request validation boundary"]
-    VALID --> ROUTES["HTTP route handlers"]
-    VALID -.-> SCHEMA["Pydantic models for typed endpoints"]
+    AUTH --> ROUTES["HTTP route handlers"]
+    ROUTES --> EVIDENCE["Evidence observation persistence"]
     ROUTES --> POSTURE["Posture assessment service"]
-    ROUTES --> SBOMVALID["SBOM endpoint: bounded body and JSON validation"]
-    SBOMVALID --> SBOM["CycloneDX component parsing and vulnerability matching"]
+    ROUTES --> SBOM["CycloneDX parsing and vulnerability matching"]
     ROUTES --> TRIAGE["Vulnerability triage"]
     ROUTES --> AUDIT["Audit service"]
-    ROUTES --> REPORT["JSON / Markdown report assembly"]
+    ROUTES --> REPORT["JSON / Markdown reports"]
+    INGEST --> EVIDENCE
     ROUTES --> ORM["SQLAlchemy session"]
-    POSTURE --> ROUTES
-    SBOM -->|"Optional outbound query when DEVICETRUST_OSV=1"| OSV["OSV API"]
     ORM --> DB[("SQLite by default / PostgreSQL via DATABASE_URL")]
+    EVIDENCE --> ORM
     AUDIT --> ORM
-    REPORT --> ORM
 ```
 
 ### Component responsibilities
@@ -34,146 +32,69 @@ flowchart TB
 | API boundary | Authentication, request handling and response serialization | `app/main.py` |
 | Input contracts | Strict Pydantic schemas and bounded fields | `app/schemas.py` |
 | Device persistence | Device inventory and declared security profile | `app/db.py` |
+| Evidence persistence | Source-attributed observations, timestamps, confidence and verification state | `app/db.py`, `app/main.py` |
+| Evidence normalization | Versioned, read-only projection for selected attributes; preserves raw observations | `app/evidence_normalization.py`, `app/main.py` |
 | Posture service | Evidence-based control findings and risk summary | `app/posture.py` |
 | SBOM service | Bounded CycloneDX component parsing, PURL validation and optional OSV lookup | `app/sbom.py` |
 | Triage | Status and mandatory justification for vulnerability decisions | `app/main.py`, `app/schemas.py` |
 | Audit | SHA-256 hash-linked event records and verification | `app/audit.py` |
 | Reporting | Per-device posture, vulnerability and evidence-trail report | `app/main.py` |
 
-## 2. Trust boundaries and attack surfaces
+## 2. Evidence ingestion
 
 ```mermaid
-flowchart LR
-    subgraph EXT["Untrusted external boundary"]
-      CLIENT["API client"]
-      BOM["Uploaded SBOM JSON"]
-    end
-    subgraph APP["Application trust boundary"]
-      AUTH["Shared API-key check"]
-      VALID["Bounded JSON / CycloneDX / PURL validation"]
-      ROUTE["FastAPI routes and domain services"]
-      DB[("Application database")]
-    end
-    subgraph THIRD["External service boundary"]
-      OSV["OSV API"]
-    end
-    CLIENT -->|"Credential-bearing HTTP request"| AUTH
-    AUTH --> ROUTE
-    BOM -->|"2 MiB streaming cap; JSON parsing"| VALID
-    VALID --> ROUTE
-    ROUTE --> DB
-    ROUTE -->|"Optional, version-scoped request"| OSV
-    OSV -->|"Best-effort response; errors skipped"| ROUTE
+flowchart TD
+    SOURCE["Evidence source"] --> API["POST /evidence"]
+    API --> AUTH["API-key authentication"]
+    AUTH --> VALID["Strict schema and field bounds"]
+    VALID --> ASSOCIATION{"Known device ID?"}
+    ASSOCIATION -->|"Yes"| EXISTS["Verify device exists"]
+    ASSOCIATION -->|"No"| UNASSIGNED["Keep observation unassigned"]
+    EXISTS --> SAVE["Persist as unverified"]
+    UNASSIGNED --> SAVE
+    SAVE --> AUDIT["Record metadata and digest in audit chain"]
+    AUDIT --> READ["GET /evidence"]
 ```
 
-**Security interpretation**
+Observations retain source type, attribute, value, source observation time, server recording time, confidence, optional artifact reference and optional SHA-256 digest. The server assigns `unverified`; clients cannot self-assert verification. Unassigned observations are not automatically merged into device records. The evidence API does not fetch supplied references or independently authenticate source claims.
+
+## 3. Trust boundaries and attack surfaces
 
 - The API uses one shared `DEVICETRUST_API_KEY`; it is not user identity, role-based authorization or tenant isolation.
 - Missing server-side API-key configuration fails closed with HTTP 503; a wrong key receives HTTP 401.
-- SBOM input is untrusted. The endpoint reads a raw request body capped at 2 MiB, then manually validates JSON and a bounded subset of CycloneDX components; it does not use a dedicated Pydantic SBOM request model.
-- Device security and management-interface attributes are declared evidence. DeviceTrust does not independently probe device reachability or attest that submitted claims are true.
-- OSV is an optional external dependency. Network and response errors are skipped; a missing result is not proof that a component is safe.
-- The database is inside the application trust boundary. The current audit hash chain does not provide immutable/WORM storage or an external checkpoint.
+- Evidence input is untrusted and bounded by strict Pydantic field constraints. References are opaque strings and are never dereferenced.
+- Device security and management-interface attributes remain declared evidence. DeviceTrust does not independently attest that submitted claims are true.
+- SBOM input is capped at 2 MiB and validates a bounded CycloneDX subset.
+- OSV is optional and best-effort; a missing result is not proof that a component is safe.
+- The audit hash chain is tamper-evident, not immutable; there is no external checkpoint.
 
-## 3. Device security posture assessment
+## 4. Device security posture assessment
 
-```mermaid
-flowchart TD
-    START["GET /devices/{id}/posture or report"] --> LOAD["Load device and declared security profile"]
-    LOAD --> EVAL["Evaluate modeled controls in app/posture.py"]
-    EVAL --> ID["Device identity and authentication"]
-    EVAL --> CFG["Default credentials and insecure interfaces"]
-    EVAL --> NET["Device and management-plane exposure"]
-    EVAL --> DATA["Encryption in transit / at rest"]
-    EVAL --> UPDATE["Update mechanism and support date"]
-    EVAL --> LOG["Security logging"]
-    EVAL --> INTEGRITY["Secure boot and firmware signing"]
-    ID --> AGG["Aggregate control findings"]
-    CFG --> AGG
-    NET --> AGG
-    DATA --> AGG
-    UPDATE --> AGG
-    LOG --> AGG
-    INTEGRITY --> AGG
-    AGG --> SUMMARY["Status counts, highest risk, evidence coverage"]
-    SUMMARY --> OUT["Return posture / include in report"]
-```
+The posture service continues to assess the existing declared device security profile. Evidence observations are stored separately in this increment and do not yet change posture results. Missing data remains unverified; ingestion alone does not imply a control is verified.
 
-Each modeled control returns a status such as `compliant`, `partial`, `non_compliant` or `unverified`. Missing evidence is not treated as compliance. The assessment uses declared metadata; it is not a device scan, safety interlock or CRA conformity assessment.
+## 5. SBOM ingestion and vulnerability workflow
 
-## 4. SBOM ingestion and vulnerability workflow
+The existing bounded CycloneDX workflow remains unchanged: authenticate, cap request body, validate JSON and component bounds, normalize PURLs, correlate local demo advisories and optional OSV results, persist findings and audit the import. The local demo feed is synthetic, not vulnerability intelligence.
 
-```mermaid
-flowchart TD
-    REQ["POST /devices/{id}/sbom"] --> AUTH["Shared API-key authentication"]
-    AUTH --> CAP["Stream request body; reject above 2 MiB"]
-    CAP --> JSON["Decode UTF-8 JSON; require object"]
-    JSON --> CYCLONE["Require bomFormat = CycloneDX and components array"]
-    CYCLONE --> BOUNDS["Enforce component count and field length bounds"]
-    BOUNDS --> PURL["Validate component object, name, version and optional PURL"]
-    PURL --> NORMAL["Normalize component identity"]
-    NORMAL --> LOCAL["Local demo advisory match: PURL type/name + version comparison"]
-    NORMAL --> FLAG{"DEVICETRUST_OSV = 1?"}
-    FLAG -->|"Yes"| OSV["Optional OSV query by PURL and exact version"]
-    FLAG -->|"No"| MERGE["Combine findings"]
-    OSV --> MERGE
-    LOCAL --> MERGE
-    MERGE --> DEDUPE["Avoid duplicate device/component/version/vulnerability records"]
-    DEDUPE --> SAVE["Persist vulnerability findings"]
-    SAVE --> EVENT["Record sbom.import audit event"]
-    EVENT --> COMMIT["Commit transaction"]
-    COMMIT --> RESPONSE["Return component and new-finding counts"]
-    SAVE --> LIST["GET /devices/{id}/vulnerabilities"]
-    LIST --> TRIAGE["PATCH /vulnerabilities/{id}: status + justification"]
-    TRIAGE --> TRIAGE_EVENT["Record vulnerability.triage audit event"]
-```
+## 6. Audit event and hash-chain flow
 
-**Important boundaries**
+State-changing operations append an event with timestamp, actor, action, entity and payload. Evidence audit events include source type, attribute, confidence and artifact digest, but deliberately omit the raw observation value. The chain detects modification of retained entries but cannot detect deletion of its final suffix without an independently retained checkpoint.
 
-- The local `DT-DEMO-*` advisory file is synthetic demonstration data, not a vulnerability feed.
-- Local matching requires PURL package type/name identity and a version comparison; components without a PURL are not matched against the local demo records.
-- CycloneDX validation covers a bounded subset, not the complete specification or dependency graph.
-- OSV lookup is opt-in and best-effort. It does not persist full affected-range provenance.
-- Triage supports `open`, `in_progress`, `fixed`, `accepted_risk` and `not_affected`; the request requires a justification of at least 10 characters.
+## 7. CI / DevSecOps pipeline
 
-## 5. Audit event and hash-chain flow
+GitHub Actions runs Ruff, Bandit, pip-audit and pytest. Automated checks do not prove absence of vulnerabilities or replace human review.
 
-```mermaid
-flowchart TD
-    MUTATION["State-changing operation"] --> EVENT["Build audit event: timestamp, actor, action, entity, payload"]
-    EVENT --> HEAD["Read latest stored audit entry"]
-    HEAD --> PREV["Use previous entry hash; genesis is 64 zeroes"]
-    PREV --> HASH["SHA-256 over canonicalized event data and previous hash"]
-    HASH --> STORE["Insert event with prev_hash and hash"]
-    STORE --> TX["Commit with application transaction"]
-    VERIFY["GET /audit/verify"] --> ORDER["Read entries by ascending ID"]
-    ORDER --> CHECK["Recompute each hash and compare prev_hash linkage"]
-    CHECK --> RESULT["Return valid flag, entry count and first broken ID"]
-```
+## 8. Implemented versus planned
 
-The chain detects mutation or gaps that break a retained link. It cannot detect deletion of the final entry or final suffix without an independently retained checkpoint. A privileged database actor may rewrite records and recompute the chain. Concurrent writers are not serialized by an external chain-head mechanism.
-
-## 6. CI / DevSecOps pipeline
-
-```mermaid
-flowchart TD
-    CHANGE["Push or pull request"] --> RUNNER["GitHub Actions: Ubuntu + Python 3.12"]
-    RUNNER --> INSTALL["Install requirements-dev.txt"]
-    INSTALL --> RUFF["Ruff lint"]
-    RUFF --> BANDIT["Bandit source security scan"]
-    BANDIT --> AUDIT["pip-audit runtime dependency audit"]
-    AUDIT --> TEST["pytest"]
-    TEST --> RESULT["Workflow success / failure"]
-```
-
-The workflow runs on pushes, pull requests and manual dispatch. The checks are automated validation gates; they do not prove absence of vulnerabilities or replace human review.
-
-## 7. Implemented versus planned
-
-| Capability | Status represented by this architecture |
+| Capability | Status |
 |---|---|
 | Device inventory and declared security profile | Implemented prototype |
-| Evidence-based posture assessment | Implemented prototype |
+| Evidence observation ingestion and listing | Implemented prototype |
+| Unassigned observations for unidentified assets | Implemented prototype |
+| Read-only normalized evidence projection | Implemented prototype; selected attributes only |
+| Canonical evidence normalization | Initial pure normalizers implemented for selected attributes; limited prototype coverage |
+| Evidence-to-device association and conflict resolution | Planned |
+| Evidence-driven posture assessment | Planned |
 | CycloneDX bounded-subset ingestion | Implemented prototype |
 | Local PURL-scoped advisory matching | Synthetic demo implementation |
 | Optional version-scoped OSV lookup | Implemented, best-effort |
@@ -183,7 +104,7 @@ The workflow runs on pushes, pull requests and manual dispatch. The checks are a
 | CISA KEV enrichment, event monitoring, lifecycle intelligence | Planned |
 | RBAC, tenant isolation, external audit checkpoints | Not implemented |
 
-## 8. Source-of-truth map
+## 9. Source-of-truth map
 
 - API routes and request orchestration: `app/main.py`
 - Input validation: `app/schemas.py`
@@ -191,6 +112,7 @@ The workflow runs on pushes, pull requests and manual dispatch. The checks are a
 - Posture rules: `app/posture.py`
 - SBOM parsing and vulnerability matching: `app/sbom.py`
 - Audit event hashing and verification: `app/audit.py`
+- Evidence normalization and association policy: [Evidence normalization design](evidence-normalization.md)
 - Security control mapping: [Security controls and evidence](security-controls.md)
 - Abuse cases and residual risks: [Threat model](threat-model.md)
 - Known prototype boundaries: [Prototype limitations](prototype-limitations.md)

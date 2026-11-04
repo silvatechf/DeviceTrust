@@ -15,6 +15,11 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Frontend JavaScript syntax
+        run: node --check web/app.js
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
       - name: Ruff
