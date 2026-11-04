@@ -20,6 +20,7 @@ A control must never become compliant solely because a field was omitted. The AP
 | Local advisory matching | Exact PURL package type/name plus version-before-fixed comparison | `tests/test_sbom_validation.py` | Local records are synthetic demonstration advisories, not vulnerability intelligence |
 | OSV lookup | Optional request scoped to package URL and exact component version | `app/sbom.py` | Best-effort external lookup; network/response errors are skipped; no provenance cache or full affected-range persistence |
 | Management exposure | Device and management interfaces assessed independently; unknown remains unverified | `tests/test_api.py` | Exposure is declared metadata, not active reachability evidence |
+| Configuration posture | Default credentials and insecure interfaces are evaluated independently; missing evidence remains unverified | `tests/test_posture_evidence_boundaries.py` | Interface inventory is declared metadata, not an independent device scan |
 | Audit integrity | SHA-256 hash chain with verification endpoint | `tests/test_api.py` | No protection against privileged rewrite/recomputation or deletion of the final entries without external checkpoint |
 | Vulnerability triage | Enumerated statuses and mandatory justification | `tests/test_api.py` | No approval workflow or separation of duties |
 
