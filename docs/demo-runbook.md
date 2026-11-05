@@ -32,9 +32,15 @@ unset DATABASE_URL
 
 Leaving `DATABASE_URL` unset uses the default local `devicetrust.db`. Confirm that this file is disposable before running the seeder.
 
-## 2. Seed synthetic records
+## 2. Apply migrations and seed synthetic records
 
-For a clean walkthrough, use a fresh disposable database. The seeder checks for conflicting device IDs before writing and does not reset or overwrite existing records.
+For a clean walkthrough, use a fresh disposable database. The seeder applies pending Alembic migrations before writing, checks for conflicting device IDs and does not reset or overwrite existing records.
+
+To apply migrations separately before starting the API:
+
+```bash
+alembic upgrade head
+```
 
 ```bash
 python -m app.seed
@@ -53,6 +59,26 @@ It then imports `samples/cold_chain_gateway_sbom.json` for `EDGE-GW-003`.
 The sample SBOM uses generic PURLs and synthetic local advisories. Findings such as `DT-DEMO-0001` are deliberately fabricated to demonstrate the workflow. They are not real CVEs, vendor advisories or confirmed vulnerabilities.
 
 If the database already contains one of the demo IDs, the seeder aborts before creating any records. Use a fresh disposable database rather than deleting a database whose contents matter.
+
+
+### Existing SQLite database created before Alembic
+
+The initial migration creates the current schema; it is not an automatic conversion migration for a database that already contains the legacy tables.
+
+Before adopting an existing database:
+
+1. Stop the application and make a verified backup of the SQLite file.
+2. Confirm the existing tables and columns match `migrations/versions/0001_initial_schema.py`. Do not stamp an unknown or modified schema.
+3. Point `DATABASE_URL` to that database and mark the baseline as applied without recreating tables:
+
+```bash
+alembic stamp 0001_initial
+alembic current
+```
+
+4. Start the application and verify representative records and relationships.
+
+If the schema differs, do not stamp it. Preserve the original file and prepare a reviewed data/schema migration first. Never run `alembic downgrade base` against a database containing data you need: the baseline downgrade drops all four application tables.
 
 ## 3. Start the application
 

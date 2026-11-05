@@ -73,7 +73,3 @@ class AuditEntry(Base):
     payload: Mapped[dict] = mapped_column(JSON)
     prev_hash: Mapped[str] = mapped_column(String(64))
     hash: Mapped[str] = mapped_column(String(64))
-
-
-def init_db() -> None:
-    Base.metadata.create_all(engine)

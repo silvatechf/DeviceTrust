@@ -101,11 +101,14 @@ export DEVICETRUST_API_KEY="replace-with-a-random-local-secret"
 
 Keep this key local. Do not commit it or reuse a production credential.
 
-### 2. Start the API
+### 2. Apply migrations and start the API
 
 ```bash
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+Schema changes are managed through Alembic. The application does not create or modify database tables at startup. Run `alembic upgrade head` after installing dependencies and whenever a new migration is introduced.
 
 - Operator console: http://127.0.0.1:8000/
 - Interactive API documentation: http://127.0.0.1:8000/docs
@@ -140,7 +143,7 @@ Copy `.env.example` to `.env`, replace both placeholders with independent random
 docker compose up --build
 ```
 
-The API port is bound to localhost. Keep `.env` private and never commit it. PostgreSQL support is configurable, but integration, restart and backup/restore behavior still require manual verification.
+The container applies Alembic migrations before starting the API. The API port is bound to localhost. Keep `.env` private and never commit it. PostgreSQL integration and restart persistence are exercised in CI; backup/restore and operational recovery still require manual verification.
 
 ## Run quality checks
 

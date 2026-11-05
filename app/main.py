@@ -1,7 +1,6 @@
 import hmac
 import json
 import os
-from contextlib import asynccontextmanager
 from datetime import timezone
 from pathlib import Path
 
@@ -13,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import audit, posture, sbom
-from .db import AuditEntry, Device, EvidenceObservation, SessionLocal, Vulnerability, init_db
+from .db import AuditEntry, Device, EvidenceObservation, SessionLocal, Vulnerability
 from .evidence_normalization import NORMALIZER_VERSION, normalize_observation
 from .schemas import DeviceIn, EvidenceObservationIn, SecurityProfile, TriageIn
 
@@ -21,13 +20,7 @@ SEV = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
 MAX_SBOM_BYTES = 2 * 1024 * 1024
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    init_db()
-    yield
-
-
-app = FastAPI(title="DeviceTrust", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="DeviceTrust", version="0.2.0")
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 
