@@ -1,118 +1,117 @@
-# Architecture and Visual Technical Reference
+# Architecture
 
-**Documentation status:** diagrams describe the current repository implementation at the time of this change. They are editable Mermaid source, not runtime screenshots or operational evidence.
+## 1. Design in one sentence
 
-## 1. System architecture
+DeviceTrust is a Python modular monolith: FastAPI exposes the HTTP API, domain modules implement posture/SBOM/audit behavior, and SQLAlchemy persists the records.
 
-DeviceTrust is a modular monolith. HTTP requests enter FastAPI, authentication dependencies and request validation are resolved at the API boundary, route handlers coordinate domain services, and SQLAlchemy persists device, evidence, vulnerability and audit records. Typed endpoints use the Pydantic models in `app/schemas.py`; the SBOM endpoint accepts a raw `Request` and applies bounded JSON and CycloneDX validation explicitly.
+It is deliberately a single application. The current scope does not justify the operational cost of microservices.
 
-```mermaid
-flowchart TB
-    SOURCES["Manual / router / network / SBOM / firmware / vendor"] --> INGEST["Evidence API: bounded validation"]
-    C["API client / operator"] --> API["FastAPI application"]
-    API --> AUTH["Shared API-key dependency"]
-    AUTH --> ROUTES["HTTP route handlers"]
-    ROUTES --> EVIDENCE["Evidence observation persistence"]
-    ROUTES --> POSTURE["Posture assessment service"]
-    ROUTES --> SBOM["CycloneDX parsing and vulnerability matching"]
-    ROUTES --> TRIAGE["Vulnerability triage"]
-    ROUTES --> AUDIT["Audit service"]
-    ROUTES --> REPORT["JSON / Markdown reports"]
-    INGEST --> EVIDENCE
-    ROUTES --> ORM["SQLAlchemy session"]
-    ORM --> DB[("SQLite by default / PostgreSQL via DATABASE_URL")]
-    EVIDENCE --> ORM
-    AUDIT --> ORM
-```
-
-### Component responsibilities
-
-| Component | Current responsibility | Implementation |
-|---|---|---|
-| API boundary | Authentication, request handling and response serialization | `app/main.py` |
-| Input contracts | Strict Pydantic schemas and bounded fields | `app/schemas.py` |
-| Device persistence | Device inventory and declared security profile | `app/db.py` |
-| Evidence persistence | Source-attributed observations, timestamps, confidence and verification state | `app/db.py`, `app/main.py` |
-| Evidence normalization | Versioned, read-only projection for selected attributes; preserves raw observations | `app/evidence_normalization.py`, `app/main.py` |
-| Posture service | Evidence-based control findings and risk summary | `app/posture.py` |
-| SBOM service | Bounded CycloneDX component parsing, PURL validation and optional OSV lookup | `app/sbom.py` |
-| Triage | Status and mandatory justification for vulnerability decisions | `app/main.py`, `app/schemas.py` |
-| Audit | SHA-256 hash-linked event records and verification | `app/audit.py` |
-| Reporting | Per-device posture, vulnerability and evidence-trail report | `app/main.py` |
-
-## 2. Evidence ingestion
+## 2. Request flow
 
 ```mermaid
 flowchart TD
-    SOURCE["Evidence source"] --> API["POST /evidence"]
-    API --> AUTH["API-key authentication"]
-    AUTH --> VALID["Strict schema and field bounds"]
-    VALID --> ASSOCIATION{"Known device ID?"}
-    ASSOCIATION -->|"Yes"| EXISTS["Verify device exists"]
-    ASSOCIATION -->|"No"| UNASSIGNED["Keep observation unassigned"]
-    EXISTS --> SAVE["Persist as unverified"]
-    UNASSIGNED --> SAVE
-    SAVE --> AUDIT["Record metadata and digest in audit chain"]
-    AUDIT --> READ["GET /evidence"]
+    CLIENT[API client / local console] --> API[FastAPI route]
+    API --> AUTH[API-key dependency]
+    AUTH --> VALIDATE[Pydantic or explicit JSON validation]
+    VALIDATE --> SERVICE[Domain function / service]
+    SERVICE --> ORM[SQLAlchemy session]
+    ORM --> DB[(SQLite default / PostgreSQL configured)]
+    SERVICE --> RESPONSE[HTTP response]
 ```
 
-Observations retain source type, attribute, value, source observation time, server recording time, confidence, optional artifact reference and optional SHA-256 digest. The server assigns `unverified`; clients cannot self-assert verification. Unassigned observations are not automatically merged into device records. The evidence API does not fetch supplied references or independently authenticate source claims.
+For normal typed endpoints, Pydantic validates request models. The SBOM route reads the request stream directly so it can enforce a 2 MiB body limit before parsing JSON.
 
-## 3. Trust boundaries and attack surfaces
+## 3. Main modules
 
-- The API uses one shared `DEVICETRUST_API_KEY`; it is not user identity, role-based authorization or tenant isolation.
-- Missing server-side API-key configuration fails closed with HTTP 503; a wrong key receives HTTP 401.
-- Evidence input is untrusted and bounded by strict Pydantic field constraints. References are opaque strings and are never dereferenced.
-- Device security and management-interface attributes remain declared evidence. DeviceTrust does not independently attest that submitted claims are true.
-- SBOM input is capped at 2 MiB and validates a bounded CycloneDX subset.
-- OSV is optional and best-effort; a missing result is not proof that a component is safe.
-- The audit hash chain is tamper-evident, not immutable; there is no external checkpoint.
-
-## 4. Device security posture assessment
-
-The posture service continues to assess the existing declared device security profile. Evidence observations are stored separately in this increment and do not yet change posture results. Missing data remains unverified; ingestion alone does not imply a control is verified.
-
-## 5. SBOM ingestion and vulnerability workflow
-
-The existing bounded CycloneDX workflow remains unchanged: authenticate, cap request body, validate JSON and component bounds, normalize PURLs, correlate local demo advisories and optional OSV results, persist findings and audit the import. The local demo feed is synthetic, not vulnerability intelligence.
-
-## 6. Audit event and hash-chain flow
-
-State-changing operations append an event with timestamp, actor, action, entity and payload. Evidence audit events include source type, attribute, confidence and artifact digest, but deliberately omit the raw observation value. The chain detects modification of retained entries but cannot detect deletion of its final suffix without an independently retained checkpoint.
-
-## 7. CI / DevSecOps pipeline
-
-GitHub Actions runs Ruff, Bandit, pip-audit and pytest. Automated checks do not prove absence of vulnerabilities or replace human review.
-
-## 8. Implemented versus planned
-
-| Capability | Status |
+| Module | Responsibility |
 |---|---|
-| Device inventory and declared security profile | Implemented prototype |
-| Evidence observation ingestion and listing | Implemented prototype |
-| Unassigned observations for unidentified assets | Implemented prototype |
-| Read-only normalized evidence projection | Implemented prototype; selected attributes only |
-| Canonical evidence normalization | Initial pure normalizers implemented for selected attributes; limited prototype coverage |
-| Evidence-to-device association and conflict resolution | Planned |
-| Evidence-driven posture assessment | Planned |
-| CycloneDX bounded-subset ingestion | Implemented prototype |
-| Local PURL-scoped advisory matching | Synthetic demo implementation |
-| Optional version-scoped OSV lookup | Implemented, best-effort |
-| Vulnerability triage with justification | Implemented prototype |
-| JSON and Markdown reports | Implemented prototype |
-| Hash-chain audit verification | Implemented with documented limitations |
-| CISA KEV enrichment, event monitoring, lifecycle intelligence | Planned |
-| RBAC, tenant isolation, external audit checkpoints | Not implemented |
+| `app/main.py` | FastAPI app, routes, authentication dependency, request orchestration and response serialization |
+| `app/schemas.py` | Pydantic request contracts and field constraints |
+| `app/db.py` | SQLAlchemy models, engine/session setup and table creation |
+| `app/posture.py` | Rules that assess the declared device security profile |
+| `app/sbom.py` | CycloneDX subset parsing, PURL validation, local demo matching and optional OSV lookup |
+| `app/evidence_normalization.py` | Pure normalizers for selected evidence attributes |
+| `app/audit.py` | SHA-256 audit hashing and chain verification |
+| `web/` | Static same-origin operator console |
 
-## 9. Source-of-truth map
+Routes coordinate work; domain rules should remain in their relevant modules rather than growing inside route handlers.
 
-- API routes and request orchestration: `app/main.py`
-- Input validation: `app/schemas.py`
-- Persistence models and database configuration: `app/db.py`
+## 4. Data flows
+
+### Device posture
+
+The posture service evaluates declared fields such as authentication, encryption, update mechanism, secure boot and internet exposure. Missing fields produce `unverified` findings. The input is declared metadata, not a measurement collected from the device.
+
+### Evidence observations
+
+```mermaid
+flowchart TD
+    SOURCE[External or manual source] --> POST[POST /evidence]
+    POST --> AUTH[Shared API key]
+    AUTH --> VALID[Schema, allowlist and bounds]
+    VALID --> DEVICE{Device ID supplied?}
+    DEVICE -->|Known ID| CHECK[Check device exists]
+    DEVICE -->|No ID| UNASSIGNED[Keep unassigned]
+    CHECK --> STORE[Persist as unverified]
+    UNASSIGNED --> STORE
+    STORE --> AUDIT[Audit metadata and digest]
+    STORE --> READ[GET /evidence]
+    STORE --> NORMAL[GET /evidence/normalized]
+```
+
+The normalized endpoint is a read-only projection. It preserves the raw value and does not change verification status or posture.
+
+### SBOM and vulnerability findings
+
+The API caps the request body at 2 MiB. The parser accepts a bounded CycloneDX JSON subset, validates component names/versions and PURLs, then checks the local synthetic advisory set. If `DEVICETRUST_OSV=1`, it also makes best-effort OSV queries. A failed or empty lookup is not proof that a component is safe.
+
+### Triage and audit
+
+A triage update requires a justification. State-changing operations append audit entries. Each entry hashes its content and the previous entry hash. The chain can reveal changes to retained entries, but it has no external checkpoint and is not immutable storage.
+
+## 5. Trust boundaries
+
+- API clients are untrusted; protected routes use one shared API key.
+- The key represents a broad local operator boundary, not a human identity or role.
+- Uploaded SBOM and evidence values are untrusted input.
+- Evidence references are opaque; the application does not fetch them.
+- Device security attributes are declarations and are not independently attested.
+- OSV is an external dependency and is optional/best-effort.
+- The database and audit chain share the same trust boundary; a privileged database attacker can rewrite both.
+
+## 6. Persistence and deployment
+
+SQLite is the default local database. PostgreSQL can be selected with `DATABASE_URL`. SQLAlchemy `create_all` creates missing tables at startup; it is not a versioned migration strategy. Alembic migrations and production database operations are not implemented.
+
+The static console is served from the same FastAPI origin. It avoids a separate frontend build/deployment pipeline, but it is not a production authentication architecture.
+
+## 7. Implemented versus future work
+
+| Capability | Current state |
+|---|---|
+| Inventory and declared-profile posture | Implemented prototype |
+| Evidence ingestion and listing | Implemented prototype |
+| Selected-attribute normalization projection | Implemented prototype |
+| Automatic device association/conflict resolution | Not implemented |
+| Evidence-driven posture | Not implemented |
+| Bounded CycloneDX ingestion | Implemented prototype |
+| Synthetic local advisory matching | Implemented demo behavior |
+| Optional OSV lookup | Best-effort integration |
+| Justified vulnerability triage | Implemented prototype |
+| JSON/Markdown reports | Implemented prototype |
+| Hash-chain verification | Implemented with limitations |
+| Individual identity/RBAC/tenant isolation | Not implemented |
+| External audit anchoring and immutable retention | Not implemented |
+
+## 8. Where to verify behavior
+
+- Routes and orchestration: `app/main.py`
+- Request constraints: `app/schemas.py`
+- Persistence: `app/db.py`
 - Posture rules: `app/posture.py`
-- SBOM parsing and vulnerability matching: `app/sbom.py`
-- Audit event hashing and verification: `app/audit.py`
-- Evidence normalization and association policy: [Evidence normalization design](evidence-normalization.md)
-- Security control mapping: [Security controls and evidence](security-controls.md)
-- Abuse cases and residual risks: [Threat model](threat-model.md)
-- Known prototype boundaries: [Prototype limitations](prototype-limitations.md)
+- SBOM parsing and matching: `app/sbom.py`
+- Evidence normalization: `app/evidence_normalization.py`
+- Audit hashing: `app/audit.py`
+- Tests: `tests/`
+
+Related documents: [Engineering decisions](engineering-decisions.md), [Threat model](threat-model.md), [Security controls](security-controls.md).

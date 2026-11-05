@@ -1,83 +1,75 @@
 # Engineering Decisions
 
-This document records material architecture and security decisions for the DeviceTrust prototype. Each decision states context, choice, consequences and conditions for revisiting it.
+These are the main choices behind the current DeviceTrust prototype. Each one solves a specific problem, but also has a cost.
 
-## DEC-001 — Modular monolith for the prototype
-**Status:** Accepted
+## DEC-001 — Modular monolith
 
-**Context:** The product is an early-stage, single-team prototype with a small domain surface and no demonstrated need for independent service scaling.
+**Decision:** Keep the API, domain logic and persistence in one FastAPI application, separated into modules.
 
-**Decision:** Keep the API, domain services and persistence in one FastAPI modular monolith. Separate responsibilities into modules and service boundaries rather than introducing distributed services.
+**Why:** The project is small and has no proven need for independently deployed services. A modular monolith is easier to run, test and explain.
 
-**Consequences:** Lower operational complexity and easier local testing; module boundaries must remain explicit to avoid a large, tightly coupled route module. Distributed deployment and independent scaling are not current capabilities.
+**Cost:** The code still needs clear module boundaries. Microservices may become useful later, but they would add operational complexity now.
 
-**Revisit when:** Independent scaling, team ownership boundaries or availability requirements justify the operational cost of service decomposition.
+## DEC-002 — Shared API key for local evaluation
 
-## DEC-002 — Shared API key is a local prototype boundary, not user identity
-**Status:** Accepted with production limitation
+**Decision:** Read `DEVICETRUST_API_KEY` from the environment, compare it with `hmac.compare_digest`, and fail closed when it is missing.
 
-**Context:** The current workflow needs a simple authenticated API boundary for local evaluation.
+**Why:** This gives protected routes a basic authentication gate without a hard-coded default credential.
 
-**Decision:** Use a configured shared API key with constant-time comparison. Fail closed when the server key is absent. Do not interpret the key as an individual identity, role or tenant.
+**Cost:** Anyone with the key has the same broad access. It provides no individual identity, roles, scopes, revocation, tenant isolation or attributable approvals. The browser console can access the key during its active session.
 
-**Consequences:** Anyone holding the key has the same broad access. The browser console exposes the key to its local browser session and developer tools. No individual accountability, scoped authorization, revocation or tenant isolation exists.
+**Next step:** Add individual identity and scoped authorization before supporting multiple operators or external access.
 
-**Revisit when:** Shared deployment, multiple operators, attributable approvals or external access are required. Add individual identity, scoped authorization and server-side sessions first.
+## DEC-003 — Ingested evidence stays unverified
 
-## DEC-003 — Evidence observations remain separate from posture inputs
-**Status:** Accepted
+**Decision:** Store bounded observations with source and timestamps. The server assigns `unverified`; normalization is read-only. Observations do not automatically associate with devices or affect posture.
 
-**Context:** Imported evidence can be incomplete, stale, conflicting, spoofed or derived from a shared upstream source. Automatically treating ingestion as proof would create false assurance.
+**Why:** Receiving a claim is not the same as validating it. Router exports, device declarations and vendor responses can be stale, spoofed or based on the same upstream source.
 
-**Decision:** Persist bounded observations with source and time provenance, default them to unverified, and expose a read-only normalized projection. Do not automatically associate observations or feed them into posture calculations.
+**Cost:** Evidence adds context but does not currently change posture results. There is no conflict-resolution or association workflow.
 
-**Consequences:** Raw observations remain traceable and normalization is reproducible. Unknown, invalid and unclassified values remain visible. Posture remains based on the existing declared profile; evidence currently adds context but does not change posture findings.
+**Next step:** Define source trust, freshness, per-control acceptance rules and an attributable review process before using observations in posture calculations.
 
-**Revisit when:** Per-control acceptance rules, freshness windows, conflict resolution, source independence and actor authorization are defined and adversarially tested.
+## DEC-004 — Normalize without losing the original
 
-## DEC-004 — Normalization is deterministic, versioned and non-destructive
-**Status:** Accepted
+**Decision:** Use pure normalizers for selected attributes. Keep the submitted attribute/value, return a canonical value when a rule exists, report invalid known values and leave unknown attributes unclassified.
 
-**Context:** Sources represent attributes in different formats; normalization must not erase original claims or silently infer semantics.
+**Why:** Pure functions are easy to test. Preserving the raw input makes the transformation reviewable and avoids silently rewriting a source claim.
 
-**Decision:** Use pure normalizers for explicitly supported attributes. Preserve source attribute and raw value, return a canonical attribute and normalized value when valid, report invalid known values without coercion, and keep unknown attributes unclassified. Include a normalizer version.
+**Cost:** Coverage is limited. Unknown values remain unknown instead of being guessed.
 
-**Consequences:** Unit tests validate normalization without database side effects. Consumers can reproduce the rules used. Unsupported attributes remain available for future adapters.
+**Next step:** Expand coverage only with explicit source and attribute rules.
 
-**Revisit when:** Source-specific adapters, stale-value rules or schema evolution require broader compatibility policy.
+## DEC-005 — Bounded CycloneDX support
 
-## DEC-005 — Bounded CycloneDX subset and explicit intelligence limits
-**Status:** Accepted for MVP
+**Decision:** Enforce a 2 MiB request cap and component/field limits, validate PURLs and match supported package identities against synthetic local advisories. Optional OSV lookup is enabled with `DEVICETRUST_OSV=1`.
 
-**Context:** Full SBOM schema and ecosystem-specific vulnerability matching are substantial integration surfaces.
+**Why:** This provides a repeatable SBOM workflow without claiming full schema or vulnerability-intelligence coverage.
 
-**Decision:** Accept a bounded CycloneDX JSON subset, enforce request and component limits, normalize PURLs, and use PURL-scoped synthetic demo advisories plus optional best-effort OSV lookup.
+**Cost:** The local feed is synthetic. The parser does not validate the full CycloneDX schema or dependency graph. OSV is best-effort; no result does not mean no vulnerability exists.
 
-**Consequences:** Deterministic local demonstrations are possible. The local feed is not vulnerability intelligence. External lookup may fail or omit relevant results. Absence of a finding is not proof that a component is safe.
+**Next step:** Select a maintained intelligence source and define provenance, caching, affected-version semantics and coverage monitoring.
 
-**Revisit when:** A production intelligence source, provenance model, caching policy, affected-range semantics and coverage monitoring are selected.
+## DEC-006 — Hash chain for tamper evidence
 
-## DEC-006 — Hash-chain audit is tamper-evident, not immutable
-**Status:** Accepted with explicit residual risk
+**Decision:** Each audit entry includes the previous hash and a SHA-256 digest of its content. The application exposes verification.
 
-**Context:** The prototype needs verifiable records of state-changing operations without claiming an independently protected audit platform.
+**Why:** A change to a retained entry or a broken link can be detected.
 
-**Decision:** Store SHA-256 hash-linked audit entries and expose verification. Document that the chain cannot detect deletion of its final entry or suffix, or privileged recomputation, without an external checkpoint.
+**Cost:** Deleting the final entry or suffix is not detectable without an external checkpoint. A privileged attacker can rewrite the database and recompute the chain. Concurrent writers are not serialized for multi-worker use.
 
-**Consequences:** Modification and interior deletion can be detected when later links remain. A valid chain does not prove completeness. Concurrent writers need serialized chain-head updates before multi-worker use.
+**Next step:** Add independently controlled checkpoints and a serialized chain-head update before stronger audit guarantees are needed.
 
-**Revisit when:** Audit assurance requires independently controlled checkpoints, signatures, WORM storage or stronger retention guarantees.
+## DEC-007 — Same-origin console
 
-## DEC-007 — Same-origin console without persistent browser credentials
-**Status:** Accepted for local demonstration
+**Decision:** Serve static console assets from FastAPI, use same-origin requests, keep the key in page memory and set restrictive response headers.
 
-**Context:** A lightweight interface improves demonstrability without a separate frontend build and deployment stack.
+**Why:** It keeps the demo simple and avoids a separate frontend build/deployment stack.
 
-**Decision:** Serve static console assets from FastAPI, use same-origin API calls, keep the shared key in page memory only, and apply restrictive console response headers.
+**Cost:** The key remains accessible to the browser session and developer tools. This is not a production session or multi-user security model.
 
-**Consequences:** Simple local deployment and no browser-storage persistence for the API key. The key remains accessible to the browser session and developer tools. This is not a production session architecture or multi-user security boundary.
+**Next step:** Use server-side sessions or a backend-for-frontend with individual identity and appropriate CSRF controls if external access is introduced.
 
-**Revisit when:** External or multi-user access is required; use server-side sessions or a backend-for-frontend with individual identity and appropriate CSRF controls.
+## How to explain these choices
 
-## Decision review rule
-Revisit a decision when new requirements or evidence invalidate its context, a residual risk becomes unacceptable, or before representing the prototype capability as production-ready. Add a new decision entry rather than silently rewriting historical rationale.
+For each decision, explain the problem, why the current approach fits the prototype, what it costs and what evidence would justify changing it. The trade-off is part of the engineering work.
