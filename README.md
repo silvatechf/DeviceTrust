@@ -1,21 +1,29 @@
 # DeviceTrust
 
-**An evidence-oriented IoT/OT security assessment and vulnerability-triage prototype, initially focused on food production, processing and cold-chain environments.**
+**Product Security Intelligence & Evidence Management — an early-stage Python platform prototype for connected and embedded products.**
 
 [![CI](https://github.com/silvatechf/DeviceTrust/actions/workflows/ci.yml/badge.svg)](https://github.com/silvatechf/DeviceTrust/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/silvatechf/DeviceTrust/actions/workflows/codeql.yml/badge.svg)](https://github.com/silvatechf/DeviceTrust/actions/workflows/codeql.yml)
 
-DeviceTrust explores how teams can organise connected-asset information, assess declared security posture, analyse supported software-component inventories, document vulnerability-triage decisions and retain traceable evidence.
+DeviceTrust explores how teams can organise product and asset records, analyse supported software-component inventories, assess vulnerability information, document security decisions and retain traceable evidence across connected and embedded products.
 
-The initial application context is **food production, processing, storage and cold-chain operations**. Agriculture and precision-farming environments are adjacent expansion areas, subject to market validation. The initial target users are expected to include OT/automation integrators, specialist security consultancies and food-sector infrastructure teams.
+The **initial customer hypothesis** is small and medium-sized **manufacturers of products with digital elements**, such as industrial gateways, sensors and embedded controllers. Product-security consultancies and specialist integrators are complementary users and potential channels. Food production and cold-chain infrastructure remain the synthetic demonstration context, not the limit of the product concept.
 
-> **Current status:** early-stage Python/FastAPI prototype for local technical evaluation, not a production security platform. DeviceTrust does not actively discover devices, independently verify device claims, detect intrusions, prevent attacks or certify regulatory compliance.
+> **Current status:** early-stage Python/FastAPI prototype for local technical evaluation. DeviceTrust does not establish CRA compliance, perform conformity assessments, submit regulatory notifications, independently attest product contents, discover devices on networks, detect intrusions or prevent attacks.
 
-## Product positioning and market scope
+## Product direction
 
-See [Market Positioning](docs/market-positioning.md) for the target users, initial use case, competitive boundaries, market-validation plan and claims policy.
+The intended workflow is to connect:
 
-The product direction is deliberately evidence-oriented: connect asset records, declared posture, supported SBOM analysis, vulnerability triage and audit context without treating missing or unverified information as proof of safety.
+1. Product, asset and version context.
+2. Software-component inventories and their provenance.
+3. Vulnerability intelligence and affected-version assessment.
+4. Reviewed security decisions, including future VEX support.
+5. Evidence, audit history and exportable assessment records.
+
+This direction is relevant to product-security workflows under the EU Cyber Resilience Act (CRA), but DeviceTrust currently supports only a small subset of the underlying engineering activities. CRA obligations extend beyond SBOMs and vulnerability triage. Legal applicability and manufacturer responsibilities must be assessed for each product and organisation.
+
+See [Market Positioning](docs/market-positioning.md) for target users, buyer hypotheses, regulatory boundaries, market validation and the claims policy.
 
 ## The current prototype
 
@@ -31,18 +39,19 @@ Implemented prototype workflows:
 6. Generate JSON/Markdown reports and verify a SHA-256-linked audit history.
 7. Use a same-origin local operator console.
 
-Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a device or change its posture result.
+Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. SBOM components are not yet persisted as a versioned product inventory.
 
 ## What is not implemented
 
-- Active LAN discovery, packet capture or device agents.
-- Independent device identity, firmware-signature or hardware attestation.
-- Automatic association of unassigned observations with devices.
-- Evidence-driven posture calculations or source-conflict resolution.
-- Full CycloneDX schema/dependency-graph validation or complete CVE coverage.
+- Product and release-version domain model with persistent SBOM history.
+- Persistent component inventory, SBOM diffing or product-to-component traceability.
+- SPDX ingestion or CycloneDX VEX generation.
+- KEV/EPSS enrichment and contextual product-version assessment.
 - Individual operator accounts, RBAC, tenant isolation or production browser sessions.
+- Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
+- Active LAN discovery, packet capture, device agents or independent firmware/hardware attestation.
 - Immutable/WORM audit storage, external audit checkpoints or multi-writer serialization.
-- Production operations, real-time intrusion detection, incident-response automation or CRA conformity assessment.
+- Production operations, real-time intrusion detection, incident-response automation or attack prevention.
 
 See [Prototype limitations](docs/prototype-limitations.md), [Threat model](docs/threat-model.md) and [Release readiness](docs/release-readiness.md).
 
@@ -105,7 +114,7 @@ The console receives the shared API key in browser memory. Use it only with a tr
 
 ### 3. Load synthetic demo data (optional)
 
-Use a dedicated disposable SQLite file for the demonstration. Do not point the seeder at a database containing data you need to preserve.
+Use a dedicated disposable SQLite file for the demonstration. Do not point the demo seeder at a database containing data you need to preserve.
 
 **Windows PowerShell** (run these commands in the same terminal session):
 ```powershell
@@ -121,7 +130,7 @@ python -m app.seed
 uvicorn app.main:app --reload
 ```
 
-The seeder creates three synthetic devices and imports the sample CycloneDX document for `EDGE-GW-003`. It does not reset an existing database; the dedicated filename keeps this walkthrough separate from the default `devicetrust.db`. See the [Demo runbook](docs/demo-runbook.md).
+The seeder creates three synthetic devices and imports the sample CycloneDX document for `EDGE-GW-003`. It does not reset an existing database. See the [Demo runbook](docs/demo-runbook.md).
 
 ## Optional PostgreSQL setup
 
@@ -148,12 +157,14 @@ GitHub Actions runs the configured checks on pushes and pull requests; CodeQL is
 ## Security principles
 
 - Missing information stays unknown; it is not treated as safe.
-- Submitted device and evidence claims are not independent attestation.
+- Submitted product, device and evidence claims are not independent attestation.
 - Weak identifiers such as MAC, IP and hostname are not identity proof.
 - Vulnerability triage requires a written justification.
+- KEV presence and EPSS scores are intelligence signals, not automatic CRA reporting triggers.
+- VEX statements require product-version context, evidence and reviewed justification.
 - Audit hash chaining provides tamper evidence, not immutable storage.
 - External intelligence failures or missing results do not mean that a component is vulnerability-free.
-- DeviceTrust is an assessment and evidence-management prototype, not an inline IDS/IPS or OT safety controller.
+- DeviceTrust is an assessment and evidence-management prototype, not an inline IDS/IPS or product conformity assessor.
 
 Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Contributions should follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -161,7 +172,7 @@ Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Contributions 
 
 | Document | What it helps explain |
 |---|---|
-| [Market positioning](docs/market-positioning.md) | Target market, buyer hypotheses, initial use case and claims policy |
+| [Market positioning](docs/market-positioning.md) | Target market, CRA context, buyer hypotheses and claims policy |
 | [Architecture](docs/architecture.md) | Request flow, modules, data flow and trust boundaries |
 | [Engineering decisions](docs/engineering-decisions.md) | Why the current design was chosen and its trade-offs |
 | [Security controls](docs/security-controls.md) | Implemented controls, tests and limitations |
@@ -179,11 +190,14 @@ Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Contributions 
 
 ## References
 
-- NISTIR 8259 — Foundational Cybersecurity Activities for IoT Device Manufacturers.
-- CycloneDX — Software Bill of Materials (SBOM) standard.
-- OSV — Open Source Vulnerabilities database and API.
-- CISA Known Exploited Vulnerabilities (KEV) Catalog.
 - Regulation (EU) 2024/2847 — Cyber Resilience Act.
+- European Commission — Cyber Resilience Act implementation and reporting obligations.
+- ENISA — CRA Single Reporting Platform.
+- CycloneDX — Software Bill of Materials (SBOM) and Vulnerability Exploitability eXchange (VEX).
+- SPDX — Software component and supply-chain data exchange.
+- CISA Known Exploited Vulnerabilities (KEV) Catalog.
+- FIRST — Exploit Prediction Scoring System (EPSS).
+- OSV — Open Source Vulnerabilities database and API.
 
 ## License
 
