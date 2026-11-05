@@ -105,13 +105,23 @@ The console receives the shared API key in browser memory. Use it only with a tr
 
 ### 3. Load synthetic demo data (optional)
 
-Stop the server first if you want to prepare a clean disposable database:
+Use a dedicated disposable SQLite file for the demonstration. Do not point the seeder at a database containing data you need to preserve.
 
-```bash
+**Windows PowerShell** (run these commands in the same terminal session):
+```powershell
+$env:DATABASE_URL = "sqlite:///devicetrust-demo.db"
 python -m app.seed
+uvicorn app.main:app --reload
 ```
 
-The seeder creates three synthetic devices and imports the sample CycloneDX document for `CAM-002`. It does not reset an existing database. Use a fresh disposable database for a repeatable walkthrough. See the [Demo runbook](docs/demo-runbook.md).
+**macOS / Linux**:
+```bash
+export DATABASE_URL="sqlite:///devicetrust-demo.db"
+python -m app.seed
+uvicorn app.main:app --reload
+```
+
+The seeder creates three synthetic devices and imports the sample CycloneDX document for `EDGE-GW-003`. It does not reset an existing database; the dedicated filename keeps this walkthrough separate from the default `devicetrust.db`. See the [Demo runbook](docs/demo-runbook.md).
 
 ## Optional PostgreSQL setup
 
