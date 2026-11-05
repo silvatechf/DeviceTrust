@@ -71,6 +71,8 @@ Proposed fields:
 - `status`: `accepted` for every persisted import in v1.
 - `component_count` and a bounded validation summary.
 
+Enforce idempotency in the database with a unique constraint on `(product_release_id, format, content_sha256)`. The service must still handle concurrent insert races by rolling back and loading the already-committed matching import; application-only pre-checks are insufficient.
+
 Do not store raw SBOM documents in the first iteration unless a retention, access-control and size policy is approved. A digest plus parsed snapshot gives traceability without silently introducing a document vault. If raw retention is later required, treat it as a separate security/storage decision.
 
 ### SBOMComponent
@@ -145,7 +147,7 @@ The digest is a content-integrity identifier, not proof of source authenticity o
 - Duplicate component occurrences within one import.
 - Parser preserves source component name/version values within bounds; storage does not lowercase or silently rewrite source fields.
 - v1 does not claim to retain supplier, scope or bom-ref.
-- Same digest imported twice for the same release.
+- Database uniqueness enforces one accepted import per `(product_release_id, format, content_sha256)`, including concurrent retries.
 - Same digest imported for a different release.
 - Changed digest creates a new immutable import and preserves old components.
 - Component diff with added, removed, version-changed and unresolved identities.
