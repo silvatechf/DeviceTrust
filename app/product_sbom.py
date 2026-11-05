@@ -7,13 +7,25 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import audit, sbom
-from .db import Product, ProductRelease, ProductFinding, SBOMComponent, SBOMImport
+from .db import (
+    Product,
+    ProductFinding,
+    ProductRelease,
+    SBOMComponent,
+    SBOMImport,
+)
 
 
 PARSER_VERSION = "0.2.0"
 
 
-def create_product(db: Session, actor: str, manufacturer: str, product_name: str, external_reference: str | None) -> Product:
+def create_product(
+    db: Session,
+    actor: str,
+    manufacturer: str,
+    product_name: str,
+    external_reference: str | None,
+) -> Product:
     product = Product(
         manufacturer=manufacturer.strip(),
         product_name=product_name.strip(),
@@ -21,7 +33,16 @@ def create_product(db: Session, actor: str, manufacturer: str, product_name: str
     )
     db.add(product)
     db.flush()
-    audit.record(db, actor, "product.create", str(product.id), {"manufacturer": product.manufacturer, "product_name": product.product_name})
+    audit.record(
+        db,
+        actor,
+        "product.create",
+        str(product.id),
+        {
+            "manufacturer": product.manufacturer,
+            "product_name": product.product_name,
+        },
+    )
     db.commit()
     db.refresh(product)
     return product
@@ -37,6 +58,7 @@ def create_release(
 ) -> ProductRelease:
     if db.get(Product, product_id) is None:
         raise LookupError("Product not found")
+
     release = ProductRelease(
         product_id=product_id,
         version=version.strip(),
@@ -45,7 +67,13 @@ def create_release(
     )
     db.add(release)
     db.flush()
-    audit.record(db, actor, "product_release.create", str(release.id), {"product_id": product_id, "version": release.version})
+    audit.record(
+        db,
+        actor,
+        "product_release.create",
+        str(release.id),
+        {"product_id": product_id, "version": release.version},
+    )
     db.commit()
     db.refresh(release)
     return release
@@ -64,7 +92,12 @@ def import_cyclonedx(
         raise LookupError("Product release not found")
 
     components = sbom.parse_cyclonedx(document)
-    findings_by_component: dict[tuple[str, str], list[dict]] = {}\n    for finding in sbom.scan(components):\n        findings_by_component.setdefault((finding["component"], finding["version"]), []).append(finding)\n\n    digest = hashlib.sha256(raw_document).hexdigest()
+    findings_by_component: dict[tuple[str, str], list[dict]] = {}
+    for finding in sbom.scan(components):
+        key = (finding["component"], finding["version"])
+        findings_by_component.setdefault(key, []).append(finding)
+
+    digest = hashlib.sha256(raw_document).hexdigest()
     existing = db.scalars(
         select(SBOMImport).where(
             SBOMImport.product_release_id == release_id,
@@ -85,11 +118,16 @@ def import_cyclonedx(
         parser_version=PARSER_VERSION,
         status="accepted",
         component_count=len(components),
-        validation_summary={"valid": True, "component_count": len(components)},
+        validation_summary={
+            "valid": True,
+            "component_count": len(components),
+        },
     )
+
     try:
         db.add(imported)
         db.flush()
+
         for ordinal, component in enumerate(components):
             occurrence = SBOMComponent(
                 sbom_import_id=imported.id,
@@ -100,20 +138,29 @@ def import_cyclonedx(
             )
             db.add(occurrence)
             db.flush()
-            for finding in findings_by_component.get((component["name"], component["version"]), []):
-                db.add(ProductFinding(
-                    sbom_component_id=occurrence.id,
-                    vuln_id=finding["vuln_id"],
-                    severity=finding["severity"],
-                    fixed_in=finding["fixed_in"],
-                    source=finding["source"],
-                ))
+
+            key = (component["name"], component["version"])
+            for finding in findings_by_component.get(key, []):
+                db.add(
+                    ProductFinding(
+                        sbom_component_id=occurrence.id,
+                        vuln_id=finding["vuln_id"],
+                        severity=finding["severity"],
+                        fixed_in=finding["fixed_in"],
+                        source=finding["source"],
+                    )
+                )
+
         audit.record(
             db,
             actor,
             "sbom.product_import",
             str(imported.id),
-            {"product_release_id": release_id, "content_sha256": digest, "component_count": len(components)},
+            {
+                "product_release_id": release_id,
+                "content_sha256": digest,
+                "component_count": len(components),
+            },
         )
         db.commit()
         db.refresh(imported)
