@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from . import audit, sbom
 from .db import (
     Product,
     ProductFinding,
@@ -13,7 +14,6 @@ from .db import (
     SBOMComponent,
     SBOMImport,
 )
-from . import audit, sbom
 
 
 PARSER_VERSION = "0.2.0"
