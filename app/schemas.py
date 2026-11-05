@@ -67,3 +67,23 @@ class TriageIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     status: Literal["open", "in_progress", "fixed", "accepted_risk", "not_affected"]
     justification: str = Field(min_length=10, max_length=1000)
+
+class ProductIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    manufacturer: str = Field(min_length=1, max_length=200)
+    product_name: str = Field(min_length=1, max_length=200)
+    external_reference: str | None = Field(default=None, max_length=255)
+
+
+class ProductReleaseIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: str = Field(min_length=1, max_length=100)
+    hardware_revision: str | None = Field(default=None, max_length=100)
+    release_reference: str | None = Field(default=None, max_length=255)
+
+
+class SBOMImportIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    product_release_id: int = Field(gt=0)
+    source_type: Literal["manual", "pipeline"] = "manual"
+    source_reference: str | None = Field(default=None, max_length=500)
