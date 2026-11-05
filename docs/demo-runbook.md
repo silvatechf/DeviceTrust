@@ -34,7 +34,7 @@ Leaving `DATABASE_URL` unset uses the default local `devicetrust.db`. Confirm th
 
 ## 2. Seed synthetic records
 
-For a clean walkthrough, use a fresh disposable database. The seeder does not reset or overwrite existing records.
+For a clean walkthrough, use a fresh disposable database. The seeder checks for conflicting device IDs before writing and does not reset or overwrite existing records.
 
 ```bash
 python -m app.seed
@@ -44,7 +44,7 @@ The seeder registers three synthetic assets:
 
 | Device ID | Demonstration role | Data quality |
 |---|---|---|
-| `COLD-CTRL-001` | Refrigeration controller | Several declared controls; integrity fields remain unknown |
+| `COLD-CTRL-001` | Refrigeration controller | Several declared controls; firmware-integrity fields remain unknown |
 | `TEMP-SENSOR-002` | Cold-room temperature sensor | Identity and several security controls remain unverified |
 | `EDGE-GW-003` | Industrial edge gateway | Stronger declared profile for comparison |
 
@@ -52,7 +52,7 @@ It then imports `samples/cold_chain_gateway_sbom.json` for `EDGE-GW-003`.
 
 The sample SBOM uses generic PURLs and synthetic local advisories. Findings such as `DT-DEMO-0001` are deliberately fabricated to demonstrate the workflow. They are not real CVEs, vendor advisories or confirmed vulnerabilities.
 
-If a database already contains these device IDs, the API will return conflict responses for duplicate records. Use a clean disposable database rather than deleting a database whose contents matter.
+If the database already contains one of the demo IDs, the seeder aborts before creating any records. Use a fresh disposable database rather than deleting a database whose contents matter.
 
 ## 3. Start the application
 
@@ -71,8 +71,8 @@ Enter the same local API key into the console. It remains in page memory only.
 1. **Overview:** show the three registered assets, synthetic findings and audit-chain status.
 2. **Inventory — refrigeration controller:** select `COLD-CTRL-001`; explain that missing firmware-integrity evidence remains unverified.
 3. **Inventory — temperature sensor:** select `TEMP-SENSOR-002`; explain why unknown identity and security attributes are not treated as compliant.
-4. **Inventory — edge gateway:** select `EDGE-GW-003`; compare its declared profile with the other assets.
-5. **SBOM:** show the imported components and synthetic `DT-DEMO-*` findings. Explain that the package list is illustrative, not a supplier-verified SBOM.
+4. **Inventory — edge gateway:** select `EDGE-GW-003`; compare its declared profile with the other assets and inspect its generated vulnerability findings.
+5. **SBOM import:** explain that the seeder imported a synthetic CycloneDX document for `EDGE-GW-003`. The current console displays resulting vulnerability findings, not a persistent component inventory or full SBOM viewer.
 6. **Triage:** record a reasoned demonstration decision. Do not interpret it as a real maintenance recommendation.
 7. **Report:** download the JSON report for `EDGE-GW-003`.
 8. **Audit:** verify the hash chain and explain that this is tamper evidence, not immutable storage.
