@@ -1,4 +1,4 @@
-"""Load simulated devices and a sample SBOM using the local API."""
+"""Load synthetic food-processing and cold-chain devices plus a sample SBOM."""
 import json
 import os
 from pathlib import Path
@@ -9,18 +9,37 @@ from .main import app
 
 DEVICES = [
     {
-        "device_id": "TEMP-001",
-        "manufacturer": "Example IoT",
-        "model": "Temperature Sensor V1",
-        "firmware_version": "1.0.2",
+        "device_id": "COLD-CTRL-001",
+        "manufacturer": "Northstar Demo Systems",
+        "model": "Refrigeration Controller RC-4",
+        "firmware_version": "2.4.1",
         "support_until": "2028-12-31",
         "security": {
             "unique_identity": True,
             "authentication": "device_certificate",
             "default_credentials": False,
+            "open_interfaces": ["https", "mqtts"],
+            "encryption_in_transit": True,
+            "encryption_at_rest": None,
+            "update_mechanism": "manual",
+            "logging_enabled": True,
+            "secure_boot": None,
+            "firmware_signed": None,
+        },
+    },
+    {
+        "device_id": "TEMP-SENSOR-002",
+        "manufacturer": "Northstar Demo Systems",
+        "model": "Cold-Room Temperature Sensor TS-2",
+        "firmware_version": "1.8.0",
+        "support_until": "2027-06-30",
+        "security": {
+            "unique_identity": None,
+            "authentication": "unknown",
+            "default_credentials": None,
             "open_interfaces": ["mqtts"],
             "encryption_in_transit": True,
-            "encryption_at_rest": False,
+            "encryption_at_rest": None,
             "update_mechanism": "manual",
             "logging_enabled": None,
             "secure_boot": None,
@@ -28,28 +47,9 @@ DEVICES = [
         },
     },
     {
-        "device_id": "CAM-002",
-        "manufacturer": "Example IoT",
-        "model": "Camera X",
-        "firmware_version": "0.9.0",
-        "support_until": "2023-01-01",
-        "security": {
-            "unique_identity": False,
-            "authentication": "password_default",
-            "default_credentials": True,
-            "open_interfaces": ["telnet", "http"],
-            "encryption_in_transit": False,
-            "encryption_at_rest": False,
-            "update_mechanism": "none",
-            "logging_enabled": False,
-            "secure_boot": False,
-            "firmware_signed": False,
-        },
-    },
-    {
-        "device_id": "GATE-003",
-        "manufacturer": "Example IoT",
-        "model": "Gateway G3",
+        "device_id": "EDGE-GW-003",
+        "manufacturer": "Northstar Demo Systems",
+        "model": "Industrial Edge Gateway EG-8",
         "firmware_version": "3.1.0",
         "support_until": "2030-06-30",
         "security": {
@@ -68,9 +68,21 @@ DEVICES = [
 ]
 
 if __name__ == "__main__":
-    headers = {"X-API-Key": os.environ["DEVICETRUST_API_KEY"]}
-    sample = json.loads((Path(__file__).parent.parent / "samples" / "sensor_sbom.json").read_text())
+    api_key = os.environ.get("DEVICETRUST_API_KEY")
+    if not api_key:
+        raise SystemExit("Set DEVICETRUST_API_KEY before running the demo seeder.")
+
+    headers = {"X-API-Key": api_key}
+    sample_path = Path(__file__).parent.parent / "samples" / "cold_chain_gateway_sbom.json"
+    sample = json.loads(sample_path.read_text(encoding="utf-8"))
+
     with TestClient(app) as client:
         for device in DEVICES:
-            print(device["device_id"], client.post("/devices", json=device, headers=headers).status_code)
-        print("sbom", client.post("/devices/CAM-002/sbom", json=sample, headers=headers).json())
+            response = client.post("/devices", json=device, headers=headers)
+            print(device["device_id"], response.status_code, response.text[:300])
+        response = client.post(
+            "/devices/EDGE-GW-003/sbom",
+            json=sample,
+            headers=headers,
+        )
+        print("SBOM import", response.status_code, response.text[:500])
