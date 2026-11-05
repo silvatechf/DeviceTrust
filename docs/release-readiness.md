@@ -17,7 +17,8 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [ ] Verify branch protection/rulesets and required checks on the default branch.
 - [ ] Define any prospective commit-signature policy in repository settings.
 - [ ] Run the candidate from a clean checkout with a disposable database.
-- [x] Add Alembic baseline migration and PostgreSQL migration/persistence CI coverage.\n- [ ] Verify PostgreSQL startup, persistence and restart behavior in a clean local Compose deployment.
+- [x] Add Alembic baseline migration and PostgreSQL migration/persistence CI coverage.
+- [ ] Verify PostgreSQL startup, persistence and restart behavior in a clean local Compose deployment.
 - [ ] Verify console flows and API error paths in a real browser at desktop/mobile sizes.
 - [ ] Test concurrent audit writes and failure behavior.
 - [ ] Demonstrate backup/restore and rollback.
