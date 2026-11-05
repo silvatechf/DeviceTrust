@@ -27,7 +27,7 @@ For normal typed endpoints, Pydantic validates request models. The SBOM route re
 |---|---|
 | `app/main.py` | FastAPI app, routes, authentication dependency, request orchestration and response serialization |
 | `app/schemas.py` | Pydantic request contracts and field constraints |
-| `app/db.py` | SQLAlchemy models, engine/session setup and table creation |
+| `app/db.py` | SQLAlchemy models, engine/session setup and database access |
 | `app/posture.py` | Rules that assess the declared device security profile |
 | `app/sbom.py` | CycloneDX subset parsing, PURL validation, local demo matching and optional OSV lookup |
 | `app/evidence_normalization.py` | Pure normalizers for selected evidence attributes |
@@ -81,7 +81,11 @@ A triage update requires a justification. State-changing operations append audit
 
 ## 6. Persistence and deployment
 
-SQLite is the default local database. PostgreSQL can be selected with `DATABASE_URL`. SQLAlchemy `create_all` creates missing tables at startup; it is not a versioned migration strategy. Alembic migrations and production database operations are not implemented.
+SQLite is the default local database. PostgreSQL can be selected with `DATABASE_URL`. Alembic owns schema evolution: apply migrations explicitly with `alembic upgrade head`; application startup does not create or alter tables. The container startup script applies pending migrations before launching the API, and the demo seeder upgrades its target database before inserting synthetic records.
+
+The initial migration establishes the existing schema; it does not automatically convert an arbitrary legacy SQLite database. Follow the backup, schema-verification and explicit `alembic stamp` procedure in the [Demo runbook](demo-runbook.md) only when the existing schema has been verified to match the baseline.
+
+CI covers SQLite migration upgrade/downgrade, ORM metadata drift and PostgreSQL persistence after engine disposal/reconnection. A clean local Compose deployment, backup/restore and deployment rollback have not yet been demonstrated.
 
 The static console is served from the same FastAPI origin. It avoids a separate frontend build/deployment pipeline, but it is not a production authentication architecture.
 

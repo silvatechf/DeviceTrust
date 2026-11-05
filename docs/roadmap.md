@@ -22,20 +22,23 @@ This roadmap separates implemented prototype capabilities from proposed work. A 
 - [x] Generate JSON/Markdown reports and verify the SHA-256-linked audit history.
 - [x] Provide a same-origin local operator console.
 
-## Milestone 2 — Product domain and operational foundations (P0)
+## Milestone 2 — Database migration foundation (P0)
 
-**Goal:** establish reliable persistence and domain boundaries before introducing versioned product and component data.
+**Goal:** make schema evolution explicit and establish a tested PostgreSQL persistence path before adding new domain entities.
 
-- [ ] Define product, product release/version, hardware revision and software release concepts.
-- [ ] Define canonical component identity and product-release-to-component relationships.
-- [ ] Add Alembic migrations; stop relying on startup create_all for evolving production schemas.
-- [ ] Add PostgreSQL integration tests, migration upgrade/downgrade tests and restart-persistence tests.
-- [ ] Define provenance fields for imported product, SBOM and vulnerability-intelligence data.
-- [ ] Add actor/decision attribution fields to the audit/domain model before multi-user workflows.
-- [ ] Preserve current local single-operator behavior while documenting that it is not production identity.
-- [ ] Keep domain services independent of HTTP routes so API, future CLI and automation can reuse them.
+- [x] Add Alembic configuration and an initial migration matching the current SQLAlchemy schema.
+- [x] Remove runtime `create_all()` from application startup.
+- [x] Apply migrations explicitly in local, container-startup and demo-seeder workflows.
+- [x] Add SQLite migration upgrade/downgrade and ORM metadata-drift tests.
+- [x] Add PostgreSQL CI coverage, including persistence after engine disposal and reconnection.
+- [x] Document safe adoption of legacy SQLite databases through backup, schema verification and explicit baseline stamping.
+- [ ] Verify PostgreSQL startup, persistence and restart behavior in a clean local Compose deployment.
+- [ ] Demonstrate backup/restore and deployment rollback.
+- [ ] Validate the legacy SQLite adoption procedure against a preserved copy of a real pre-Alembic database.
 
-**Exit criteria:** reproducible migrations; verified persistence across restart; tests against PostgreSQL; explicit product/version/component relationships; no untracked schema creation on application startup.
+**Exit criteria:** automated migration and PostgreSQL persistence checks pass on the candidate commit; local Compose, legacy-database adoption and recovery procedures are separately evidenced before a versioned release.
+
+Product/version/component domain modelling is intentionally tracked in Milestone 3 rather than being treated as completed by the database foundation.
 
 ## Milestone 3 — Persistent SBOM and component intelligence (P1)
 
