@@ -1,14 +1,16 @@
 # Local Demonstration Runbook
 
-This runbook prepares a repeatable local showcase using synthetic records only.
+This runbook prepares a repeatable, synthetic food-processing and cold-chain showcase.
 
 ## Safety and scope
 
 - Use a disposable local SQLite database.
 - Do not point the demo seeder at a customer, production or shared database.
-- The sample devices and SBOM are synthetic. They do not represent real products or real vulnerability intelligence.
+- All three devices, the vendor name, SBOM and local advisories are synthetic.
+- The SBOM components are generic demonstration package identifiers, not a verified bill of materials from a real refrigeration controller.
 - Keep the API bound to localhost. Do not expose the shared API key or operator console to the internet.
-- The prototype does not scan networks, validate device identity or certify CRA compliance.
+- The prototype does not scan networks, validate device identity, monitor temperatures, control refrigeration equipment or certify CRA compliance.
+- Do not use the demonstration findings as operational vulnerability intelligence or maintenance instructions.
 
 ## 1. Prepare the environment
 
@@ -16,7 +18,7 @@ Create and activate a virtual environment, then install development dependencies
 
 Set a one-off local API key:
 
-**PowerShell**
+**Windows PowerShell**
 ```powershell
 $env:DEVICETRUST_API_KEY = "replace-with-a-random-local-secret"
 Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
@@ -32,11 +34,25 @@ Leaving `DATABASE_URL` unset uses the default local `devicetrust.db`. Confirm th
 
 ## 2. Seed synthetic records
 
+For a clean walkthrough, use a fresh disposable database. The seeder does not reset or overwrite existing records.
+
 ```bash
 python -m app.seed
 ```
 
-The seeder creates three example devices and imports the sample CycloneDX document for `CAM-002`. Re-running it against the same database does not reset existing data; use a fresh disposable database for a clean demonstration.
+The seeder registers three synthetic assets:
+
+| Device ID | Demonstration role | Data quality |
+|---|---|---|
+| `COLD-CTRL-001` | Refrigeration controller | Several declared controls; integrity fields remain unknown |
+| `TEMP-SENSOR-002` | Cold-room temperature sensor | Identity and several security controls remain unverified |
+| `EDGE-GW-003` | Industrial edge gateway | Stronger declared profile for comparison |
+
+It then imports `samples/cold_chain_gateway_sbom.json` for `EDGE-GW-003`.
+
+The sample SBOM uses generic PURLs and synthetic local advisories. Findings such as `DT-DEMO-0001` are deliberately fabricated to demonstrate the workflow. They are not real CVEs, vendor advisories or confirmed vulnerabilities.
+
+If a database already contains these device IDs, the API will return conflict responses for duplicate records. Use a clean disposable database rather than deleting a database whose contents matter.
 
 ## 3. Start the application
 
@@ -46,18 +62,20 @@ uvicorn app.main:app --reload
 
 Open:
 - Operator console: `http://127.0.0.1:8000/`
-- API documentation: `http://127.0.0.1:8000/docs`
+- Interactive API documentation: `http://127.0.0.1:8000/docs`
 
 Enter the same local API key into the console. It remains in page memory only.
 
 ## 4. Suggested walkthrough
 
-1. **Overview:** show device count, open findings, high/critical findings and audit status.
-2. **Inventory:** select `CAM-002` and explain its declared posture evidence and high-risk configuration.
-3. **SBOM:** import `samples/sensor_sbom.json` for a device and explain that demo advisories are synthetic.
-4. **Triage:** record a justified decision and show the corresponding audit event.
-5. **Report:** download a JSON report and explain its evidence boundaries.
-6. **Audit:** verify the hash chain and explain that this is tamper evidence, not immutable storage.
+1. **Overview:** show the three registered assets, synthetic findings and audit-chain status.
+2. **Inventory — refrigeration controller:** select `COLD-CTRL-001`; explain that missing firmware-integrity evidence remains unverified.
+3. **Inventory — temperature sensor:** select `TEMP-SENSOR-002`; explain why unknown identity and security attributes are not treated as compliant.
+4. **Inventory — edge gateway:** select `EDGE-GW-003`; compare its declared profile with the other assets.
+5. **SBOM:** show the imported components and synthetic `DT-DEMO-*` findings. Explain that the package list is illustrative, not a supplier-verified SBOM.
+6. **Triage:** record a reasoned demonstration decision. Do not interpret it as a real maintenance recommendation.
+7. **Report:** download the JSON report for `EDGE-GW-003`.
+8. **Audit:** verify the hash chain and explain that this is tamper evidence, not immutable storage.
 
 ## 5. Clean up
 
