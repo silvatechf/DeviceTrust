@@ -1,4 +1,5 @@
-"""Load synthetic food-processing and cold-chain devices plus a sample SBOM."""
+"""Seed legacy test fixtures and a synthetic food-processing / cold-chain demo."""
+
 import json
 import os
 from pathlib import Path
@@ -7,7 +8,68 @@ from fastapi.testclient import TestClient
 
 from .main import app
 
+# Keep these stable: the existing API test suite imports DEVICES directly.
 DEVICES = [
+    {
+        "device_id": "TEMP-001",
+        "manufacturer": "Example IoT",
+        "model": "Temperature Sensor V1",
+        "firmware_version": "1.0.2",
+        "support_until": "2028-12-31",
+        "security": {
+            "unique_identity": True,
+            "authentication": "device_certificate",
+            "default_credentials": False,
+            "open_interfaces": ["mqtts"],
+            "encryption_in_transit": True,
+            "encryption_at_rest": False,
+            "update_mechanism": "manual",
+            "logging_enabled": None,
+            "secure_boot": None,
+            "firmware_signed": None,
+        },
+    },
+    {
+        "device_id": "CAM-002",
+        "manufacturer": "Example IoT",
+        "model": "Camera X",
+        "firmware_version": "0.9.0",
+        "support_until": "2023-01-01",
+        "security": {
+            "unique_identity": False,
+            "authentication": "password_default",
+            "default_credentials": True,
+            "open_interfaces": ["telnet", "http"],
+            "encryption_in_transit": False,
+            "encryption_at_rest": False,
+            "update_mechanism": "none",
+            "logging_enabled": False,
+            "secure_boot": False,
+            "firmware_signed": False,
+        },
+    },
+    {
+        "device_id": "GATE-003",
+        "manufacturer": "Example IoT",
+        "model": "Gateway G3",
+        "firmware_version": "3.1.0",
+        "support_until": "2030-06-30",
+        "security": {
+            "unique_identity": True,
+            "authentication": "device_certificate",
+            "default_credentials": False,
+            "open_interfaces": ["https"],
+            "encryption_in_transit": True,
+            "encryption_at_rest": True,
+            "update_mechanism": "automatic_signed",
+            "logging_enabled": True,
+            "secure_boot": True,
+            "firmware_signed": True,
+        },
+    },
+]
+
+COLD_CHAIN_DEVICES = [
     {
         "device_id": "COLD-CTRL-001",
         "manufacturer": "Northstar Demo Systems",
@@ -89,7 +151,7 @@ if __name__ == "__main__":
         existing = client.get("/devices", headers=headers)
         _require_status(existing, 200, "Device inventory preflight")
         existing_ids = {item["device_id"] for item in existing.json()}
-        requested_ids = {item["device_id"] for item in DEVICES}
+        requested_ids = {item["device_id"] for item in COLD_CHAIN_DEVICES}
         conflicts = sorted(existing_ids & requested_ids)
         if conflicts:
             raise SystemExit(
@@ -98,7 +160,7 @@ if __name__ == "__main__":
                 + ". Use a fresh disposable database."
             )
 
-        for device in DEVICES:
+        for device in COLD_CHAIN_DEVICES:
             response = client.post("/devices", json=device, headers=headers)
             _require_status(response, 201, f"Create {device['device_id']}")
             print("Created", device["device_id"])
