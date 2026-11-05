@@ -60,6 +60,26 @@ The sample SBOM uses generic PURLs and synthetic local advisories. Findings such
 
 If the database already contains one of the demo IDs, the seeder aborts before creating any records. Use a fresh disposable database rather than deleting a database whose contents matter.
 
+
+### Existing SQLite database created before Alembic
+
+The initial migration creates the current schema; it is not an automatic conversion migration for a database that already contains the legacy tables.
+
+Before adopting an existing database:
+
+1. Stop the application and make a verified backup of the SQLite file.
+2. Confirm the existing tables and columns match `migrations/versions/0001_initial_schema.py`. Do not stamp an unknown or modified schema.
+3. Point `DATABASE_URL` to that database and mark the baseline as applied without recreating tables:
+
+```bash
+alembic stamp 0001_initial
+alembic current
+```
+
+4. Start the application and verify representative records and relationships.
+
+If the schema differs, do not stamp it. Preserve the original file and prepare a reviewed data/schema migration first. Never run `alembic downgrade base` against a database containing data you need: the baseline downgrade drops all four application tables.
+
 ## 3. Start the application
 
 ```bash
