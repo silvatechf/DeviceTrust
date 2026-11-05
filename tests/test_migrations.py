@@ -5,8 +5,9 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 
-def test_initial_migration_can_upgrade_and_downgrade(tmp_path: Path):
+def test_initial_migration_can_upgrade_and_downgrade(tmp_path: Path, monkeypatch):
     database_url = f"sqlite:///{tmp_path / 'migration-test.db'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", database_url)
 
