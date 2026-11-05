@@ -32,9 +32,15 @@ unset DATABASE_URL
 
 Leaving `DATABASE_URL` unset uses the default local `devicetrust.db`. Confirm that this file is disposable before running the seeder.
 
-## 2. Seed synthetic records
+## 2. Apply migrations and seed synthetic records
 
-For a clean walkthrough, use a fresh disposable database. The seeder checks for conflicting device IDs before writing and does not reset or overwrite existing records.
+For a clean walkthrough, use a fresh disposable database. The seeder applies pending Alembic migrations before writing, checks for conflicting device IDs and does not reset or overwrite existing records.
+
+To apply migrations separately before starting the API:
+
+```bash
+alembic upgrade head
+```
 
 ```bash
 python -m app.seed
