@@ -4,6 +4,8 @@ import json
 import os
 from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 
 from .main import app
@@ -147,6 +149,7 @@ if __name__ == "__main__":
     sample_path = Path(__file__).parent.parent / "samples" / "cold_chain_gateway_sbom.json"
     sample = json.loads(sample_path.read_text(encoding="utf-8"))
 
+    command.upgrade(Config("alembic.ini"), "head")
     with TestClient(app) as client:
         existing = client.get("/devices", headers=headers)
         _require_status(existing, 200, "Device inventory preflight")
