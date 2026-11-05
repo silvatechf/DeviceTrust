@@ -1,50 +1,55 @@
 # Roadmap
 
-## Milestone 0 — Repository bootstrap
-- Import prototype without rewriting working behavior.
-- Establish architecture, threat model and honest product boundaries.
-- Integrate changes through pull requests.
+This roadmap separates completed prototype work from capabilities that still need design, implementation and evidence. A planned item is not an implemented feature.
 
-## Milestone 1 — Exposure, lifecycle and evidence foundation
-- Add nullable, provenance-backed internet exposure.
-- Model management interfaces separately from generic open ports.
-- Add lifecycle state for product/model and firmware.
-- Add bounded evidence observations with source, timestamps, confidence and verification state.
-- Support unassigned observations for unidentified assets.
-- Ensure unknown is never treated as safe.
-- Add deterministic findings and tests.
+## Milestone 0 — Repository and engineering baseline
 
-## Milestone 2 — Evidence normalization and vulnerability intelligence
+- [x] Establish FastAPI application and SQLAlchemy persistence.
+- [x] Document architecture, trust boundaries and prototype limitations.
+- [x] Add CI quality/security checks and CodeQL configuration.
+- [x] Keep changes reviewable through focused branches and pull requests.
 
-### Evidence normalization and identity
-- [x] Define canonical attribute vocabulary, normalization boundaries and source provenance.
-- [x] Specify conflict retention, temporal semantics and reviewed association safeguards.
-- [x] Implement deterministic pure normalizers with raw-value preservation and version metadata.
-- [x] Add a read-only normalized projection and tests for unknown and invalid observations.
-- [ ] Extend projection coverage and define behavior for stale and conflicting observations.
-- [ ] Implement reviewed association only after actor identity and authorization limitations are addressed.
-- [ ] Define explicit per-control evidence acceptance and freshness rules before posture integration.
+## Milestone 1 — Inventory and declared posture
 
-### Vulnerability intelligence
-- [x] Implement bounded CycloneDX component validation and PURL-based matching for the supported subset.
-- [ ] Extend schema coverage, component normalization and ecosystem-specific validation.
-- [ ] Evaluate affected version ranges and ecosystem identifiers beyond the current bounded matching.
-- [ ] Add CISA KEV enrichment and preserve source/timestamp.
-- [ ] Treat runtimes and interpreters as SBOM components.
-- [ ] Treat unavailable feeds as incomplete/unknown, not clean.
+- [x] Store device inventory and declared security attributes.
+- [x] Assess selected controls and expose posture findings.
+- [x] Preserve unknown states instead of treating missing fields as safe.
+- [x] Model declared internet exposure and management interfaces separately.
 
-## Milestone 3 — Security events
-- Define authenticated event schema and source identity.
-- Detect out-of-window maintenance actions, unexpected setpoint changes and new management origins.
-- Build a simulated refrigeration incident scenario.
-- Add replay resistance and event provenance.
-- No physical control commands in the MVP.
+## Milestone 2 — Evidence and component findings
 
-## Milestone 4 — Operational readiness
+### Evidence
+- [x] Store bounded observations with source, source time and server recording time.
+- [x] Support unassigned observations.
+- [x] Keep verification state server-controlled and default to `unverified`.
+- [x] Add pure normalization for selected attributes and a read-only projection.
+- [ ] Expand attribute/source coverage.
+- [ ] Define stale/conflicting observation handling.
+- [ ] Add reviewed association only after individual identity and authorization exist.
+- [ ] Define per-control evidence acceptance and freshness rules before posture integration.
 
-The current prototype is not production-ready. See [release readiness](release-readiness.md), [engineering decisions](engineering-decisions.md) and the [test matrix](test-matrix.md) for the evidence gates and explicit limitations.
-- Per-client identities, RBAC and secret rotation.
-- Alembic migrations and PostgreSQL tests.
-- External audit anchoring.
-- Operator exposure/lifecycle report.
-- CI hardening, dependency and container scanning.
+### SBOM and vulnerability findings
+- [x] Parse a bounded CycloneDX JSON subset.
+- [x] Validate PURLs and apply PURL-scoped synthetic demo matching.
+- [x] Add optional best-effort OSV lookup.
+- [ ] Expand schema and ecosystem-specific version semantics.
+- [ ] Add intelligence provenance, caching and coverage monitoring.
+- [ ] Evaluate CISA KEV enrichment without treating feed absence as safety.
+
+## Milestone 3 — Security events (not implemented)
+
+- [ ] Define authenticated event schema and source identity.
+- [ ] Model event provenance and replay protection.
+- [ ] Add simulated maintenance-window and unexpected-change scenarios.
+- [ ] Keep physical control commands out of scope.
+
+## Milestone 4 — Operational readiness (not implemented)
+
+- [ ] Individual operator identities, RBAC, scopes and credential lifecycle.
+- [ ] Alembic migrations and PostgreSQL integration tests.
+- [ ] External audit checkpoints and serialized concurrent writes.
+- [ ] Rate limiting, operational monitoring and alerting.
+- [ ] Backup/restore and deployment rollback.
+- [ ] Container scanning and documented deployment hardening.
+
+See [Release readiness](release-readiness.md) for the evidence required before a public versioned release.
