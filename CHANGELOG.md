@@ -17,6 +17,8 @@ The project has not published a versioned release yet. This file records the cur
 - Same-origin local operator console with inventory, posture, SBOM, triage, reports and audit views.
 - CI checks for Ruff, Bandit, dependency auditing, JavaScript syntax and pytest.
 - Threat model, architecture, evidence, security-control and release-readiness documentation.
+- Engineering decision records for architecture, authentication boundaries, evidence normalization, SBOM scope, audit integrity and the operator console.
+- Security test matrix linking implemented controls to automated test locations and outstanding manual verification.
 
 ### Security and limitations
 - The application remains a local/single-trust-domain prototype.
