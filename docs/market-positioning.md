@@ -1,171 +1,155 @@
-# Market Positioning — Agri-food IoT/OT Security
+# Market Positioning — Product Security Intelligence
 
-## Decision
+## Strategic decision
 
-DeviceTrust will remain a horizontal IoT/OT security evidence and vulnerability-triage product, with an initial market focus on **food production, processing, storage and cold-chain operations**.
+Position DeviceTrust as **Product Security Intelligence & Evidence Management**: a lightweight workflow concept for organising product identity and version context, software-component information, vulnerability assessment, reviewed security decisions and traceable evidence across connected and embedded products.
 
-Agriculture and precision-farming environments remain an adjacent expansion area, not the first commercial wedge.
+### Initial customer hypothesis
 
-This is a positioning hypothesis to validate with prospective users. It is not evidence of product-market fit, customer demand, revenue or regulatory qualification.
+Small and medium-sized **manufacturers of products with digital elements** are the primary customer hypothesis. Examples include manufacturers of industrial gateways, sensors, connected controllers and embedded products.
 
-## Why this market focus
+Product-security consultancies, OT security specialists and integrators are complementary users and potential channels. Their legal role must be assessed per engagement: a service provider or integrator is not automatically the manufacturer under the Cyber Resilience Act (CRA).
 
-Food and agri-food operations depend on connected operational assets: industrial gateways, sensors, refrigeration controllers, environmental controls, production equipment and software components. Weak asset visibility, unsupported firmware, incomplete component information and fragmented supplier records can make vulnerability assessment difficult.
+Food production, processing and cold-chain infrastructure remain the synthetic demonstration context. They are not the boundary of the product concept.
 
-The focus is supported by several external signals:
+This is a strategic hypothesis, not validated product-market fit, customer demand, revenue or regulatory qualification.
 
-- On 4 November 2026, the European Commission and ENISA published a joint statement about cyber incidents affecting commercial refrigeration systems and similar devices in several EU Member States. This demonstrates that connected food-retail infrastructure is an active operational-security concern; it does not demonstrate that DeviceTrust detected or could have prevented those incidents.
-- ENISA's 2026 threat landscape describes how digital dependencies expand attack surfaces and how geopolitical developments influence cyber activity against EU organisations.
-- Research on smart-farming security describes technical and deployment-readiness gaps, including interoperability, validation environments and the transition from research prototypes to deployable solutions.
-- The ACT4FOOD initiative demonstrates that food-supply-chain cybersecurity is already an active European innovation area. DeviceTrust must therefore avoid generic claims of comprehensive food-chain protection or AI-driven real-time detection.
+## Problem hypothesis
 
-These signals establish relevance, not market size or willingness to pay. Customer interviews and pilots are required.
+Manufacturers need to maintain context across product models and releases, software components, vulnerability information, security decisions, support periods and evidence. These records can be fragmented across engineering, suppliers, security teams and product documentation.
 
-## Initial customer segment
+The core problem to validate is:
 
-### Primary initial segment
+**When a new vulnerability or component issue is identified, can a manufacturer determine which product versions may be affected, explain the assessment, record the decision and retrieve supporting evidence without reconstructing the process manually?**
 
-**OT security integrators, industrial automation service providers and specialist cybersecurity consultancies serving food and beverage operators.**
+DeviceTrust should focus on that traceability problem rather than attempting to become a general-purpose vulnerability scanner, OT monitoring suite or compliance automation platform.
 
-Why start here:
+## Regulatory context — EU Cyber Resilience Act
 
-- They can encounter similar asset and vulnerability-assessment problems across multiple customer sites.
-- They understand industrial constraints and vendor diversity.
-- They can assess whether an evidence-centric workflow complements existing network-monitoring and OT-security tools.
-- A bounded pilot can be conducted with synthetic or explicitly authorised customer data.
+Regulation (EU) 2024/2847 establishes cybersecurity requirements for products with digital elements. It is relevant context for the product direction, but it is not a shortcut to a compliance claim.
 
-### Secondary segment
+Important boundaries:
 
-Food and beverage manufacturers, cold-storage operators, refrigerated logistics providers and larger food retailers with internal IT/OT or security teams.
+- The CRA entered into force on 10 December 2024.
+- Article 14 reporting obligations apply from 11 September 2026.
+- The main CRA obligations apply from 11 December 2027, subject to the Regulation's transitional provisions and scope.
+- Article 14 reporting concerns actively exploited vulnerabilities contained in products with digital elements and severe incidents affecting product security. It is not triggered automatically by every scanner result, CVE match, KEV entry or high EPSS score.
+- Reporting has defined deadlines and must use the CRA Single Reporting Platform. DeviceTrust does not integrate with that platform and must not start legal reporting timers or submit notifications.
+- The CRA includes obligations beyond SBOM creation, including product risk assessment, secure-by-design requirements, vulnerability handling, security updates, technical documentation and support-period considerations.
+- Applicability, product classification, exclusions, manufacturer role and legal obligations require case-specific assessment.
 
-### Adjacent expansion
+A vulnerability feed can support awareness and investigation, but it does not by itself establish that a vulnerability is contained in a particular product, is actively exploited in that product, or meets an Article 14 reporting condition. Manufacturer awareness and product context matter.
 
-Agricultural technology providers and larger, digitally mature farming operations using connected irrigation, greenhouse controls, environmental sensors and edge gateways.
+DeviceTrust's intended role is limited to supporting engineering evidence and reviewed decisions. It is not a conformity assessment, legal opinion, certification tool or regulatory reporting channel.
 
-Small individual farms should not be the initial target without evidence of a repeatable buyer, budget and deployment model.
+## Target users and buying roles
 
-## Buyer and user roles
-
-| Role | Primary concern | DeviceTrust relevance |
+| Segment / role | Potential need | Expected relationship |
 |---|---|---|
-| OT Security Specialist | Asset context and vulnerability exposure | Technical user |
-| IT / Infrastructure Manager | Device inventory and supplier dependencies | User and influencer |
-| CISO / Security Manager | Risk prioritisation and evidence | Sponsor or buyer |
-| Automation Integrator | Repeatable customer assessments | Potential channel partner |
-| MSSP / OT Consultancy | Repeatable assessment workflow | Potential buyer and partner |
-| Plant / Operations Manager | Continuity and safe maintenance | Operational stakeholder |
+| Small and medium-sized product manufacturers | Product/version/component traceability and vulnerability decisions | Primary customer hypothesis |
+| Product Security Engineer / PSIRT | Component impact analysis, VEX and decision evidence | Primary technical user |
+| Engineering / Firmware Lead | Release contents, dependencies and support context | Technical stakeholder |
+| CISO / Security Manager | Risk visibility, governance and audit evidence | Sponsor or buyer |
+| Product Compliance / Regulatory Lead | Retrievable technical evidence and process records | Influencer; not a substitute for legal assessment |
+| Product-security consultancy | Repeatable assessments across clients | Complementary user / channel |
+| OT or automation integrator | Product and deployment context at customer sites | Complementary user / channel |
 
 ## Product promise
 
-**DeviceTrust helps teams organise IoT/OT asset information, assess declared security posture, analyse supported SBOM inputs, document vulnerability triage and retain traceable evidence.**
+**DeviceTrust aims to connect product/version records, software-component intelligence, vulnerability assessment, reviewed security decisions and traceable evidence in one explainable workflow.**
 
-It does not currently discover devices on networks, independently verify device identity or firmware, detect intrusions, predict attacks, control industrial equipment or provide production-grade continuous monitoring.
+The current prototype does only a small part of this promise: device inventory, declared posture, bounded evidence ingestion, a bounded CycloneDX parser, limited advisory matching, justified triage, reports and hash-linked audit history.
 
-## Initial use case
+## Initial demonstration context
 
-### Food production and cold-chain asset security assessment
+Use the existing food-processing / cold-chain scenario to make the workflow tangible without implying a vertical lock-in:
 
-Use a controlled assessment dataset representing a food-processing or cold-storage site:
+1. Register synthetic refrigeration controller, temperature sensor and industrial edge gateway records.
+2. Show declared attributes and preserve missing information as unverified.
+3. Import the synthetic CycloneDX SBOM for the edge gateway.
+4. Show limited matches against deliberately synthetic DT-DEMO-* advisories.
+5. Record a justified triage decision.
+6. Generate a report and verify the audit chain.
 
-1. Import or register representative assets such as refrigeration controllers, industrial gateways, environmental sensors and edge devices.
-2. Record declared manufacturer, model, firmware and selected security attributes.
-3. Preserve missing or uncertain information as unverified.
-4. Import a supported CycloneDX SBOM and inspect component findings.
-5. Correlate supported component identifiers with the local synthetic demonstration advisories and, where enabled, best-effort OSV results.
-6. Record justified vulnerability-triage decisions.
-7. Produce a device report and review the audit history.
+All identities, vendor names, package identifiers, SBOM contents and local advisories are fabricated. They are not real supplier data, real product firmware, confirmed vulnerabilities or a validated customer environment.
 
-The demonstration must label synthetic devices, SBOMs and local advisories clearly. It must not imply live network discovery, real customer telemetry or validated vulnerability coverage.
+## Product concept: Product Security File
 
-## Competitive position
+A future **Product Security File** could be a versioned, exportable record for each product release, containing:
 
-DeviceTrust is not currently a replacement for OT network-monitoring, asset-discovery, intrusion-detection or incident-response platforms.
+- Product identity: manufacturer, model, product identifier, hardware/firmware/software release and support period.
+- Software supply chain: SBOM format/version, components, identifiers, provenance, digest and import history.
+- Vulnerability assessment: advisories, affected-version reasoning, KEV/EPSS context and assessment timestamps.
+- Security decisions: triage, VEX statements, rationale, reviewer/actor and supporting evidence.
+- Lifecycle and audit: product-version history, changes, decisions and integrity checkpoints.
+- Reporting preparation: reviewed information that may help an authorised manufacturer prepare a notification.
 
-Established vendors and initiatives already address parts of this space, including asset visibility, network monitoring, threat detection and food-sector cyber resilience. DeviceTrust should be positioned as a lightweight, evidence-oriented assessment and vulnerability-triage workflow that may complement existing tools.
+This is an internal product concept, not an official CRA document, a complete technical file, proof of conformity or an implemented capability.
+
+## Competitive boundaries and potential differentiation
+
+DeviceTrust must not claim to replace established software-composition analysis, vulnerability-management, PSIRT, product-security or OT-security platforms.
 
 Potential differentiation to validate:
 
-- Clear provenance and uncertainty for imported asset/evidence data.
-- A focused workflow connecting inventory, supported SBOM analysis, justified triage and reports.
-- Lightweight local evaluation suitable for technical assessment and partner feedback.
-- Explicit separation between declared claims, observations and independently verified facts.
+- A focused workflow for smaller connected-product manufacturers that need product/version-to-component traceability.
+- Explicit provenance and uncertainty rather than presenting imported data as verified facts.
+- A reviewed chain from component finding to product impact assessment, decision rationale and evidence.
+- A lightweight evaluation path that may complement existing engineering and security tools.
 
-No competitive advantage is proven yet.
+These are hypotheses. No competitive advantage, market gap or willingness to pay has been demonstrated yet. Interview target users before investing in broad integrations or a multi-tenant service.
 
-## Why agriculture is not the first wedge
+## Market discovery plan
 
-Precision agriculture is strategically relevant, but it is a broad and fragmented environment with diverse device types, connectivity models, suppliers and operational contexts. A farm-level buyer may also have different budgets and security maturity from an industrial food processor or cold-chain operator.
+Conduct 5–10 initial exploratory interviews, then expand only if a repeatable problem emerges.
 
-The current DeviceTrust prototype is more closely aligned with centrally managed assets, gateways, component inventories, SBOMs and documented vulnerability decisions than with field-level discovery or agricultural process monitoring.
+Prioritise:
+- Product-security or firmware leads at small and medium-sized manufacturers of connected products.
+- Manufacturers of industrial gateways, sensors and embedded controllers.
+- Product-security consultancies and specialist integrators supporting those manufacturers.
 
-Agriculture remains in scope as a later vertical, particularly through AgTech integrators and larger operations. It should not dominate the first product narrative until interviews establish a repeatable buyer and concrete workflow.
+Ask for concrete examples:
+- How are product releases and their software components recorded?
+- Is an SBOM available for each shipped version? Who owns its accuracy?
+- How is a newly disclosed vulnerability mapped to shipped products and supported versions?
+- How are false positives, backports and non-affected decisions justified?
+- How are decisions, evidence, reviewers and customer communications retained?
+- What triggers escalation to a PSIRT or regulatory/legal function?
+- Which tools already cover the workflow, and where is manual work still required?
+- Who owns the budget and could sponsor a bounded pilot?
 
-## Roadmap implications
-
-### Now — prove the assessment workflow
-
-- Keep the existing prototype scope accurate.
-- Build a reproducible food-processing / cold-chain demonstration using synthetic data.
-- Improve the domain model and sample records only where needed to represent generic IoT/OT assets accurately.
-- Document provenance, confidence, verification state and operational criticality as distinct concepts.
-- Validate the workflow with OT integrators and food-sector security practitioners.
-
-### Next — improve asset and vulnerability intelligence
-
-- Define safe import formats and integrations for external asset inventories.
-- Expand SBOM ecosystem/version semantics and record intelligence provenance and freshness.
-- Define a defensible risk-prioritisation model that combines technical severity, exposure, asset criticality and evidence confidence.
-- Add reviewed evidence-to-asset association and conflict handling only with suitable identity and authorisation controls.
-
-### Later — controlled operational integrations
-
-- Evaluate passive discovery integrations and read-only network telemetry sources.
-- Add monitoring of asset and vulnerability changes.
-- Introduce production-grade identities, RBAC, tenant isolation, operational controls and external audit checkpoints before multi-customer operation.
-- Keep physical control and automatic remediation out of scope unless a separate safety and authorisation case is established.
-
-## Market validation plan
-
-Conduct 15–20 discovery conversations across:
-
-- OT/automation integrators serving food and beverage customers.
-- OT security consultancies and MSSPs.
-- Security, infrastructure and operations leaders at food processors, cold-storage operators and larger retailers.
-
-Ask about the current asset-inventory process, sources of firmware/software information, SBOM availability, vulnerability triage, supplier coordination, reporting effort, existing tools and purchasing authority.
-
-Do not lead with a feature pitch. Seek evidence of a recurring workflow problem, current workaround, measurable cost or risk, budget owner and willingness to run a bounded pilot.
+Do not lead with a feature pitch. Look for recurring work, measurable cost or risk, a named owner, existing budget and willingness to test with authorised data.
 
 ### Validation gates
 
-Proceed with the food/cold-chain wedge if interviews show a repeated, costly assessment or evidence-management problem that existing tools do not adequately solve and at least one qualified organisation agrees to a controlled pilot.
+Continue with manufacturers as the primary segment if interviews show a recurring product/version/component traceability problem, an identifiable owner and willingness to run a bounded pilot.
 
-Reconsider the initial vertical if the problem is already fully handled by incumbent tooling, if no reachable buyer owns it, or if the required integrations exceed the project's realistic scope.
+Reconsider the segment if existing tools already solve the problem adequately, no reachable buyer owns it, SBOM data is unavailable in practice, or the required product integrations exceed the project's realistic scope.
 
 ## Claims policy
 
 Allowed now:
-
-- IoT/OT security evidence and vulnerability-triage prototype.
-- Inventory and declared-posture assessment.
-- Bounded CycloneDX ingestion and limited vulnerability matching.
-- Justified triage, reports and hash-linked audit history.
+- Python/FastAPI prototype for IoT inventory, declared security posture and vulnerability triage.
+- Bounded CycloneDX JSON ingestion and limited PURL-based matching.
+- Optional best-effort OSV lookup.
+- Justified triage, JSON/Markdown reports and SHA-256-linked audit verification.
+- Synthetic cold-chain demonstration.
 
 Do not claim:
-
-- Active or complete device discovery.
-- Real-time monitoring or intrusion detection.
-- Prevention of cyberattacks or nation-state sabotage.
-- Prediction of attacks or operational failures.
-- Complete CVE coverage or verified device security.
-- NIS2/CER/CRA compliance, certification or guaranteed compliance.
-- Production readiness or validated customer outcomes.
+- CRA compliance, conformity assessment, certification or guaranteed compliance.
+- ENISA CRA Single Reporting Platform integration or automatic regulatory notifications.
+- Complete SBOM coverage, complete CVE coverage or verified product composition.
+- Automatic Article 14 trigger detection or legal deadline management.
+- VEX generation or product-version impact analysis before implemented and validated.
+- Independent device/firmware attestation, active discovery, continuous monitoring, IDS/IPS or attack prevention.
+- Production readiness, customer validation or product-market fit.
 
 ## References
 
-- European Commission, Joint statement on cyber incidents in refrigeration systems across the EU, 4 November 2026: https://digital-strategy.ec.europa.eu/en/news/joint-statement-cyber-incidents-refrigeration-systems-across-eu
-- ENISA, Threat Landscape 2026: https://www.enisa.europa.eu/topics/cyber-threats/threat-landscape
-- ENISA, Cybersecurity of Critical Sectors: https://www.enisa.europa.eu/topics/cybersecurity-of-critical-sectors
-- European Commission, NIS2 Directive: https://digital-strategy.ec.europa.eu/en/policies/nis2-directive
-- ACT4FOOD — Advanced Cybersecurity Tools for Critical Food Supply Chains: https://act4food.eu/
-- Systematic mapping study on security for IoT-based smart farming systems, Computers & Security, March 2026: https://doi.org/10.1016/j.cose.2025.104790
+- Regulation (EU) 2024/2847 — Cyber Resilience Act: https://eur-lex.europa.eu/eli/reg/2024/2847/oj/eng
+- European Commission — Cyber Resilience Act: https://digital-strategy.ec.europa.eu/en/policies/cyber-resilience-act
+- European Commission — CRA reporting obligations: https://digital-strategy.ec.europa.eu/en/policies/cra-reporting-obligations
+- ENISA — CRA Single Reporting Platform: https://www.enisa.europa.eu/topics/cybersecurity-policy/cra
+- CycloneDX — VEX: https://cyclonedx.org/capabilities/vex/
+- CISA — Known Exploited Vulnerabilities Catalog: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+- FIRST — Exploit Prediction Scoring System: https://www.first.org/epss/
