@@ -35,7 +35,7 @@ DEVICES = [
         "support_until": "2027-06-30",
         "security": {
             "unique_identity": None,
-            "authentication": "unknown",
+            "authentication": None,
             "default_credentials": None,
             "open_interfaces": ["mqtts"],
             "encryption_in_transit": True,
@@ -67,6 +67,15 @@ DEVICES = [
     },
 ]
 
+
+def _require_status(response, expected: int, operation: str) -> None:
+    if response.status_code != expected:
+        raise SystemExit(
+            f"{operation} failed: expected HTTP {expected}, "
+            f"received HTTP {response.status_code}: {response.text[:500]}"
+        )
+
+
 if __name__ == "__main__":
     api_key = os.environ.get("DEVICETRUST_API_KEY")
     if not api_key:
@@ -77,12 +86,27 @@ if __name__ == "__main__":
     sample = json.loads(sample_path.read_text(encoding="utf-8"))
 
     with TestClient(app) as client:
+        existing = client.get("/devices", headers=headers)
+        _require_status(existing, 200, "Device inventory preflight")
+        existing_ids = {item["device_id"] for item in existing.json()}
+        requested_ids = {item["device_id"] for item in DEVICES}
+        conflicts = sorted(existing_ids & requested_ids)
+        if conflicts:
+            raise SystemExit(
+                "Demo seed aborted before writing: these device IDs already exist: "
+                + ", ".join(conflicts)
+                + ". Use a fresh disposable database."
+            )
+
         for device in DEVICES:
             response = client.post("/devices", json=device, headers=headers)
-            print(device["device_id"], response.status_code, response.text[:300])
+            _require_status(response, 201, f"Create {device['device_id']}")
+            print("Created", device["device_id"])
+
         response = client.post(
             "/devices/EDGE-GW-003/sbom",
             json=sample,
             headers=headers,
         )
-        print("SBOM import", response.status_code, response.text[:500])
+        _require_status(response, 200, "Import cold-chain gateway SBOM")
+        print("SBOM import:", response.json())
