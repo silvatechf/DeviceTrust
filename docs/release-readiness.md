@@ -17,7 +17,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [ ] Verify branch protection/rulesets and required checks on the default branch.
 - [ ] Define any prospective commit-signature policy in repository settings.
 - [ ] Run the candidate from a clean checkout with a disposable database.
-- [ ] Verify PostgreSQL startup, persistence and restart behavior.
+- [x] Add Alembic baseline migration and PostgreSQL migration/persistence CI coverage.\n- [ ] Verify PostgreSQL startup, persistence and restart behavior in a clean local Compose deployment.
 - [ ] Verify console flows and API error paths in a real browser at desktop/mobile sizes.
 - [ ] Test concurrent audit writes and failure behavior.
 - [ ] Demonstrate backup/restore and rollback.
@@ -43,13 +43,13 @@ A checkbox must be marked only when the check has actually been performed and ev
 - Shared API key; no individual identity, RBAC, scopes, revocation workflow or tenant isolation.
 - Browser console receives the shared key in page memory.
 - No server-side browser sessions or backend-for-frontend.
-- No Alembic migration workflow; startup uses SQLAlchemy `create_all`.
+- Alembic baseline and explicit migration workflow are implemented; future schema changes still require reviewed migration scripts.
 - Audit chain has no external checkpoint, immutable retention or multi-writer serialization.
 - CycloneDX support is a bounded subset.
 - Local advisories are synthetic; optional OSV lookup is best-effort.
 - Evidence normalization covers selected attributes only; observations are not associated automatically or consumed by posture.
 - No global rate limiting, concurrency quota or operational alerting.
-- PostgreSQL integration, backup/restore, rollback and production TLS have not been demonstrated.
+- PostgreSQL migration/persistence is covered by CI; backup/restore, rollback and production TLS have not been demonstrated.
 
 ## Claims supported by the current implementation
 
