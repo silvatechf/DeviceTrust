@@ -55,7 +55,7 @@ Proposed fields:
 - `release_reference`: optional opaque manufacturer reference.
 - `created_at`.
 
-A uniqueness constraint should be based only on an explicitly selected manufacturer/product identity policy. Do not assume semantic versioning for every embedded product. Preserve version text; ecosystem-specific comparison belongs in later assessment logic.
+Use the generated `id` as the authoritative ProductRelease identity. Do not add a uniqueness constraint over declared manufacturer, product, version, hardware revision or release-reference fields in v1: these values may be missing, duplicated or changed, and no trustworthy cross-vendor natural key is established. Preserve version text; ecosystem-specific comparison belongs in later assessment logic.
 
 ### SBOMImport
 
