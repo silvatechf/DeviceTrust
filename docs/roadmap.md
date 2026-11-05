@@ -44,17 +44,19 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Goal:** answer which product releases may contain a newly affected component.
 
-- [ ] Persist each SBOM import as an immutable/versioned record with format, spec version, source, timestamp, digest and parser result.
-- [ ] Persist components with identifiers, PURLs where available, name, version, supplier and declared scope.
-- [ ] Link components to a specific product release and SBOM import.
+- [ ] Persist each accepted SBOM import as an immutable/versioned record with format, declared spec version, source, timestamp, SHA-256 digest of the exact bounded request bytes and parser result.
+- [ ] Persist component occurrences per import with bounded source name (preserving casing), version and validated PURL where available; do not globally deduplicate occurrences.
+- [ ] Keep `supplier`, `scope` and `bom_ref` out of the v1 persistence contract until a separately reviewed parser contract exposes and validates them.
+- [ ] Initially accept CycloneDX JSON with declared `specVersion=1.5`; this gate is not full CycloneDX schema validation.
+- [ ] Link each component occurrence to one SBOM import and each accepted import to a generated-ID product release; do not infer product identity from device or manufacturer labels.
 - [ ] Preserve incomplete or ambiguous identifiers; do not silently invent component matches.
-- [ ] Add safe re-import behavior, duplicate detection and import history.
+- [ ] Add safe re-import behavior and import history; enforce idempotency with a database uniqueness constraint on `(product_release_id, format, content_sha256)` and handle concurrent duplicate inserts.
 - [ ] Compare SBOM imports and explain component additions, removals and version changes.
-- [ ] Link vulnerability findings to the SBOM import and component, not only to a device.
+- [ ] Link product-scoped vulnerability findings to the exact component occurrence; derive import provenance through that component. Keep existing device-scoped findings backward-compatible.
 - [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
 - [ ] Keep parser limits, validation failures and unsupported fields visible to the user.
 
-**Exit criteria:** a reviewer can trace a finding to a product release, SBOM import and component identifier, including source and timestamp; re-imports do not overwrite history.
+**Exit criteria:** a reviewer can trace a product-scoped finding to a generated-ID product release, accepted SBOM import and immutable component occurrence, including source and timestamp; exact-byte digests and database constraints make duplicate handling safe under concurrency; re-imports do not overwrite history. Invalid imports create no accepted-import row and no partial component/finding writes.
 
 ## Milestone 4 — Reviewed vulnerability decisions and intelligence (P2)
 
