@@ -19,6 +19,8 @@ The project has not published a versioned release yet. This file records the cur
 - Threat model, architecture, evidence, security-control and release-readiness documentation.
 - Engineering decision records for architecture, authentication boundaries, evidence normalization, SBOM scope, audit integrity and the operator console.
 - Security test matrix linking implemented controls to automated test locations and outstanding manual verification.
+- Agri-food / cold-chain market-positioning hypothesis, target-segment assumptions and market-validation gates.
+- Synthetic food-processing and cold-chain demo records, sample CycloneDX document and repeatable local runbook.
 
 ### Security and limitations
 - The application remains a local/single-trust-domain prototype.
@@ -26,4 +28,5 @@ The project has not published a versioned release yet. This file records the cur
 - The audit chain is tamper-evident, not immutable.
 - Local advisories are synthetic; optional OSV lookup is not comprehensive vulnerability coverage.
 - Evidence observations are not independently attested, automatically associated or consumed by posture assessment.
-- No CRA conformity assessment or production-readiness claim is made.
+- Demo device identities, vendor, package identifiers and advisory findings are fabricated and are not real supplier data or confirmed vulnerabilities.
+- No active discovery, real-time monitoring, intrusion prevention, physical equipment control, CRA conformity assessment or production-readiness claim is made.
