@@ -12,9 +12,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import audit, posture, sbom
-from .db import AuditEntry, Device, EvidenceObservation, SessionLocal, Vulnerability
+from .db import AuditEntry, Device, EvidenceObservation, ProductRelease, SBOMComponent, SBOMImport, ProductFinding, SessionLocal, Vulnerability
 from .evidence_normalization import NORMALIZER_VERSION, normalize_observation
-from .schemas import DeviceIn, EvidenceObservationIn, SecurityProfile, TriageIn
+from . import product_sbom
+from .schemas import DeviceIn, EvidenceObservationIn, ProductIn, ProductReleaseIn, SecurityProfile, TriageIn
 
 SEV = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
 MAX_SBOM_BYTES = 2 * 1024 * 1024
@@ -142,6 +143,90 @@ async def _read_sbom_document(request: Request) -> dict:
     if not isinstance(document, dict):
         raise HTTPException(422, "SBOM document must be a JSON object")
     return document
+
+
+
+@app.post("/products", status_code=201)
+def create_product(body: ProductIn, db: Session = Depends(get_db), actor: str = Depends(auth)):
+    product = product_sbom.create_product(db, actor, body.manufacturer, body.product_name, body.external_reference)
+    return {"id": product.id, "manufacturer": product.manufacturer, "product_name": product.product_name,
+            "external_reference": product.external_reference, "created_at": product.created_at}
+
+
+@app.post("/products/{product_id}/releases", status_code=201)
+def create_product_release(product_id: int, body: ProductReleaseIn, db: Session = Depends(get_db), actor: str = Depends(auth)):
+    try:
+        release = product_sbom.create_release(db, actor, product_id, body.version, body.hardware_revision, body.release_reference)
+    except LookupError:
+        raise HTTPException(404, "Product not found") from None
+    return {"id": release.id, "product_id": release.product_id, "version": release.version,
+            "hardware_revision": release.hardware_revision, "release_reference": release.release_reference,
+            "created_at": release.created_at}
+
+
+@app.post("/product-releases/{release_id}/sbom", status_code=201)
+async def import_product_sbom(
+    release_id: int, request: Request,
+    source_type: str = Query(default="manual", pattern="^(manual|pipeline)$"),
+    source_reference: str | None = Query(default=None, max_length=500),
+    db: Session = Depends(get_db), actor: str = Depends(auth),
+):
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw) + len(chunk) > MAX_SBOM_BYTES:
+            raise HTTPException(413, "SBOM request exceeds the 2 MiB limit")
+        raw.extend(chunk)
+    try:
+        document = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(422, "Request body must contain valid UTF-8 JSON") from None
+    if not isinstance(document, dict):
+        raise HTTPException(422, "SBOM document must be a JSON object")
+    try:
+        imported, created = product_sbom.import_cyclonedx(
+            db, actor, release_id, bytes(raw), document, source_type, source_reference
+        )
+    except LookupError:
+        raise HTTPException(404, "Product release not found") from None
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "SBOM import conflicts with an existing database record") from None
+    return {"id": imported.id, "product_release_id": imported.product_release_id, "format": imported.format,
+            "spec_version": imported.spec_version, "content_sha256": imported.content_sha256,
+            "status": imported.status, "component_count": imported.component_count, "created": created}
+
+
+@app.get("/product-releases/{release_id}/sbom")
+def list_product_sbom_imports(release_id: int, db: Session = Depends(get_db), _: str = Depends(auth)):
+    if db.get(ProductRelease, release_id) is None:
+        raise HTTPException(404, "Product release not found")
+    imports = db.scalars(select(SBOMImport).where(SBOMImport.product_release_id == release_id)
+                         .order_by(SBOMImport.imported_at, SBOMImport.id)).all()
+    return [{"id": item.id, "format": item.format, "spec_version": item.spec_version,
+             "content_sha256": item.content_sha256, "imported_at": item.imported_at,
+             "component_count": item.component_count, "status": item.status} for item in imports]
+
+
+@app.get("/sbom/imports/{import_id}/components")
+def list_sbom_components(import_id: int, db: Session = Depends(get_db), _: str = Depends(auth)):
+    if db.get(SBOMImport, import_id) is None:
+        raise HTTPException(404, "SBOM import not found")
+    rows = db.scalars(select(SBOMComponent).where(SBOMComponent.sbom_import_id == import_id)
+                      .order_by(SBOMComponent.ordinal)).all()
+    return [{"id": row.id, "ordinal": row.ordinal, "name": row.name, "version": row.version, "purl": row.purl}
+            for row in rows]
+
+
+@app.get("/sbom/components/{component_id}/findings")
+def list_product_findings(component_id: int, db: Session = Depends(get_db), _: str = Depends(auth)):
+    if db.get(SBOMComponent, component_id) is None:
+        raise HTTPException(404, "SBOM component not found")
+    rows = db.scalars(select(ProductFinding).where(ProductFinding.sbom_component_id == component_id)
+                      .order_by(ProductFinding.vuln_id, ProductFinding.source)).all()
+    return [{"id": row.id, "vuln_id": row.vuln_id, "severity": row.severity, "fixed_in": row.fixed_in,
+             "source": row.source, "status": row.status, "justification": row.justification} for row in rows]
 
 
 @app.get("/health")
