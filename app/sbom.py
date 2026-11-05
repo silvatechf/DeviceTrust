@@ -10,12 +10,18 @@ MAX_COMPONENTS = 5000
 MAX_COMPONENT_NAME = 200
 MAX_COMPONENT_VERSION = 100
 MAX_PURL_LENGTH = 512
+SUPPORTED_CYCLONEDX_SPEC_VERSION = "1.5"
 ADVISORIES = Path(__file__).parent / "data" / "advisories.json"
 
 
 def parse_cyclonedx(doc: dict) -> list[dict]:
     if not isinstance(doc, dict) or doc.get("bomFormat") != "CycloneDX":
         raise ValueError("Document must declare bomFormat='CycloneDX'.")
+    spec_version = doc.get("specVersion")
+    if spec_version != SUPPORTED_CYCLONEDX_SPEC_VERSION:
+        raise ValueError(
+            f"Unsupported or missing CycloneDX specVersion; expected {SUPPORTED_CYCLONEDX_SPEC_VERSION}."
+        )
     components = doc.get("components")
     if not isinstance(components, list):
         raise ValueError("CycloneDX document must contain a components array.")

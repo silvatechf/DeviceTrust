@@ -3,31 +3,42 @@ import pytest
 from app.sbom import parse_cyclonedx, scan_local
 
 
+def _document(components, spec_version="1.5"):
+    return {"bomFormat": "CycloneDX", "specVersion": spec_version, "components": components}
+
+
 def _component(name="openssl", version="1.1.1", purl="pkg:generic/openssl@1.1.1"):
     return {"type": "library", "name": name, "version": version, "purl": purl}
 
 
+def test_rejects_missing_cyclonedx_spec_version():
+    with pytest.raises(ValueError, match="Unsupported or missing CycloneDX specVersion"):
+        parse_cyclonedx({"bomFormat": "CycloneDX", "components": []})
+
+
+def test_rejects_unsupported_cyclonedx_spec_version():
+    with pytest.raises(ValueError, match="Unsupported or missing CycloneDX specVersion"):
+        parse_cyclonedx(_document([], spec_version="1.6"))
+
+
 def test_rejects_non_object_component():
     with pytest.raises(ValueError, match="must be an object"):
-        parse_cyclonedx({"bomFormat": "CycloneDX", "components": ["openssl"]})
+        parse_cyclonedx(_document(["openssl"]))
 
 
 def test_rejects_component_without_name_or_version():
     with pytest.raises(ValueError, match="invalid name"):
-        parse_cyclonedx({"bomFormat": "CycloneDX", "components": [{"version": "1.0"}]})
+        parse_cyclonedx(_document([{"version": "1.0"}]))
 
 
 def test_rejects_invalid_package_url():
     with pytest.raises(ValueError, match="invalid purl"):
-        parse_cyclonedx({"bomFormat": "CycloneDX", "components": [_component(purl="not-a-purl")]})
+        parse_cyclonedx(_document([_component(purl="not-a-purl")]))
 
 
 def test_rejects_package_url_version_mismatch():
     with pytest.raises(ValueError, match="purl/version mismatch"):
-        parse_cyclonedx({
-            "bomFormat": "CycloneDX",
-            "components": [_component(purl="pkg:generic/openssl@9.9.9")],
-        })
+        parse_cyclonedx(_document([_component(purl="pkg:generic/openssl@9.9.9")]))
 
 
 def test_local_demo_match_requires_package_url():
