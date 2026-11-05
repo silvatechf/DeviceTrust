@@ -50,7 +50,12 @@ def parse_cyclonedx(doc: dict) -> list[dict]:
             if parsed_purl.version and parsed_purl.version != version:
                 raise ValueError(f"Component at index {index} has a purl/version mismatch.")
 
-        parsed.append({"name": name.strip().lower(), "version": version.strip(), "purl": purl})
+        parsed.append({
+            "name": name.strip().lower(),
+            "source_name": name.strip(),
+            "version": version.strip(),
+            "purl": purl,
+        })
     return parsed
 
 
