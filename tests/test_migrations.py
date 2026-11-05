@@ -15,6 +15,7 @@ def test_initial_migration_can_upgrade_and_downgrade(tmp_path: Path):
     try:
         tables = set(inspect(engine).get_table_names())
         assert {"alembic_version", "devices", "evidence_observations", "vulnerabilities", "audit_log"} <= tables
+        command.check(config)
 
         command.downgrade(config, "base")
         assert "devices" not in inspect(engine).get_table_names()
