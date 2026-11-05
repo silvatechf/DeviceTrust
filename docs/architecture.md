@@ -118,4 +118,4 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 - Audit hashing: `app/audit.py`
 - Tests: `tests/`
 
-Related documents: [Engineering decisions](engineering-decisions.md), [Threat model](threat-model.md), [Security controls](security-controls.md).
+Related documents: [Engineering decisions](engineering-decisions.md), [Threat model](threat-model.md), [Security controls](security-controls.md), [Persistent SBOM domain design](persistent-sbom-domain-design.md).
