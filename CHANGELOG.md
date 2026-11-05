@@ -19,6 +19,14 @@ The project has not published a versioned release yet. This file records the cur
 - Threat model, architecture, evidence, security-control and release-readiness documentation.
 - Engineering decision records for architecture, authentication boundaries, evidence normalization, SBOM scope, audit integrity and the operator console.
 - Security test matrix linking implemented controls to automated test locations and outstanding manual verification.
+- Synthetic food-processing and cold-chain demo records, sample CycloneDX document and repeatable local runbook.
+
+### Changed
+- Repositioned the product hypothesis around Product Security Intelligence & Evidence Management for connected and embedded product manufacturers.
+- Clarified product-security consultancies and specialist integrators as complementary users and potential channels.
+- Kept food production and cold-chain as a synthetic demonstration context rather than the product's market boundary.
+- Reordered the roadmap around operational foundations, persistent product/SBOM data, reviewed vulnerability decisions and developer workflows.
+- Updated the interview guide to distinguish the current prototype from the proposed product direction and CRA boundaries.
 
 ### Security and limitations
 - The application remains a local/single-trust-domain prototype.
@@ -26,4 +34,5 @@ The project has not published a versioned release yet. This file records the cur
 - The audit chain is tamper-evident, not immutable.
 - Local advisories are synthetic; optional OSV lookup is not comprehensive vulnerability coverage.
 - Evidence observations are not independently attested, automatically associated or consumed by posture assessment.
-- No CRA conformity assessment or production-readiness claim is made.
+- Demo device identities, vendor, package identifiers and advisory findings are fabricated and are not real supplier data or confirmed vulnerabilities.
+- No active discovery, real-time monitoring, intrusion prevention, physical equipment control, CRA conformity assessment or production-readiness claim is made.
