@@ -17,12 +17,17 @@ The repository is publicly visible, but no versioned release has been published 
 - [ ] Set an accurate repository description and relevant topics.
 - [ ] Review the full Git history and confirm no secrets, private data, customer data or unintended material are present.
 - [ ] Confirm branch protection / rulesets and required checks for the default branch.
-- [ ] Resolve the unsigned commit history / signature policy before merging the current PR.
+- [ ] Define and document a prospective commit-signature policy and verify the required branch rules. Do not rewrite historical commits solely to satisfy a policy selected later.
 - [ ] Run the exact final candidate locally from a clean checkout and disposable database.
 - [ ] Capture genuine desktop and mobile screenshots from the running application.
 - [ ] Verify all console flows, API error paths and the /docs experience in a real browser.
-- [ ] Confirm CI and CodeQL pass on the exact candidate commit.
+- [ ] Confirm CI and CodeQL pass on the exact candidate commit; record its SHA, run URLs and conclusions in the release evidence.
+- [ ] Review [engineering decisions](engineering-decisions.md) and the [security test matrix](test-matrix.md), including every documented residual gap.
 - [ ] Publish a versioned release only after all required gates are satisfied.
+
+## Evidence interpretation
+
+The [test matrix](test-matrix.md) maps implemented controls to test locations. It is not proof that those tests passed on a particular revision. No release gate is satisfied by configuration alone: retain evidence from the exact candidate SHA. Manual browser, PostgreSQL, concurrency, backup/restore and clean-checkout checks remain open until executed and recorded.
 
 ## Demo acceptance gates
 

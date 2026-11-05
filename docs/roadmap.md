@@ -20,13 +20,15 @@
 - [x] Define canonical attribute vocabulary, normalization boundaries and source provenance.
 - [x] Specify conflict retention, temporal semantics and reviewed association safeguards.
 - [x] Implement deterministic pure normalizers with raw-value preservation and version metadata.
-- [ ] Add read-only normalized projections and tests for unknown, invalid, stale and conflicting observations.
+- [x] Add a read-only normalized projection and tests for unknown and invalid observations.
+- [ ] Extend projection coverage and define behavior for stale and conflicting observations.
 - [ ] Implement reviewed association only after actor identity and authorization limitations are addressed.
 - [ ] Define explicit per-control evidence acceptance and freshness rules before posture integration.
 
 ### Vulnerability intelligence
-- [ ] Strengthen CycloneDX validation and component normalization.
-- [ ] Evaluate affected version ranges and ecosystem identifiers.
+- [x] Implement bounded CycloneDX component validation and PURL-based matching for the supported subset.
+- [ ] Extend schema coverage, component normalization and ecosystem-specific validation.
+- [ ] Evaluate affected version ranges and ecosystem identifiers beyond the current bounded matching.
 - [ ] Add CISA KEV enrichment and preserve source/timestamp.
 - [ ] Treat runtimes and interpreters as SBOM components.
 - [ ] Treat unavailable feeds as incomplete/unknown, not clean.
@@ -39,6 +41,8 @@
 - No physical control commands in the MVP.
 
 ## Milestone 4 — Operational readiness
+
+The current prototype is not production-ready. See [release readiness](release-readiness.md), [engineering decisions](engineering-decisions.md) and the [test matrix](test-matrix.md) for the evidence gates and explicit limitations.
 - Per-client identities, RBAC and secret rotation.
 - Alembic migrations and PostgreSQL tests.
 - External audit anchoring.

@@ -104,7 +104,7 @@ node --check web/app.js
 pytest -q
 ```
 
-GitHub Actions runs these checks on pushes and pull requests. CodeQL analysis is configured separately. A green CI run is useful evidence, not proof that the application is secure or production-ready.
+GitHub Actions runs these checks on pushes and pull requests. CodeQL analysis is configured separately. Consult the [security test matrix](docs/test-matrix.md) for the control-to-test map and the remaining manual verification gaps. A configured workflow is not evidence of a successful run; inspect the exact candidate commit before making a release claim. A green CI run is useful evidence, not proof that the application is secure or production-ready.
 
 ## Security model
 
@@ -127,6 +127,8 @@ Please read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Contrib
 - [Operator console and its security boundary](docs/operator-console.md)
 - [Local demonstration runbook](docs/demo-runbook.md)
 - [Prototype limitations](docs/prototype-limitations.md)
+- [Engineering decisions and architecture rationale](docs/engineering-decisions.md)
+- [Security test matrix and verification evidence](docs/test-matrix.md)
 - [Release readiness checklist](docs/release-readiness.md)
 - [Roadmap](docs/roadmap.md)
 - [Changelog](CHANGELOG.md)
