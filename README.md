@@ -1,49 +1,86 @@
 # DeviceTrust
 
-**Evidence-oriented IoT Product Security & Lifecycle Management prototype**
+**A Python/FastAPI prototype for IoT security evidence and vulnerability triage**
 
 [![CI](https://github.com/silvatechf/DeviceTrust/actions/workflows/ci.yml/badge.svg)](https://github.com/silvatechf/DeviceTrust/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/silvatechf/DeviceTrust/actions/workflows/codeql.yml/badge.svg)](https://github.com/silvatechf/DeviceTrust/actions/workflows/codeql.yml)
 
-DeviceTrust explores how IoT product-security teams can organize device inventory, security posture evidence, SBOM component findings and auditable triage decisions in one lightweight workflow.
+DeviceTrust explores a practical question: **how can a team keep device inventory, security posture, software-component findings and investigation decisions in one traceable workflow?**
 
-> **Project status:** early-stage prototype for local technical evaluation. It is not a production security platform, active network scanner, device-protection system or Cyber Resilience Act (CRA) conformity assessment.
+It is an engineering prototype built with Python, FastAPI, Pydantic and SQLAlchemy. It is intended for local evaluation and technical learning, not production deployment.
 
-## What works in this prototype
+> **Current status:** early-stage prototype. DeviceTrust does not actively discover devices, independently verify device claims, prevent attacks or certify compliance with the EU Cyber Resilience Act (CRA).
 
-- FastAPI API with shared API-key authentication.
-- Device inventory and declared security-profile assessment.
-- Explicit `unverified` posture when evidence is missing or insufficient.
-- Bounded evidence observation ingestion, including unassigned observations.
-- Read-only normalization projection for selected identity, network, firmware and security attributes.
-- Bounded CycloneDX JSON ingestion and PURL-based component matching.
-- Synthetic local demonstration advisories and optional best-effort OSV lookup.
+## The problem and the approach
+
+IoT security information arrives from different places: inventories, vendor declarations, router exports and SBOM files. Inputs can be incomplete, stale or wrong. Treating missing information as proof of safety creates false confidence.
+
+DeviceTrust brings selected inputs into one API and keeps their limits visible:
+
+1. Store device inventory and declared security attributes.
+2. Assess the declared profile and keep missing information as `unverified`.
+3. Accept bounded evidence observations while preserving source and timestamps.
+4. Parse a supported subset of CycloneDX JSON and match components against synthetic demo advisories; optionally query OSV.
+5. Let an operator record a vulnerability triage status with a justification.
+6. Generate JSON/Markdown reports and verify a SHA-256-linked audit history.
+
+Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a device or change its posture result.
+
+## What is implemented
+
+- FastAPI HTTP API with shared API-key authentication.
+- Pydantic request validation and bounded input fields.
+- SQLAlchemy persistence; SQLite by default, PostgreSQL configurable through `DATABASE_URL`.
+- Device inventory and declared-profile posture assessment.
+- Explicit `unverified` results when required posture information is missing.
+- Bounded evidence ingestion, unassigned observations and read-only normalization for selected attributes.
+- Bounded CycloneDX JSON parsing and PURL-based component matching.
+- Synthetic local demo advisories and optional best-effort OSV lookup.
 - Vulnerability triage with mandatory justification.
 - JSON and Markdown device reports.
-- SHA-256 hash-chained audit events and integrity verification.
-- Same-origin local operator console for inventory, posture, SBOM, triage, reports and audit review.
+- SHA-256 hash-linked audit entries and integrity verification.
+- Same-origin local operator console served by FastAPI.
 
-## What it does not do
+## What is not implemented
 
-- Discover devices through active LAN scanning or packet capture.
-- Independently attest device identity, firmware integrity or security declarations.
-- Automatically associate unassigned evidence with devices.
-- Feed normalized observations into posture calculations.
-- Provide complete CVE coverage or complete CycloneDX schema validation.
-- Provide individual user identities, RBAC, tenant isolation or production browser sessions.
-- Prevent attacks, control physical equipment or certify CRA compliance.
+- Active LAN discovery, packet capture or device agents.
+- Independent device identity, firmware-signature or hardware attestation.
+- Automatic association of unassigned observations with devices.
+- Evidence-driven posture calculations or source-conflict resolution.
+- Full CycloneDX schema/dependency-graph validation or complete CVE coverage.
+- Individual operator accounts, RBAC, tenant isolation or production browser sessions.
+- Immutable/WORM audit storage, external audit checkpoints or multi-writer serialization.
+- Production operations, incident response automation or CRA conformity assessment.
 
-See [Prototype Limitations](docs/prototype-limitations.md) and the [Threat Model](docs/threat-model.md) before evaluating the project.
+See [Prototype limitations](docs/prototype-limitations.md), [Threat model](docs/threat-model.md) and [Release readiness](docs/release-readiness.md).
 
-## Architecture
+## Architecture at a glance
 
-DeviceTrust is a modular monolith built with Python 3.12, FastAPI, Pydantic and SQLAlchemy. SQLite is the default local database; PostgreSQL can be configured with `DATABASE_URL`.
+DeviceTrust is a **modular monolith**, not a set of microservices. FastAPI handles HTTP requests and authentication; route handlers coordinate domain logic; SQLAlchemy persists devices, evidence, vulnerabilities and audit events.
 
-The [architecture reference](docs/architecture.md) includes editable Mermaid diagrams, trust boundaries and a clear distinction between implemented and planned capabilities.
+```mermaid
+flowchart LR
+    CLIENT[API client / local console] --> API[FastAPI]
+    API --> AUTH[Shared API key]
+    AUTH --> ROUTES[Route handlers]
+    ROUTES --> POSTURE[Posture service]
+    ROUTES --> EVIDENCE[Evidence + normalizer]
+    ROUTES --> SBOM[SBOM + advisory lookup]
+    ROUTES --> TRIAGE[Vulnerability triage]
+    ROUTES --> REPORT[Reports]
+    ROUTES --> AUDIT[Audit service]
+    POSTURE --> DB[(SQLAlchemy / SQLite or PostgreSQL)]
+    EVIDENCE --> DB
+    SBOM --> DB
+    TRIAGE --> DB
+    AUDIT --> DB
+```
 
-## Quick start — local SQLite
+The diagram shows the current application structure, not a deployment topology. See [Architecture](docs/architecture.md) for request flow and trust boundaries.
 
-### 1. Create an environment
+## Run locally
+
+### 1. Create a virtual environment
 
 **Windows PowerShell**
 ```powershell
@@ -61,7 +98,7 @@ pip install -r requirements-dev.txt
 export DEVICETRUST_API_KEY="replace-with-a-random-local-secret"
 ```
 
-Keep the API key local. Do not commit it or reuse a production credential.
+Keep this key local. Do not commit it or reuse a production credential.
 
 ### 2. Start the API
 
@@ -72,29 +109,29 @@ uvicorn app.main:app --reload
 - Operator console: http://127.0.0.1:8000/
 - Interactive API documentation: http://127.0.0.1:8000/docs
 
-The operator console receives the shared API key in browser memory. Use it only with a trusted local instance; do not expose it to the public internet.
+The console receives the shared API key in browser memory. Use it only with a trusted local instance. Do not expose the service or key to the public internet.
 
-### 3. Optional synthetic demo data
+### 3. Load synthetic demo data (optional)
 
-Stop any running instance first if you want a clean disposable database. Then:
+Stop the server first if you want to prepare a clean disposable database:
 
 ```bash
 python -m app.seed
 ```
 
-The seeder creates three synthetic devices and imports the sample CycloneDX document for `CAM-002`. It does not reset an existing database. Use a fresh disposable database for a clean walkthrough. See the [Demo Runbook](docs/demo-runbook.md).
+The seeder creates three synthetic devices and imports the sample CycloneDX document for `CAM-002`. It does not reset an existing database. Use a fresh disposable database for a repeatable walkthrough. See the [Demo runbook](docs/demo-runbook.md).
 
-## Optional Docker Compose — PostgreSQL
+## Optional PostgreSQL setup
 
-Copy `.env.example` to `.env`, replace both placeholders with independent random hexadecimal secrets, and then run:
+Copy `.env.example` to `.env`, replace both placeholders with independent random secrets, then run:
 
 ```bash
 docker compose up --build
 ```
 
-The API port is bound to `127.0.0.1`. Keep the environment file private and never commit `.env`. The Compose configuration requires explicit secrets and does not fall back to a known default database password.
+The API port is bound to localhost. Keep `.env` private and never commit it. PostgreSQL support is configurable, but integration, restart and backup/restore behavior still require manual verification.
 
-## Quality checks
+## Run quality checks
 
 ```bash
 ruff check .
@@ -104,43 +141,46 @@ node --check web/app.js
 pytest -q
 ```
 
-GitHub Actions runs these checks on pushes and pull requests. CodeQL analysis is configured separately. Consult the [security test matrix](docs/test-matrix.md) for the control-to-test map and the remaining manual verification gaps. A configured workflow is not evidence of a successful run; inspect the exact candidate commit before making a release claim. A green CI run is useful evidence, not proof that the application is secure or production-ready.
+GitHub Actions runs the configured checks on pushes and pull requests; CodeQL is configured separately. Check the exact commit's workflow results before claiming they passed. Tests and static analysis provide useful evidence, not proof that the application is secure or production-ready. The [test matrix](docs/test-matrix.md) maps controls to test locations and records remaining gaps.
 
-## Security model
+## Security principles
 
-1. Missing data is not evidence of compliance.
-2. Evidence observations preserve source and time context and remain unverified by default.
-3. Weak identifiers such as MAC, IP, hostname, OUI and banners are not proof of device identity.
-4. Risk acceptance requires a recorded justification.
-5. Audit hash chains provide tamper evidence, not immutable storage.
-6. DeviceTrust is an assessment and evidence-management prototype, not an inline IDS/IPS or OT safety controller.
+- Missing information stays unknown; it is not treated as safe.
+- Submitted device and evidence claims are not independent attestation.
+- Weak identifiers such as MAC, IP and hostname are not identity proof.
+- Vulnerability triage requires a written justification.
+- Audit hash chaining provides tamper evidence, not immutable storage.
+- External intelligence failures or missing results do not mean that a component is vulnerability-free.
 
-Please read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Contributions should follow [CONTRIBUTING.md](CONTRIBUTING.md).
+Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Contributions should follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Technical documentation
 
-- [Architecture and data flows](docs/architecture.md)
-- [Security controls and evidence model](docs/security-controls.md)
-- [Threat model and residual risks](docs/threat-model.md)
-- [Evidence ingestion API](docs/evidence-ingestion.md)
-- [Evidence normalization and association design](docs/evidence-normalization.md)
-- [Operator console and its security boundary](docs/operator-console.md)
-- [Local demonstration runbook](docs/demo-runbook.md)
-- [Prototype limitations](docs/prototype-limitations.md)
-- [Engineering decisions and architecture rationale](docs/engineering-decisions.md)
-- [Security test matrix and verification evidence](docs/test-matrix.md)
-- [Release readiness checklist](docs/release-readiness.md)
-- [Roadmap](docs/roadmap.md)
-- [Changelog](CHANGELOG.md)
+| Document | What it helps explain |
+|---|---|
+| [Architecture](docs/architecture.md) | Request flow, modules, data flow and trust boundaries |
+| [Engineering decisions](docs/engineering-decisions.md) | Why the current design was chosen and its trade-offs |
+| [Security controls](docs/security-controls.md) | Implemented controls, tests and limitations |
+| [Threat model](docs/threat-model.md) | Assets, trust boundaries, abuse cases and residual risks |
+| [Evidence ingestion](docs/evidence-ingestion.md) | Evidence API behavior and validation boundaries |
+| [Evidence normalization](docs/evidence-normalization.md) | Canonical attributes, normalization and future association |
+| [Operator console](docs/operator-console.md) | Browser workflow and credential boundary |
+| [Demo runbook](docs/demo-runbook.md) | Repeatable local walkthrough with synthetic data |
+| [Prototype limitations](docs/prototype-limitations.md) | What must not be claimed |
+| [Test matrix](docs/test-matrix.md) | Control-to-test mapping and manual verification gaps |
+| [Release readiness](docs/release-readiness.md) | Evidence required before a release |
+| [Roadmap](docs/roadmap.md) | Implemented work and next steps |
+| [Interview guide](docs/interview-guide.md) | A clear way to explain the project and defend decisions |
+| [Changelog](CHANGELOG.md) | Development history |
 
 ## References
 
 - NISTIR 8259 — Foundational Cybersecurity Activities for IoT Device Manufacturers.
-- CycloneDX — Software Bill of Materials standard.
+- CycloneDX — Software Bill of Materials (SBOM) standard.
 - OSV — Open Source Vulnerabilities database and API.
 - CISA Known Exploited Vulnerabilities (KEV) Catalog.
 - Regulation (EU) 2024/2847 — Cyber Resilience Act.
 
 ## License
 
-No license has been selected yet. Until the copyright holder chooses and adds a license, all rights are reserved and reuse, modification or redistribution are not granted. See the release-readiness checklist before publishing a versioned release.
+No license has been selected. Until a license is added, all rights are reserved; public visibility does not grant permission to reuse, modify or redistribute this project.
