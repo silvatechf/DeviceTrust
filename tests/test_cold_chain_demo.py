@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
+from app.sbom import parse_cyclonedx, scan_local
 from app.schemas import DeviceIn
 from app.seed import COLD_CHAIN_DEVICES, DEVICES
-from app.sbom import parse_cyclonedx, scan_local
 
 
 def test_cold_chain_demo_devices_match_api_contract():
