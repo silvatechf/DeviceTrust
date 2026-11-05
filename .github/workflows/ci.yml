@@ -30,3 +30,33 @@ jobs:
         run: pip-audit -r requirements.txt
       - name: Tests
         run: pytest -q
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: devicetrust
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: devicetrust_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devicetrust -d devicetrust_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://devicetrust:test-password@localhost:5432/devicetrust_test
+      DEVICETRUST_API_KEY: test-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: PostgreSQL migration and persistence test
+        run: pytest -q tests/test_postgres_persistence.py
