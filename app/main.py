@@ -11,11 +11,27 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import audit, posture, sbom
-from .db import AuditEntry, Device, EvidenceObservation, ProductRelease, SBOMComponent, SBOMImport, ProductFinding, SessionLocal, Vulnerability
+from . import audit, posture, product_sbom, sbom
+from .db import (
+    AuditEntry,
+    Device,
+    EvidenceObservation,
+    ProductFinding,
+    ProductRelease,
+    SBOMComponent,
+    SBOMImport,
+    SessionLocal,
+    Vulnerability,
+)
 from .evidence_normalization import NORMALIZER_VERSION, normalize_observation
-from . import product_sbom
-from .schemas import DeviceIn, EvidenceObservationIn, ProductIn, ProductReleaseIn, SecurityProfile, TriageIn
+from .schemas import (
+    DeviceIn,
+    EvidenceObservationIn,
+    ProductIn,
+    ProductReleaseIn,
+    SecurityProfile,
+    TriageIn,
+)
 
 SEV = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
 MAX_SBOM_BYTES = 2 * 1024 * 1024
