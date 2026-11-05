@@ -27,7 +27,7 @@ For normal typed endpoints, Pydantic validates request models. The SBOM route re
 |---|---|
 | `app/main.py` | FastAPI app, routes, authentication dependency, request orchestration and response serialization |
 | `app/schemas.py` | Pydantic request contracts and field constraints |
-| `app/db.py` | SQLAlchemy models, engine/session setup and table creation |
+| `app/db.py` | SQLAlchemy models, engine/session setup and database access |
 | `app/posture.py` | Rules that assess the declared device security profile |
 | `app/sbom.py` | CycloneDX subset parsing, PURL validation, local demo matching and optional OSV lookup |
 | `app/evidence_normalization.py` | Pure normalizers for selected evidence attributes |
