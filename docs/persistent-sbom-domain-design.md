@@ -150,15 +150,17 @@ The digest is a content-integrity identifier, not proof of source authenticity o
 - SQLite migration upgrade/downgrade and PostgreSQL integration.
 - Existing device-scoped import, finding, triage and report tests remain valid.
 
-## 9. Decisions still required before implementation
+## 9. Proposed decisions for design review
 
-1. Product identity and uniqueness policy when manufacturer identifiers are absent.
-2. Whether rejected import attempts are stored separately from accepted SBOM imports.
-3. Whether the product-scoped finding model is separate or shares selected fields with legacy device vulnerabilities.
-4. Whether component `bom-ref` values are unique within an import and how duplicates are handled.
-5. Which CycloneDX specification versions and component fields are in the initial supported contract.
+The current implementation does not provide trustworthy manufacturer identifiers or individual actor identity. The following defaults minimise false identity claims and preserve compatibility:
 
-These decisions should be resolved in the issue #18 design review before writing the migration.
+1. **Product identity:** use an internal generated ID as the authoritative database identity. Treat manufacturer, product name and optional external reference as declared attributes, not a natural key. Do not enforce global uniqueness on names. When no trustworthy manufacturer identifier exists, keep potentially duplicate product records separate and expose duplicate detection as a review task; never auto-merge them. Product-release identity follows the same rule: preserve the declared version and optional hardware/release references, without assuming SemVer or inventing a cross-vendor uniqueness key.
+2. **Rejected ingestion attempts:** do not create an `SBOMImport` for a document that fails validation before acceptance. Keep the import table semantically limited to accepted or explicitly partial snapshots. Return bounded validation errors and emit sanitised operational/security telemetry; do not log raw SBOM content. A separate ingestion-attempt entity is deferred until there is a concrete audit/retention requirement and a trustworthy actor model.
+3. **Product findings:** introduce a separate product-scoped finding model referencing the exact `SBOMComponent` occurrence. Keep the existing device-scoped `vulnerabilities` table and its uniqueness semantics unchanged. This avoids nullable polymorphic ownership and prevents accidental migration of findings without product provenance.
+4. **`bom-ref`:** preserve it as an opaque, import-local reference, but do not impose uniqueness in the first iteration. Duplicate or missing values must not collapse component occurrences; `(sbom_import_id, ordinal)` remains the occurrence key. If a future operation needs to resolve `bom-ref`, it must detect ambiguity and return an explicit unresolved result.
+5. **CycloneDX contract:** initially support JSON only and the bounded component fields already represented by the parser. Before persistence is implemented, add explicit `specVersion` validation and fixtures for every version admitted by the API. Do not claim full CycloneDX schema support. The exact version allow-list must be selected in the implementation PR after checking the parser/library compatibility and fixtures; unsupported or missing versions must produce an explicit validation outcome.
+
+These are proposed defaults, not implemented behavior. The implementation PR must encode the selected decisions in constraints, service-level invariants and tests. In particular, acceptance of partial imports, product duplicate review UX and the exact CycloneDX version allow-list remain explicit implementation decisions.
 
 ## 10. Explicit non-goals
 
