@@ -18,21 +18,22 @@ This is an initial implementation for selected identity, network, firmware and s
 
 Different sources may express the same attribute in different formats. A canonical vocabulary makes later comparison easier, but a bad mapping can create false certainty. DeviceTrust therefore normalizes only attributes with explicit rules and keeps the original input available for review.
 
-## Example canonical attributes
+## Attributes currently mapped
 
 | Canonical attribute | Example | Important limitation |
 |---|---|---|
 | `identity.manufacturer` | `Acme` | Claim, not attestation |
 | `identity.model` | `GW-100` | May be ambiguous |
+| `identity.serial_number` | `SN123` | Sensitive operational identifier |
 | `network.mac_address` | `02:00:00:00:00:01` | Spoofable; not identity proof |
 | `network.ip_address` | `192.0.2.10` | Time-bound and reusable |
 | `network.hostname` | `sensor-01` | Mutable and non-unique |
 | `firmware.version` | `1.2.3` | Vendor formats may not be comparable |
 | `security.secure_boot` | `enabled` | Must state how it was observed |
+| `security.firmware_signed` | `true` | Signature presence is not validation |
 | `management.internet_exposed` | `false` | Scope and observation window matter |
-| `sbom.component.purl` | `pkg:pypi/example@1.0` | Must be validated before correlation |
 
-Unknown attributes remain unclassified; the normalizer does not guess a similar canonical name.
+Unknown attributes remain unclassified; the normalizer does not guess a similar canonical name. SBOM PURL validation is handled separately by the SBOM parser, not by this normalizer.
 
 ## Normalization rules
 
@@ -41,8 +42,7 @@ Unknown attributes remain unclassified; the normalizer does not guess a similar 
 - Parse IP addresses using standard library parsing.
 - Normalize MAC addresses to a canonical representation.
 - Parse boolean values only from an explicit set of accepted representations.
-- Keep firmware versions as opaque strings unless their ecosystem defines comparison semantics.
-- Reuse the SBOM PURL validation boundary rather than introducing a weaker parser.
+- Keep firmware and identity strings opaque unless their semantics are explicitly defined.
 - Keep invalid known values in the raw observation and report a normalization error.
 
 ## Identity and association are separate
