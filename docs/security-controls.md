@@ -11,7 +11,7 @@ This document describes what the current code does, where to find its tests and 
 | Evidence ingestion | Source allowlist, bounded values, timezone-aware timestamps and digest format checks | `tests/test_api.py` | No source-specific identity or independent attestation |
 | Verification boundary | Server assigns `unverified`; client cannot self-verify | `tests/test_api.py` | No operator review workflow |
 | SBOM body | Streaming 2 MiB limit; malformed/non-object JSON rejected | `tests/test_sbom_input_limits.py` | Reverse-proxy limits not validated |
-| SBOM components | Component count/field bounds and PURL validation | `tests/test_sbom_validation.py` | Not full CycloneDX schema or dependency-graph validation |
+| SBOM components | CycloneDX JSON `specVersion` 1.5 allow-list, component count/field bounds and PURL validation | `tests/test_sbom_validation.py` | Only version declaration is gated; not full CycloneDX schema or dependency-graph validation |
 | Local advisory matching | PURL package type/name and version-before-fixed comparison | `tests/test_sbom_validation.py` | Synthetic demo records, not a maintained feed |
 | OSV lookup | Optional exact PURL/version query | `tests/test_sbom_osv_response.py` | Best-effort; errors are skipped and coverage is not guaranteed |
 | Posture assessment | Missing data stays unverified; declared exposed management interface is high risk | `tests/test_posture_evidence_boundaries.py` | Uses declared metadata, not active discovery |
