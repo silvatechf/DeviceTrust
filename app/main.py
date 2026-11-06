@@ -161,7 +161,6 @@ async def _read_sbom_document(request: Request) -> dict:
     return document
 
 
-
 @app.post("/products", status_code=201)
 def create_product(body: ProductIn, db: Session = Depends(get_db), actor: str = Depends(auth)):
     product = product_sbom.create_product(db, actor, body.manufacturer, body.product_name, body.external_reference)
