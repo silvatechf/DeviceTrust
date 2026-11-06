@@ -66,10 +66,12 @@ def _lt(a: str, b: str) -> bool:
         return False
 
 
-def scan_local(components: list[dict]) -> list[dict]:
+def scan_local(
+    components: list[dict], *, include_component_index: bool = False
+) -> list[dict]:
     advisories = json.loads(ADVISORIES.read_text(encoding="utf-8"))
     hits = []
-    for component in components:
+    for component_index, component in enumerate(components):
         purl = component.get("purl")
         if not purl:
             continue
@@ -83,22 +85,29 @@ def scan_local(components: list[dict]) -> list[dict]:
                 and advisory["package"].lower() == parsed_purl.name.lower()
             )
             if same_package and _lt(component["version"], advisory["fixed"]):
-                hits.append({
+                finding = {
                     "component": component["name"],
                     "version": component["version"],
                     "vuln_id": advisory["id"],
                     "severity": advisory["severity"],
                     "fixed_in": advisory["fixed"],
                     "source": "local-demo",
-                })
+                }
+                if include_component_index:
+                    finding["component_index"] = component_index
+                hits.append(finding)
     return hits
 
 
-def scan_osv(components: list[dict]) -> list[dict]:
+def scan_osv(
+    components: list[dict], *, include_component_index: bool = False
+) -> list[dict]:
     """Optional OSV lookup scoped to each exact package URL and component version."""
     hits = []
     with httpx.Client(timeout=8) as client:
-        for component in (item for item in components if item.get("purl")):
+        for component_index, component in enumerate(components):
+            if not component.get("purl"):
+                continue
             try:
                 response = client.post(
                     "https://api.osv.dev/v1/query",
@@ -134,19 +143,24 @@ def scan_osv(components: list[dict]) -> list[dict]:
                 if not isinstance(severity, str):
                     severity = "unknown"
 
-                hits.append({
+                finding = {
                     "component": component["name"],
                     "version": component["version"],
                     "vuln_id": vuln_id,
                     "severity": severity.lower(),
                     "fixed_in": None,
                     "source": "osv",
-                })
+                }
+                if include_component_index:
+                    finding["component_index"] = component_index
+                hits.append(finding)
     return hits
 
 
-def scan(components: list[dict]) -> list[dict]:
-    hits = scan_local(components)
+def scan(
+    components: list[dict], *, include_component_index: bool = False
+) -> list[dict]:
+    hits = scan_local(components, include_component_index=include_component_index)
     if os.getenv("DEVICETRUST_OSV") == "1":
-        hits += scan_osv(components)
+        hits += scan_osv(components, include_component_index=include_component_index)
     return hits

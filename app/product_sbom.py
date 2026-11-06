@@ -91,10 +91,10 @@ def import_cyclonedx(
         raise LookupError("Product release not found")
 
     components = sbom.parse_cyclonedx(document)
-    findings_by_component: dict[tuple[str, str], list[dict]] = {}
-    for finding in sbom.scan(components):
-        key = (finding["component"], finding["version"])
-        findings_by_component.setdefault(key, []).append(finding)
+    findings_by_component: dict[int, list[dict]] = {}
+    for finding in sbom.scan(components, include_component_index=True):
+        component_index = finding["component_index"]
+        findings_by_component.setdefault(component_index, []).append(finding)
 
     digest = hashlib.sha256(raw_document).hexdigest()
     existing = db.scalars(
@@ -138,8 +138,7 @@ def import_cyclonedx(
             db.add(occurrence)
             db.flush()
 
-            key = (component["name"], component["version"])
-            for finding in findings_by_component.get(key, []):
+            for finding in findings_by_component.get(ordinal, []):
                 db.add(
                     ProductFinding(
                         sbom_component_id=occurrence.id,
