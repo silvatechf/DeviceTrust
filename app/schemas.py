@@ -68,6 +68,7 @@ class TriageIn(BaseModel):
     status: Literal["open", "in_progress", "fixed", "accepted_risk", "not_affected"]
     justification: str = Field(min_length=10, max_length=1000)
 
+
 class ProductIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     manufacturer: str = Field(min_length=1, max_length=200)
