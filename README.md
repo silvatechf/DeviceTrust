@@ -37,9 +37,9 @@ Implemented prototype workflows:
 4. Parse a supported subset of CycloneDX JSON and match components against synthetic demo advisories; optionally query OSV.
 5. Record vulnerability-triage decisions with a mandatory justification.
 6. Generate JSON/Markdown reports and verify a SHA-256-linked audit history.
-7. Persist accepted product-release SBOM imports, component occurrences and product-scoped findings through the authenticated product SBOM API (feature branch; validation pending).\n8. Use a same-origin local operator console.
+7. Persist accepted product-release SBOM imports, component occurrences and product-scoped findings through the authenticated product SBOM API (feature branch; CI and local PostgreSQL validation passed).\n8. Use a same-origin local operator console.
 
-Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The new product-scoped SBOM persistence flow is implemented on the current feature branch but is not yet merged or operationally validated.
+Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The new product-scoped SBOM persistence flow is implemented and locally validated on the current feature branch; it remains under PR review and is not yet released.
 
 ### Product-scoped SBOM API (feature branch)
 
@@ -54,12 +54,11 @@ The persistent SBOM work introduces these authenticated endpoints:
 
 The import digest is calculated from the exact request bytes. A repeated digest for the same release and format returns the existing import. Only fully validated imports are persisted. The API does not store raw SBOM documents or infer a relationship between a product and a device.
 
-This API is under review in [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). Its CI, migration and PostgreSQL behavior must be verified before treating it as a released capability.
+This API is under review in [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). CI and local PostgreSQL integration checks have passed; the API remains unreleased until the review and merge process is complete.
 
 ## What is not implemented
 
-- Product and release-version domain model with persistent SBOM history.
-- Persistent component inventory, SBOM diffing or product-to-component traceability.
+- SBOM history comparison/diffing and product-to-device relationship inference.
 - SPDX ingestion or CycloneDX VEX generation.
 - KEV/EPSS enrichment and contextual product-version assessment.
 - Individual operator accounts, RBAC, tenant isolation or production browser sessions.
