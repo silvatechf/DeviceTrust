@@ -37,7 +37,8 @@ Implemented prototype workflows:
 4. Parse a supported subset of CycloneDX JSON and match components against synthetic demo advisories; optionally query OSV.
 5. Record vulnerability-triage decisions with a mandatory justification.
 6. Generate JSON/Markdown reports and verify a SHA-256-linked audit history.
-7. Persist accepted product-release SBOM imports, component occurrences and product-scoped findings through the authenticated product SBOM API.\n8. Use a same-origin local operator console.
+7. Persist accepted product-release SBOM imports, component occurrences and product-scoped findings through the authenticated product SBOM API.
+8. Use a same-origin local operator console.
 
 Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. It is covered by CI and CodeQL on the merge commit; local PostgreSQL integration and API-flow validation were also performed.
 
