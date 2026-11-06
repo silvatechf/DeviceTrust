@@ -74,6 +74,7 @@ class AuditEntry(Base):
     prev_hash: Mapped[str] = mapped_column(String(64))
     hash: Mapped[str] = mapped_column(String(64))
 
+
 class Product(Base):
     __tablename__ = "products"
 
