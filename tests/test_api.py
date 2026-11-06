@@ -286,3 +286,154 @@ def test_normalized_evidence_projection_preserves_raw_and_unknown_values(client)
 
     assert client.get("/evidence/normalized?limit=201", headers=H).status_code == 422
     assert client.get("/evidence/normalized?offset=-1", headers=H).status_code == 422
+
+
+def test_product_sbom_import_is_persistent_and_idempotent(client):
+    product_response = client.post(
+        "/products",
+        json={"manufacturer": "Example Vendor", "product_name": "Sensor X"},
+        headers=H,
+    )
+    assert product_response.status_code == 201
+    product_id = product_response.json()["id"]
+
+    release_response = client.post(
+        f"/products/{product_id}/releases",
+        json={"version": "1.2.3", "hardware_revision": "rev-A"},
+        headers=H,
+    )
+    assert release_response.status_code == 201
+    release_id = release_response.json()["id"]
+
+    raw_sbom = (Path(__file__).parent.parent / "samples" / "sensor_sbom.json").read_bytes()
+    first = client.post(
+        f"/product-releases/{release_id}/sbom",
+        content=raw_sbom,
+        headers={**H, "Content-Type": "application/json"},
+    )
+    assert first.status_code == 201
+    first_body = first.json()
+    assert first_body["created"] is True
+    assert first_body["component_count"] == 3
+    assert len(first_body["content_sha256"]) == 64
+
+    retry = client.post(
+        f"/product-releases/{release_id}/sbom",
+        content=raw_sbom,
+        headers={**H, "Content-Type": "application/json"},
+    )
+    assert retry.status_code == 201
+    assert retry.json()["id"] == first_body["id"]
+    assert retry.json()["created"] is False
+
+    imports = client.get(f"/product-releases/{release_id}/sbom", headers=H)
+    assert imports.status_code == 200
+    assert len(imports.json()) == 1
+
+    components = client.get(f"/sbom/imports/{first_body['id']}/components", headers=H)
+    assert components.status_code == 200
+    assert len(components.json()) == 3
+    assert [item["ordinal"] for item in components.json()] == [0, 1, 2]
+
+    vulnerable = next(item for item in components.json() if item["name"].lower() == "openssl")
+    findings = client.get(f"/sbom/components/{vulnerable['id']}/findings", headers=H)
+    assert findings.status_code == 200
+    assert findings.json()
+
+
+def test_product_sbom_import_rejects_invalid_document_without_persisting(client):
+    product = client.post(
+        "/products",
+        json={"manufacturer": "Example Vendor", "product_name": "Invalid SBOM Target"},
+        headers=H,
+    ).json()
+    release = client.post(
+        f"/products/{product['id']}/releases",
+        json={"version": "0.0.1"},
+        headers=H,
+    ).json()
+    response = client.post(
+        f"/product-releases/{release['id']}/sbom",
+        json={"bomFormat": "CycloneDX", "components": []},
+        headers=H,
+    )
+    assert response.status_code == 422
+    imports = client.get(f"/product-releases/{release['id']}/sbom", headers=H)
+    assert imports.status_code == 200
+    assert imports.json() == []
+
+
+def test_product_sbom_endpoints_require_authentication(client):
+    assert client.post("/products", json={"manufacturer": "X", "product_name": "Y"}).status_code == 401
+    assert client.post("/products/1/releases", json={"version": "1"}).status_code == 401
+    assert client.get("/product-releases/1/sbom").status_code == 401
+
+
+def test_product_sbom_findings_are_scoped_to_exact_component_occurrence(client):
+    product = client.post(
+        "/products",
+        json={"manufacturer": "Example Vendor", "product_name": "Collision Test"},
+        headers=H,
+    )
+    assert product.status_code == 201
+
+    release = client.post(
+        f"/products/{product.json()['id']}/releases",
+        json={"version": "1.0.0"},
+        headers=H,
+    )
+    assert release.status_code == 201
+    release_id = release.json()["id"]
+
+    document = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.5",
+        "components": [
+            {
+                "type": "library",
+                "name": "  OpenSSL  ",
+                "version": "  1.1.1  ",
+                "purl": "pkg:generic/openssl@1.1.1",
+            },
+            {
+                "type": "library",
+                "name": "openssl",
+                "version": "1.1.1",
+                "purl": "pkg:pypi/openssl@1.1.1",
+            },
+        ],
+    }
+
+    imported = client.post(
+        f"/product-releases/{release_id}/sbom",
+        json=document,
+        headers=H,
+    )
+    assert imported.status_code == 201
+
+    components = client.get(
+        f"/sbom/imports/{imported.json()['id']}/components",
+        headers=H,
+    ).json()
+
+    assert len(components) == 2
+
+    generic_component = next(
+        item for item in components
+        if item["purl"] == "pkg:generic/openssl@1.1.1"
+    )
+    assert generic_component["name"] == "  OpenSSL  "
+    assert generic_component["version"] == "  1.1.1  "
+
+    findings = {
+        component["purl"]: client.get(
+            f"/sbom/components/{component['id']}/findings",
+            headers=H,
+        ).json()
+        for component in components
+    }
+
+    assert [item["vuln_id"] for item in findings["pkg:generic/openssl@1.1.1"]] == [
+        "DT-DEMO-0002"
+    ]
+    assert findings["pkg:pypi/openssl@1.1.1"] == []

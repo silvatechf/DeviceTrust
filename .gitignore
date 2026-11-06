@@ -7,3 +7,6 @@ __pycache__/
 .bandit
 .env
 .env.example
+
+# Local database backups
+/backups/
