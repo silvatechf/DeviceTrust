@@ -15,7 +15,6 @@ from .db import (
     SBOMImport,
 )
 
-
 PARSER_VERSION = "0.2.0"
 
 
