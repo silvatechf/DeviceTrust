@@ -287,6 +287,7 @@ def test_normalized_evidence_projection_preserves_raw_and_unknown_values(client)
     assert client.get("/evidence/normalized?limit=201", headers=H).status_code == 422
     assert client.get("/evidence/normalized?offset=-1", headers=H).status_code == 422
 
+
 def test_product_sbom_import_is_persistent_and_idempotent(client):
     product_response = client.post(
         "/products",
