@@ -44,17 +44,18 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Goal:** answer which product releases may contain a newly affected component.
 
-- [ ] Persist each SBOM import as an immutable/versioned record with format, spec version, source, timestamp, digest and parser result.
-- [ ] Persist components with identifiers, PURLs where available, name, version, supplier and declared scope.
-- [ ] Link components to a specific product release and SBOM import.
-- [ ] Preserve incomplete or ambiguous identifiers; do not silently invent component matches.
-- [ ] Add safe re-import behavior, duplicate detection and import history.
+- [x] Persist accepted CycloneDX JSON 1.5 SBOM imports with format, spec version, source, timestamp, SHA-256 digest and parser version.
+- [x] Persist component occurrences and link them to a specific product release and SBOM import.
+- [x] Preserve source component name/version values and supported PURLs without inventing identifiers.
+- [x] Add duplicate detection and idempotent re-import behavior for the same release, format and content digest.
+- [x] Link synthetic vulnerability findings to exact component occurrences.
 - [ ] Compare SBOM imports and explain component additions, removals and version changes.
-- [ ] Link vulnerability findings to the SBOM import and component, not only to a device.
 - [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
-- [ ] Keep parser limits, validation failures and unsupported fields visible to the user.
+- [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
-**Exit criteria:** a reviewer can trace a finding to a product release, SBOM import and component identifier, including source and timestamp; re-imports do not overwrite history.
+**Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped synthetic findings. It does not yet provide SBOM diffing or re-evaluation when vulnerability intelligence changes.
+
+**Remaining exit criteria:** a reviewer can compare imports and trace a finding across product release, SBOM import and component identity; re-evaluation and broader format/field coverage are implemented and tested.
 
 ## Milestone 4 — Reviewed vulnerability decisions and intelligence (P2)
 
