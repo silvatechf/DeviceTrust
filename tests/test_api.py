@@ -391,8 +391,8 @@ def test_product_sbom_findings_are_scoped_to_exact_component_occurrence(client):
         "components": [
             {
                 "type": "library",
-                "name": "openssl",
-                "version": "1.1.1",
+                "name": "  OpenSSL  ",
+                "version": "  1.1.1  ",
                 "purl": "pkg:generic/openssl@1.1.1",
             },
             {
@@ -417,6 +417,13 @@ def test_product_sbom_findings_are_scoped_to_exact_component_occurrence(client):
     ).json()
 
     assert len(components) == 2
+
+    generic_component = next(
+        item for item in components
+        if item["purl"] == "pkg:generic/openssl@1.1.1"
+    )
+    assert generic_component["name"] == "  OpenSSL  "
+    assert generic_component["version"] == "  1.1.1  "
 
     findings = {
         component["purl"]: client.get(

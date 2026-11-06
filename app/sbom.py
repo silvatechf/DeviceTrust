@@ -47,13 +47,14 @@ def parse_cyclonedx(doc: dict) -> list[dict]:
                 parsed_purl = PackageURL.from_string(purl)
             except (TypeError, ValueError):
                 raise ValueError(f"Component at index {index} has an invalid purl.") from None
-            if parsed_purl.version and parsed_purl.version != version:
+            if parsed_purl.version and parsed_purl.version != version.strip():
                 raise ValueError(f"Component at index {index} has a purl/version mismatch.")
 
         parsed.append({
             "name": name.strip().lower(),
-            "source_name": name.strip(),
+            "source_name": name,
             "version": version.strip(),
+            "source_version": version,
             "purl": purl,
         })
     return parsed

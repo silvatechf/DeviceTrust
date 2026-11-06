@@ -15,7 +15,7 @@ from .db import (
     SBOMImport,
 )
 
-PARSER_VERSION = "0.2.0"
+PARSER_VERSION = "0.3.0"
 
 
 def create_product(
@@ -132,7 +132,7 @@ def import_cyclonedx(
                 sbom_import_id=imported.id,
                 ordinal=ordinal,
                 name=component["source_name"],
-                version=component["version"],
+                version=component["source_version"],
                 purl=component["purl"],
             )
             db.add(occurrence)

@@ -74,7 +74,11 @@ def test_sample_sbom_has_two_expected_demo_matches():
     findings = scan(parsed)
     assert {finding["vuln_id"] for finding in findings} == {"DT-DEMO-0001", "DT-DEMO-0002"}
 
-def test_parser_preserves_source_name_and_normalized_scanner_name():
-    parsed = parse_cyclonedx(_document([_component(name="OpenSSL")]))
-    assert parsed[0]["source_name"] == "OpenSSL"
+def test_parser_preserves_original_name_and_version_for_provenance():
+    parsed = parse_cyclonedx(
+        _document([_component(name="  OpenSSL  ", version="  1.1.1  ")])
+    )
+    assert parsed[0]["source_name"] == "  OpenSSL  "
+    assert parsed[0]["source_version"] == "  1.1.1  "
     assert parsed[0]["name"] == "openssl"
+    assert parsed[0]["version"] == "1.1.1"
