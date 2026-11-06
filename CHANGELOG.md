@@ -9,6 +9,7 @@ The project has not published a versioned release yet. This file records the cur
 ### Added
 - FastAPI device inventory and evidence-oriented posture prototype.
 - Bounded CycloneDX JSON ingestion with PURL-scoped synthetic demonstration advisories and optional best-effort OSV lookup.
+- Product-scoped persistence for accepted CycloneDX JSON 1.5 SBOM imports, component occurrences and component-scoped synthetic findings; duplicate imports are idempotent per product release, format and content digest.
 - Vulnerability triage with mandatory justification.
 - JSON and Markdown device reports.
 - SHA-256 hash-chained audit records and integrity verification, with documented limitations.

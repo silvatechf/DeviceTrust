@@ -57,6 +57,7 @@ A checkbox must be marked only when the check has actually been performed and ev
 - Built a Python/FastAPI modular-monolith prototype for IoT inventory and declared security-posture assessment.
 - Implemented bounded evidence ingestion and a read-only normalized projection for selected attributes.
 - Implemented bounded CycloneDX JSON parsing and PURL-based matching against synthetic demo advisories, with optional best-effort OSV lookup.
+- Implemented authenticated product-release SBOM persistence for a bounded CycloneDX JSON 1.5 subset, including import provenance metadata, component occurrences, digest-based idempotency and component-scoped synthetic findings.
 - Implemented justified vulnerability triage, JSON/Markdown reports and SHA-256 audit-chain verification.
 - Integrated linting, static security checks, dependency auditing, JavaScript syntax validation and pytest into CI.
 - Documented trust boundaries, threat scenarios, engineering decisions and residual risks.

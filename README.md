@@ -37,11 +37,12 @@ Implemented prototype workflows:
 4. Parse a supported subset of CycloneDX JSON and match components against synthetic demo advisories; optionally query OSV.
 5. Record vulnerability-triage decisions with a mandatory justification.
 6. Generate JSON/Markdown reports and verify a SHA-256-linked audit history.
-7. Persist accepted product-release SBOM imports, component occurrences and product-scoped findings through the authenticated product SBOM API (feature branch; CI and local PostgreSQL validation passed).\n8. Use a same-origin local operator console.
+7. Persist accepted product-release SBOM imports, component occurrences and product-scoped findings through the authenticated product SBOM API.
+8. Use a same-origin local operator console.
 
-Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The new product-scoped SBOM persistence flow is implemented and locally validated on the current feature branch; it remains under PR review and is not yet released.
+Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. It is covered by CI and CodeQL on the merge commit; local PostgreSQL integration and API-flow validation were also performed.
 
-### Product-scoped SBOM API (feature branch)
+### Product-scoped SBOM API
 
 The persistent SBOM work introduces these authenticated endpoints:
 
@@ -54,7 +55,7 @@ The persistent SBOM work introduces these authenticated endpoints:
 
 The import digest is calculated from the exact request bytes. A repeated digest for the same release and format returns the existing import. Only fully validated imports are persisted. The API does not store raw SBOM documents or infer a relationship between a product and a device.
 
-This API is under review in [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). CI and local PostgreSQL integration checks have passed; the API remains unreleased until the review and merge process is complete.
+This API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). The merge commit passed CI and CodeQL. The API is part of the current prototype, not a production-ready service.
 
 ## What is not implemented
 
