@@ -56,9 +56,9 @@ These are the main choices behind the current DeviceTrust prototype. Each one so
 
 **Why:** A change to a retained entry or a broken link can be detected.
 
-**Cost:** Deleting the final entry or suffix is not detectable without an external checkpoint. A privileged attacker can rewrite the database and recompute the chain. Concurrent writers are not serialized for multi-worker use.
+**Cost:** Deleting the final entry or suffix is not detectable without an external checkpoint. A privileged attacker can rewrite the database and recompute the chain. This decision does not provide immutable/WORM storage.
 
-**Next step:** Add independently controlled checkpoints and a serialized chain-head update before stronger audit guarantees are needed.
+**Next step:** Add independently controlled checkpoints before making stronger audit-integrity claims.
 
 ## DEC-007 — Same-origin console
 
@@ -73,3 +73,17 @@ These are the main choices behind the current DeviceTrust prototype. Each one so
 ## How to explain these choices
 
 For each decision, explain the problem, why the current approach fits the prototype, what it costs and what evidence would justify changing it. The trade-off is part of the engineering work.
+
+## DEC-007 — Transactional serialization of audit-chain writers
+
+**Decision:** Add a singleton `audit_chain_state` row. Authenticated write requests acquire it before domain reads and hold it in the same transaction as the domain mutation and audit append. PostgreSQL serializes through the row update lock; SQLite begins an IMMEDIATE write transaction. Direct audit appends acquire the same lock if the current transaction has not already done so. A missing state row fails closed.
+
+**Alternatives considered:**
+- Optimistic compare-and-swap with whole-transaction retries: less time holding a lock, but substantially more complex SQLAlchemy/request retry semantics.
+- External append-only audit service or queue: stronger isolation and potential external anchoring, but disproportionate operational complexity for the current single-operator prototype.
+
+**Trade-offs:** Writers sharing one database are serialized, reducing concurrent write throughput. SQLite uses a database-level write reservation; PostgreSQL serializes on one row. Lock contention can delay or fail a write. The domain mutation, lock-row version update and audit append commit or roll back together.
+
+**Security boundary:** This prevents concurrent application writers from forking the chain head. It does not prevent a privileged database administrator or external writer from rewriting the audit table, and it does not detect deletion of the final suffix without an independent checkpoint.
+
+**Verification:** Concurrent SQLite and PostgreSQL writer tests, transaction rollback of the lock generation and audit append, and an unauthenticated-write check.
