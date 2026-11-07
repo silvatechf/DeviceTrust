@@ -220,3 +220,74 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
                     f'DROP DATABASE IF EXISTS "{database_name}" WITH (FORCE)'
                 )
         admin_engine.dispose()
+
+
+
+def test_failed_product_api_write_rolls_back_and_releases_postgres_lock(
+    monkeypatch,
+):
+    product_name = f"postgres-rollback-{uuid4().hex}"
+    original_record = audit.record
+
+    with Session(application_engine) as session:
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        version_before = state.version
+        audit_count_before = session.query(AuditEntry).count()
+
+    def fail_after_audit_flush(session, actor, action, entity, payload):
+        original_record(session, actor, action, entity, payload)
+        raise RuntimeError("injected PostgreSQL failure after audit flush")
+
+    monkeypatch.setattr(audit, "record", fail_after_audit_flush)
+    with TestClient(app, raise_server_exceptions=False) as api:
+        failed = api.post(
+            "/products",
+            json={
+                "manufacturer": "PostgreSQL Rollback Test",
+                "product_name": product_name,
+            },
+            headers={"X-API-Key": "test-key"},
+        )
+    assert failed.status_code == 500
+
+    monkeypatch.setattr(audit, "record", original_record)
+    with Session(application_engine) as session:
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        assert state.version == version_before
+        assert (
+            session.query(Product).filter_by(product_name=product_name).count()
+            == 0
+        )
+        assert session.query(AuditEntry).count() == audit_count_before
+
+    with TestClient(app) as api:
+        recovered = api.post(
+            "/products",
+            json={
+                "manufacturer": "PostgreSQL Rollback Test",
+                "product_name": product_name,
+            },
+            headers={"X-API-Key": "test-key"},
+        )
+    assert recovered.status_code == 201
+
+    with Session(application_engine) as session:
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        assert state.version == version_before + 1
+        assert (
+            session.query(Product).filter_by(product_name=product_name).count()
+            == 1
+        )
+        assert (
+            session.query(AuditEntry)
+            .filter(
+                AuditEntry.action == "product.create",
+                AuditEntry.entity == str(recovered.json()["id"]),
+            )
+            .count()
+            == 1
+        )
+        assert verify(session)["valid"] is True
