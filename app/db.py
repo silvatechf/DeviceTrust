@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///devicetrust.db")
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False, "timeout": 30} if DATABASE_URL.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False, "timeout": 10} if DATABASE_URL.startswith("sqlite") else {},
 )
 SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
