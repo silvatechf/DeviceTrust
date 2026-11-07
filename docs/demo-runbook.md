@@ -95,7 +95,7 @@ Enter the same local API key into the console. It remains in page memory only.
 
 The product-scoped API is separate from the legacy device-scoped SBOM workflow. It stores accepted import metadata and component occurrences against a declared product release. It does not infer that a product release belongs to a device.
 
-The following commands use cURL. In Windows PowerShell, use `curl.exe` rather than the `curl` alias. Keep the API key local and do not paste it into shared logs or screenshots.
+The following commands use cURL. In Windows PowerShell, use `curl.exe` rather than the `curl` alias. Run each cURL command as a single line. Keep the API key local and do not paste it into shared logs or screenshots.
 
 Set the key in the shell used for the commands:
 
@@ -112,25 +112,19 @@ export API_KEY="$DEVICETRUST_API_KEY"
 Create a declared product identity:
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8000/products \
-  -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
-  -d '{"manufacturer":"Synthetic Cold Chain Systems","product_name":"Edge Gateway","external_reference":"DEMO-GW"}'
+curl -sS -X POST http://127.0.0.1:8000/products -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{"manufacturer":"Synthetic Cold Chain Systems","product_name":"Edge Gateway","external_reference":"DEMO-GW"}'
 ```
 
 Copy the returned `id` and use it as `PRODUCT_ID` below. Create a product release:
 
 ```bash
-curl -sS -X POST "http://127.0.0.1:8000/products/PRODUCT_ID/releases" \
-  -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
-  -d '{"version":"3.1.0","hardware_revision":"A","release_reference":"DEMO-3.1.0"}'
+curl -sS -X POST "http://127.0.0.1:8000/products/PRODUCT_ID/releases" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{"version":"3.1.0","hardware_revision":"A","release_reference":"DEMO-3.1.0"}'
 ```
 
 Copy the returned `id` as `RELEASE_ID`. Import the sample SBOM using the exact file bytes:
 
 ```bash
-curl -sS -X POST "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom?source_type=manual&source_reference=local-demo" \
-  -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
-  --data-binary @samples/cold_chain_gateway_sbom.json
+curl -sS -X POST "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom?source_type=manual&source_reference=local-demo" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" --data-binary @samples/cold_chain_gateway_sbom.json
 ```
 
 The response includes the import ID, SHA-256 digest, parser/spec version, component count and a `created` flag. An identical import for the same release and format is idempotent: the existing import is returned with `created: false`. The route responds with HTTP 201 in either case. The raw SBOM document is not retained; the accepted parsed component snapshot and digest are persisted.
@@ -138,18 +132,14 @@ The response includes the import ID, SHA-256 digest, parser/spec version, compon
 Copy the returned import `id` as `IMPORT_ID`. Inspect accepted imports and their component occurrences:
 
 ```bash
-curl -sS "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom" \
-  -H "X-API-Key: $API_KEY"
-
-curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/components" \
-  -H "X-API-Key: $API_KEY"
+curl -sS "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom" -H "X-API-Key: $API_KEY"
+curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/components" -H "X-API-Key: $API_KEY"
 ```
 
 For a component with findings, use its returned component `id`:
 
 ```bash
-curl -sS "http://127.0.0.1:8000/sbom/components/COMPONENT_ID/findings" \
-  -H "X-API-Key: $API_KEY"
+curl -sS "http://127.0.0.1:8000/sbom/components/COMPONENT_ID/findings" -H "X-API-Key: $API_KEY"
 ```
 
 These endpoints expose the persisted product/release/import/component provenance. Findings are synthetic demo intelligence and must not be treated as a complete vulnerability assessment. The product-scoped workflow is API-only; the local console walkthrough below uses the legacy device-scoped demonstration.
