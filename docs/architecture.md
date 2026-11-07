@@ -67,7 +67,7 @@ The API caps the request body at 2 MiB. The parser accepts a bounded CycloneDX J
 
 ### Triage and audit
 
-A triage update requires a justification. State-changing operations append audit entries in the same database transaction as the domain mutation. Authenticated write requests acquire the singleton audit-chain state row before database reads; PostgreSQL serializes through the row update lock, while SQLite starts an IMMEDIATE write transaction. The lock is held until commit or rollback, so concurrent application writers sharing the same database cannot append from the same chain head. Each entry hashes its content and the previous entry hash. The chain has no external checkpoint and is not immutable storage.
+A triage update requires a justification. State-changing operations append audit entries in the same database transaction as the domain mutation. Authenticated write requests acquire the singleton audit-chain state row before database reads; PostgreSQL serializes through the row update lock, while SQLite starts an IMMEDIATE write transaction. Both backends use a 10-second lock wait bound. The lock is held until commit or rollback, so concurrent application writers sharing the same database cannot append from the same chain head. Each entry hashes its content and the previous entry hash. The chain has no external checkpoint and is not immutable storage.
 
 ## 5. Trust boundaries
 
