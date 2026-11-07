@@ -124,7 +124,7 @@ curl -sS -X POST "http://127.0.0.1:8000/products/PRODUCT_ID/releases" -H "X-API-
 Copy the returned `id` as `RELEASE_ID`. Import the sample SBOM using the exact file bytes:
 
 ```bash
-curl -sS -X POST "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom?source_type=manual&source_reference=local-demo" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" --data-binary @samples/cold_chain_gateway_sbom.json
+curl -sS -X POST "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom?source_type=manual&source_reference=local-demo" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" --data-binary "@samples/cold_chain_gateway_sbom.json"
 ```
 
 The response includes the import ID, SHA-256 digest, parser/spec version, component count and a `created` flag. An identical import for the same release and format is idempotent: the existing import is returned with `created: false`. The route responds with HTTP 201 in either case. The raw SBOM document is not retained; the accepted parsed component snapshot and digest are persisted.
