@@ -110,3 +110,24 @@ def test_audit_append_fails_closed_without_migrated_chain_state(tmp_path):
             assert db.query(AuditEntry).count() == 0
     finally:
         engine.dispose()
+
+
+def test_audit_chain_state_and_entry_roll_back_together(tmp_path):
+    engine = _database(tmp_path)
+    try:
+        with Session(engine) as db:
+            state = db.get(AuditChainState, 1)
+            assert state is not None
+            version_before = state.version
+
+        with Session(engine) as db:
+            record(db, "test", "device.create", "ROLLBACK-001", {"id": 1})
+            db.rollback()
+
+        with Session(engine) as db:
+            state = db.get(AuditChainState, 1)
+            assert state is not None
+            assert state.version == version_before
+            assert db.query(AuditEntry).count() == 0
+    finally:
+        engine.dispose()
