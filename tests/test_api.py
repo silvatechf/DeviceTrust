@@ -188,11 +188,13 @@ def test_audit_chain_cannot_detect_deleted_tail_without_checkpoint(tmp_path):
     from sqlalchemy.orm import Session
 
     from app.audit import record, verify
-    from app.db import Base
+    from app.db import AuditChainState, Base
 
     engine = create_engine(f"sqlite:///{tmp_path / 'audit-tail.db'}")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
+        db.add(AuditChainState(id=1, version=0))
+        db.commit()
         record(db, "test", "device.create", "DEVICE-1", {"id": 1})
         db.commit()
         record(db, "test", "device.update", "DEVICE-1", {"id": 1})
