@@ -53,7 +53,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
 - [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
-**Current status:** the initial persistence slice is implemented and merged in PR #22. The product SBOM comparison slice reports additions, removals, version changes and source-name changes across accepted imports for the same release. It matches by version-independent PURL identity; duplicate identities and components without PURLs remain explicitly ambiguous or unidentified. Comparison does not re-evaluate vulnerability intelligence.
+**Current status:** the initial persistence slice is implemented and merged in PR #22. The product SBOM comparison slice reports additions, removals and each matched component's changed dimensions across accepted imports for the same release. PURL identity excludes only the version segment; qualifiers and subpath remain identity boundaries. Duplicate identities and components without usable PURLs remain ambiguous or unidentified. Comparison does not re-evaluate vulnerability intelligence. Broader CycloneDX coverage remains outstanding.
 
 **Remaining exit criteria:** stored product releases can be re-evaluated when intelligence changes, with broader format/field coverage and ecosystem-aware version semantics implemented and tested.
 
