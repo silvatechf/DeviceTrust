@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from time import sleep
 
+import pytest
 from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import Session
 
@@ -94,5 +95,18 @@ def test_audit_chain_serializes_concurrent_sqlite_writers(tmp_path, monkeypatch)
                 .count()
                 == writer_count
             )
+    finally:
+        engine.dispose()
+
+
+
+def test_audit_append_fails_closed_without_migrated_chain_state(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'missing-chain-state.db'}")
+    Base.metadata.create_all(engine)
+    try:
+        with Session(engine) as db:
+            with pytest.raises(RuntimeError, match="Audit chain state is missing"):
+                record(db, "test", "device.create", "DEVICE-1", {"id": 1})
+            assert db.query(AuditEntry).count() == 0
     finally:
         engine.dispose()
