@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from app import audit
 from app.audit import record, verify
-from app.db import AuditChainState, AuditEntry, Device, engine as application_engine
+from app.db import AuditChainState, AuditEntry, Device
+from app.db import engine as application_engine
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("DATABASE_URL", "").startswith(("postgresql://", "postgresql+psycopg://")),
