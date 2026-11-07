@@ -205,7 +205,6 @@ async def import_product_sbom(
     if not isinstance(document, dict):
         raise HTTPException(422, "SBOM document must be a JSON object")
 
-    audit.acquire_chain_lock(db)
     try:
         imported, created = product_sbom.import_cyclonedx(
             db, actor, release_id, bytes(raw), document, source_type, source_reference
@@ -402,11 +401,12 @@ async def import_sbom(
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
 
+    scan_results = sbom.scan(components)
     audit.acquire_chain_lock(db)
     _device(db, device_id)
 
     new_findings = 0
-    for finding in sbom.scan(components):
+    for finding in scan_results:
         existing = db.scalars(
             select(Vulnerability).where(
                 Vulnerability.device_id == device_id,
