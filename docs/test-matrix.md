@@ -17,6 +17,7 @@ This matrix connects security/product controls to concrete automated tests. It i
 | SBOM request size and JSON boundary | tests/test_sbom_input_limits.py | Malformed/non-object JSON and 2 MiB body cap | Deployment proxy limits need review |
 | CycloneDX component validation | tests/test_sbom_validation.py | Component object/name, PURL validity, package identity and version matching | Not full schema/dependency graph validation |
 | SBOM intelligence behavior | tests/test_sbom_osv_response.py, tests/test_sbom_validation.py | OSV response handling and deterministic synthetic feed | No complete CVE coverage or live-feed SLA |
+| Product SBOM comparison | tests/test_product_sbom_diff.py | Add/remove/version/name changes, version-independent PURL identity, duplicate-PURL ambiguity, PURL-less components, authentication and same-release boundary | PURL-less or duplicate identities are not matched; comparison does not assess vulnerability impact |
 | Audit chain integrity | tests/test_api.py, tests/test_audit_chain_boundaries.py | Tampering, interior deletion and final-suffix limitation | No external checkpoint or multi-writer serialization |
 | Operator console security headers | tests/test_operator_console.py | CSP, nosniff, frame denial, no-store and static assets | No real-browser security suite |
 | Console credential storage boundary | tests/test_operator_console.py | No localStorage/sessionStorage references in served script | No automated real-browser interaction suite |
