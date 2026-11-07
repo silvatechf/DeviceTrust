@@ -20,7 +20,8 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [x] Add Alembic baseline migration and PostgreSQL migration/persistence CI coverage.
 - [ ] Verify PostgreSQL startup, persistence and restart behavior in a clean local Compose deployment.
 - [ ] Verify console flows and API error paths in a real browser at desktop/mobile sizes.
-- [x] Test concurrent complete API/domain writes and transaction failure behavior on SQLite and PostgreSQL.\n- [ ] Verify migration 0003 upgrade/downgrade on disposable SQLite and PostgreSQL databases (automated CI coverage added; awaiting exact-head run).
+- [x] Test concurrent complete API/domain writes and transaction failure behavior on SQLite and PostgreSQL.
+- [ ] Verify migration 0003 upgrade/downgrade on disposable SQLite and PostgreSQL databases (automated CI coverage added; awaiting exact-head run).
 - [ ] Demonstrate backup/restore and rollback.
 - [ ] Inspect CI and CodeQL results for the exact candidate SHA and record their URLs.
 - [ ] Capture genuine screenshots from the running app using synthetic data only.
