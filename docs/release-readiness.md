@@ -20,7 +20,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [x] Add Alembic baseline migration and PostgreSQL migration/persistence CI coverage.
 - [ ] Verify PostgreSQL startup, persistence and restart behavior in a clean local Compose deployment.
 - [ ] Verify console flows and API error paths in a real browser at desktop/mobile sizes.
-- [x] Test concurrent audit writes and transaction failure behavior on SQLite and PostgreSQL.
+- [x] Test concurrent complete API/domain writes and transaction failure behavior on SQLite and PostgreSQL.\n- [ ] Verify migration 0003 upgrade/downgrade on disposable SQLite and PostgreSQL databases (automated CI coverage added; awaiting exact-head run).
 - [ ] Demonstrate backup/restore and rollback.
 - [ ] Inspect CI and CodeQL results for the exact candidate SHA and record their URLs.
 - [ ] Capture genuine screenshots from the running app using synthetic data only.
@@ -46,7 +46,7 @@ A checkbox must be marked only when the check has actually been performed and ev
 - No server-side browser sessions or backend-for-frontend.
 - Alembic baseline and explicit migration workflow are implemented; future schema changes still require reviewed migration scripts.
 - Audit-chain appends are serialized for application writers sharing one database, but there is no external checkpoint or immutable retention; a privileged database administrator can still rewrite the chain.
-- The audit-chain state migration is additive, but downgrading to the prior revision removes the required lock row. The new application then fails closed on writes until the migration is reapplied or the previous application version is restored; coordinate application/database rollback and preserve a backup.
+- The audit-chain state migration is additive. Its downgrade removes the required lock row; the new application then fails closed on writes until the migration is reapplied or the previous application version is restored. Automated downgrade tests use isolated disposable databases only; production rollback still requires coordinated application/database rollback and a preserved backup.
 - CycloneDX support is a bounded subset.
 - Local advisories are synthetic; optional OSV lookup is best-effort.
 - Evidence normalization covers selected attributes only; observations are not associated automatically or consumed by posture.
