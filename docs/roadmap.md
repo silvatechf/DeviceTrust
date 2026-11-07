@@ -49,7 +49,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Preserve source component name/version values and supported PURLs without inventing identifiers.
 - [x] Add duplicate detection and idempotent re-import behavior for the same release, format and content digest.
 - [x] Link synthetic vulnerability findings to exact component occurrences.
-- [x] Compare accepted SBOM imports and explain component additions, removals and version changes using version-independent PURL identity; report ambiguous and unidentified occurrences without speculative matching.
+- [x] Compare accepted SBOM imports and explain additions, removals and matched-component changes (version and/or source name) using PURL identity that excludes only the version segment while preserving qualifiers and subpath; report ambiguous and unidentified occurrences without speculative matching.
 - [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
 - [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
