@@ -82,7 +82,7 @@ For each decision, explain the problem, why the current approach fits the protot
 - Optimistic compare-and-swap with whole-transaction retries: less time holding a lock, but substantially more complex SQLAlchemy/request retry semantics.
 - External append-only audit service or queue: stronger isolation and potential external anchoring, but disproportionate operational complexity for the current single-operator prototype.
 
-**Trade-offs:** Writers sharing one database are serialized, reducing concurrent write throughput. SQLite uses a database-level write reservation; PostgreSQL serializes on one row. Lock contention can delay or fail a write. The domain mutation, lock-row version update and audit append commit or roll back together.
+**Trade-offs:** Writers sharing one database are serialized, reducing concurrent write throughput. SQLite uses a database-level write reservation; PostgreSQL serializes on one row. Lock contention can delay or fail a write; SQLite's busy timeout and PostgreSQL's transaction-local lock timeout are both bounded to 10 seconds. The domain mutation, lock-row version update and audit append commit or roll back together.
 
 **Security boundary:** This prevents concurrent application writers from forking the chain head. It does not prevent a privileged database administrator or external writer from rewriting the audit table, and it does not detect deletion of the final suffix without an independent checkpoint.
 
