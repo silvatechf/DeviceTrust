@@ -1,13 +1,13 @@
 import os
 from datetime import date, datetime, timezone
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, create_engine
+from sqlalchemy import BigInteger, CheckConstraint, JSON, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///devicetrust.db")
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False, "timeout": 30} if DATABASE_URL.startswith("sqlite") else {},
 )
 SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
@@ -73,6 +73,16 @@ class AuditEntry(Base):
     payload: Mapped[dict] = mapped_column(JSON)
     prev_hash: Mapped[str] = mapped_column(String(64))
     hash: Mapped[str] = mapped_column(String(64))
+
+
+class AuditChainState(Base):
+    __tablename__ = "audit_chain_state"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_audit_chain_state_singleton"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
 
 
 class Product(Base):
