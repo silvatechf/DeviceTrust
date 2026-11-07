@@ -46,6 +46,7 @@ A checkbox must be marked only when the check has actually been performed and ev
 - No server-side browser sessions or backend-for-frontend.
 - Alembic baseline and explicit migration workflow are implemented; future schema changes still require reviewed migration scripts.
 - Audit-chain appends are serialized for application writers sharing one database, but there is no external checkpoint or immutable retention; a privileged database administrator can still rewrite the chain.
+- The audit-chain state migration is additive, but downgrading to the prior revision removes the required lock row. The new application then fails closed on writes until the migration is reapplied or the previous application version is restored; coordinate application/database rollback and preserve a backup.
 - CycloneDX support is a bounded subset.
 - Local advisories are synthetic; optional OSV lookup is best-effort.
 - Evidence normalization covers selected attributes only; observations are not associated automatically or consumed by posture.
