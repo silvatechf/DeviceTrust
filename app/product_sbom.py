@@ -219,10 +219,12 @@ def compare_imports(
     from_import_id: int,
     to_import_id: int,
 ) -> dict:
-    """Compare two accepted imports without mutating stored SBOM evidence.
+    """Compare accepted imports without mutating stored SBOM evidence.
 
-    Package URLs are compared without their version segment so a version change
-    remains a match. Missing or repeated package identities are never guessed.
+    PURL identity excludes only the PURL version. Qualifiers and subpath remain
+    part of identity. A matched component appears once in the changed list with
+    all changed dimensions (version and/or name). Duplicate identities and
+    components without a usable PURL are never matched speculatively.
     """
     if db.get(ProductRelease, release_id) is None:
         raise LookupError("Product release not found")
@@ -271,10 +273,11 @@ def compare_imports(
 
     added = []
     removed = []
-    version_changed = []
-    metadata_changed = []
+    changed = []
     ambiguous = []
     unchanged = 0
+    version_changed = 0
+    name_changed = 0
 
     for identity in sorted(previous_groups.keys() | current_groups.keys()):
         before = previous_groups.get(identity, [])
@@ -295,17 +298,20 @@ def compare_imports(
 
         old_item = before[0]
         new_item = after[0]
+        dimensions = []
         if old_item.version != new_item.version:
-            version_changed.append({
+            dimensions.append("version")
+            version_changed += 1
+        if old_item.name != new_item.name:
+            dimensions.append("name")
+            name_changed += 1
+
+        if dimensions:
+            changed.append({
                 "identity": identity,
                 "previous": _component_snapshot(old_item),
                 "current": _component_snapshot(new_item),
-            })
-        elif old_item.name != new_item.name:
-            metadata_changed.append({
-                "identity": identity,
-                "previous": _component_snapshot(old_item),
-                "current": _component_snapshot(new_item),
+                "changes": dimensions,
             })
         else:
             unchanged += 1
@@ -317,8 +323,9 @@ def compare_imports(
         "summary": {
             "added": len(added),
             "removed": len(removed),
-            "version_changed": len(version_changed),
-            "metadata_changed": len(metadata_changed),
+            "changed": len(changed),
+            "version_changed": version_changed,
+            "name_changed": name_changed,
             "unchanged": unchanged,
             "ambiguous": len(ambiguous),
             "unidentified_previous": len(previous_unidentified),
@@ -326,8 +333,7 @@ def compare_imports(
         },
         "added": added,
         "removed": removed,
-        "version_changed": version_changed,
-        "metadata_changed": metadata_changed,
+        "changed": changed,
         "ambiguous": ambiguous,
         "unidentified": {
             "previous": previous_unidentified,
