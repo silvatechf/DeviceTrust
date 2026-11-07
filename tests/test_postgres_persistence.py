@@ -2,8 +2,6 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from time import sleep
-from threading import Barrier
-from time import sleep
 from uuid import uuid4
 
 import pytest
