@@ -1,5 +1,7 @@
+import json
 import os
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from threading import Barrier
 from time import sleep
 from uuid import uuid4
@@ -12,7 +14,7 @@ from sqlalchemy import create_engine, delete, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app import audit
+from app import audit, product_sbom
 from app.audit import record, verify
 from app.db import (
     AuditChainState,
@@ -382,3 +384,75 @@ def test_product_sbom_records_survive_database_engine_disposal():
             session.execute(delete(Product).where(Product.id == product_id))
             session.commit()
         verification_engine.dispose()
+
+
+def test_product_sbom_import_rolls_back_on_postgres_audit_failure(monkeypatch):
+    suffix = uuid4().hex[:12]
+    raw_document = (
+        Path(__file__).parent.parent / "samples" / "sensor_sbom.json"
+    ).read_bytes()
+    document = json.loads(raw_document)
+
+    with Session(application_engine) as session:
+        product = Product(
+            manufacturer="PostgreSQL Integration",
+            product_name=f"SBOM Rollback {suffix}",
+        )
+        session.add(product)
+        session.flush()
+
+        release = ProductRelease(product_id=product.id, version="1.0.0")
+        session.add(release)
+        session.commit()
+        release_id = release.id
+
+        audit_count_before = session.query(AuditEntry).filter_by(
+            action="sbom.product_import"
+        ).count()
+
+        original_record = product_sbom.audit.record
+
+        def fail_import_audit(db, actor, action, entity, payload):
+            if action == "sbom.product_import":
+                raise RuntimeError("injected PostgreSQL audit append failure")
+            return original_record(db, actor, action, entity, payload)
+
+        monkeypatch.setattr(product_sbom.audit, "record", fail_import_audit)
+
+        with pytest.raises(RuntimeError, match="injected PostgreSQL audit append failure"):
+            product_sbom.import_cyclonedx(
+                session,
+                "postgres-integration",
+                release_id,
+                raw_document,
+                document,
+                "manual",
+                None,
+            )
+
+        assert session.query(SBOMImport).filter_by(
+            product_release_id=release_id
+        ).count() == 0
+        assert (
+            session.query(SBOMComponent)
+            .join(SBOMImport)
+            .filter(SBOMImport.product_release_id == release_id)
+            .count()
+            == 0
+        )
+        assert (
+            session.query(ProductFinding)
+            .join(SBOMComponent)
+            .join(SBOMImport)
+            .filter(SBOMImport.product_release_id == release_id)
+            .count()
+            == 0
+        )
+        assert (
+            session.query(AuditEntry).filter_by(action="sbom.product_import").count()
+            == audit_count_before
+        )
+
+        session.delete(release)
+        session.delete(product)
+        session.commit()
