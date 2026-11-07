@@ -730,9 +730,10 @@ def test_product_sbom_import_rolls_back_all_rows_when_audit_append_fails(client,
     original_record = product_sbom.audit.record
 
     def fail_import_audit(db, actor, action, entity, payload):
+        result = original_record(db, actor, action, entity, payload)
         if action == "sbom.product_import":
             raise RuntimeError("injected audit append failure")
-        return original_record(db, actor, action, entity, payload)
+        return result
 
     monkeypatch.setattr(product_sbom.audit, "record", fail_import_audit)
 
