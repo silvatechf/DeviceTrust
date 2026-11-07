@@ -25,6 +25,7 @@ def create_product(
     product_name: str,
     external_reference: str | None,
 ) -> Product:
+    audit.acquire_chain_lock(db)
     product = Product(
         manufacturer=manufacturer.strip(),
         product_name=product_name.strip(),
@@ -55,6 +56,7 @@ def create_release(
     hardware_revision: str | None,
     release_reference: str | None,
 ) -> ProductRelease:
+    audit.acquire_chain_lock(db)
     if db.get(Product, product_id) is None:
         raise LookupError("Product not found")
 
@@ -87,6 +89,7 @@ def import_cyclonedx(
     source_type: str,
     source_reference: str | None,
 ) -> tuple[SBOMImport, bool]:
+    audit.acquire_chain_lock(db)
     if db.get(ProductRelease, release_id) is None:
         raise LookupError("Product release not found")
 
