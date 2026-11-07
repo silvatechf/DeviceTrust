@@ -1,7 +1,7 @@
 import hashlib
 import json
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
 from .db import AuditChainState, AuditEntry, utcnow
@@ -20,8 +20,11 @@ def acquire_chain_lock(db: Session) -> None:
     if transaction is not None and db.info.get("audit_chain_locked_tx") is transaction:
         return
 
-    if db.get_bind().dialect.name == "sqlite":
+    dialect = db.get_bind().dialect.name
+    if dialect == "sqlite":
         db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    elif dialect == "postgresql":
+        db.execute(text("SET LOCAL lock_timeout = '10s'"))
 
     result = db.execute(
         update(AuditChainState)
