@@ -1,3 +1,4 @@
+import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -5,12 +6,23 @@ from threading import Barrier
 from time import sleep
 from uuid import uuid4
 
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, update
 from sqlalchemy.orm import Session
 
-from app import audit
-from app.db import AuditChainState, AuditEntry, Base, Product, SessionLocal
+from app import audit, product_sbom
+from app.db import (
+    AuditChainState,
+    AuditEntry,
+    Base,
+    Product,
+    ProductFinding,
+    SBOMComponent,
+    SBOMImport,
+    SessionLocal,
+)
 from app.main import app, get_write_db
 from app.seed import DEVICES
 
@@ -449,7 +461,6 @@ def test_product_sbom_findings_are_scoped_to_exact_component_occurrence(client):
     assert findings["pkg:pypi/openssl@1.1.1"] == []
 
 
-
 def test_unauthenticated_write_does_not_acquire_audit_chain_lock(client):
     with SessionLocal() as db:
         state = db.get(AuditChainState, 1)
@@ -621,3 +632,136 @@ def test_failed_product_api_write_rolls_back_domain_audit_and_releases_lock(
             assert audit.verify(db) == {"valid": True, "entries": 1}
     finally:
         engine.dispose()
+def _create_product_release(client, product_name: str) -> int:
+    product = client.post(
+        "/products",
+        json={"manufacturer": "Example Vendor", "product_name": product_name},
+        headers=H,
+    )
+    assert product.status_code == 201
+    release = client.post(
+        f"/products/{product.json()['id']}/releases",
+        json={"version": "1.0.0"},
+        headers=H,
+    )
+    assert release.status_code == 201
+    return release.json()["id"]
+
+
+def test_product_sbom_changed_content_creates_new_import_and_hashes_exact_bytes(client):
+    release_id = _create_product_release(client, "Digest Change Test")
+    raw = (Path(__file__).parent.parent / "samples" / "sensor_sbom.json").read_bytes()
+    changed_raw = raw + b"\n"
+
+    first = client.post(
+        f"/product-releases/{release_id}/sbom",
+        content=raw,
+        headers={**H, "Content-Type": "application/json"},
+    )
+    second = client.post(
+        f"/product-releases/{release_id}/sbom",
+        content=changed_raw,
+        headers={**H, "Content-Type": "application/json"},
+    )
+
+    assert first.status_code == second.status_code == 201
+    first_body = first.json()
+    second_body = second.json()
+    assert first_body["created"] is True
+    assert second_body["created"] is True
+    assert first_body["id"] != second_body["id"]
+    assert first_body["content_sha256"] == hashlib.sha256(raw).hexdigest()
+    assert second_body["content_sha256"] == hashlib.sha256(changed_raw).hexdigest()
+
+    imports = client.get(f"/product-releases/{release_id}/sbom", headers=H)
+    assert imports.status_code == 200
+    assert {item["id"] for item in imports.json()} == {
+        first_body["id"],
+        second_body["id"],
+    }
+
+
+def test_identical_sbom_bytes_are_distinct_across_product_releases(client):
+    product = client.post(
+        "/products",
+        json={"manufacturer": "Example Vendor", "product_name": "Release Boundary Test"},
+        headers=H,
+    )
+    assert product.status_code == 201
+    product_id = product.json()["id"]
+
+    release_ids = []
+    for version in ("1.0.0", "1.0.1"):
+        release = client.post(
+            f"/products/{product_id}/releases",
+            json={"version": version},
+            headers=H,
+        )
+        assert release.status_code == 201
+        release_ids.append(release.json()["id"])
+
+    raw = (Path(__file__).parent.parent / "samples" / "sensor_sbom.json").read_bytes()
+    imports = []
+    for release_id in release_ids:
+        response = client.post(
+            f"/product-releases/{release_id}/sbom",
+            content=raw,
+            headers={**H, "Content-Type": "application/json"},
+        )
+        assert response.status_code == 201
+        assert response.json()["created"] is True
+        imports.append(response.json())
+
+    assert imports[0]["id"] != imports[1]["id"]
+    assert imports[0]["content_sha256"] == imports[1]["content_sha256"]
+    for release_id, imported in zip(release_ids, imports, strict=True):
+        listed = client.get(f"/product-releases/{release_id}/sbom", headers=H)
+        assert [item["id"] for item in listed.json()] == [imported["id"]]
+
+
+def test_product_sbom_import_rolls_back_all_rows_when_audit_append_fails(client, monkeypatch):
+    release_id = _create_product_release(client, "Atomic Rollback Test")
+    raw = (Path(__file__).parent.parent / "samples" / "sensor_sbom.json").read_bytes()
+
+    with SessionLocal() as db:
+        audit_count_before = db.query(AuditEntry).filter_by(
+            action="sbom.product_import"
+        ).count()
+
+    original_record = product_sbom.audit.record
+
+    def fail_import_audit(db, actor, action, entity, payload):
+        if action == "sbom.product_import":
+            raise RuntimeError("injected audit append failure")
+        return original_record(db, actor, action, entity, payload)
+
+    monkeypatch.setattr(product_sbom.audit, "record", fail_import_audit)
+
+    with pytest.raises(RuntimeError, match="injected audit append failure"):
+        client.post(
+            f"/product-releases/{release_id}/sbom",
+            content=raw,
+            headers={**H, "Content-Type": "application/json"},
+        )
+
+    with SessionLocal() as db:
+        assert db.query(SBOMImport).filter_by(product_release_id=release_id).count() == 0
+        assert (
+            db.query(SBOMComponent)
+            .join(SBOMImport)
+            .filter(SBOMImport.product_release_id == release_id)
+            .count()
+            == 0
+        )
+        assert (
+            db.query(ProductFinding)
+            .join(SBOMComponent)
+            .join(SBOMImport)
+            .filter(SBOMImport.product_release_id == release_id)
+            .count()
+            == 0
+        )
+        assert (
+            db.query(AuditEntry).filter_by(action="sbom.product_import").count()
+            == audit_count_before
+        )
