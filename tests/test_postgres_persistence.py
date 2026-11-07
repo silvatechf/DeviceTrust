@@ -453,6 +453,6 @@ def test_product_sbom_import_rolls_back_on_postgres_audit_failure(monkeypatch):
             == audit_count_before
         )
 
-        session.delete(release)
-        session.delete(product)
+        session.execute(delete(ProductRelease).where(ProductRelease.id == release_id))
+        session.execute(delete(Product).where(Product.id == product.id))
         session.commit()
