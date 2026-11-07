@@ -68,7 +68,7 @@ The API caps the request body at 2 MiB. The parser accepts a bounded CycloneDX J
 
 ### Product SBOM comparison
 
-The authenticated `GET /product-releases/{release_id}/sbom/diff` endpoint compares two accepted imports belonging to the same product release. It matches components by a version-independent Package URL identity, then reports additions, removals, version changes and source-name changes. Duplicate package identities are reported as ambiguous. Components without a usable PURL remain unidentified and are not matched by name or ordinal. The comparison is read-only and does not re-evaluate vulnerability findings.
+The authenticated `GET /product-releases/{release_id}/sbom/diff` endpoint compares two accepted imports belonging to the same product release. It removes only the PURL version segment when constructing component identity; PURL qualifiers and subpath are preserved and therefore distinguish identities. Additions and removals are reported separately. Each uniquely matched component with changes appears once in `changed`, with a `changes` array containing `version`, `name`, or both. The `version_changed` and `name_changed` summary counters count change dimensions independently and may overlap. Duplicate identities are reported as ambiguous. Components without a usable PURL, including unexpected invalid legacy values, remain unidentified and are never matched by name or ordinal. Comparing an import with itself yields deterministic unchanged counts for uniquely identified components. The comparison is read-only and does not re-evaluate vulnerability findings.
 
 ### Triage and audit
 
