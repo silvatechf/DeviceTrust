@@ -1,12 +1,39 @@
 import hashlib
 import json
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from .db import AuditEntry, utcnow
+from .db import AuditChainState, AuditEntry, utcnow
 
 GENESIS = "0" * 64
+
+
+def acquire_chain_lock(db: Session) -> None:
+    """Serialize audit appends within the caller's domain transaction.
+
+    SQLite requires an IMMEDIATE transaction before any request reads. PostgreSQL
+    serializes writers by updating the singleton state row, whose row lock is held
+    until the surrounding transaction commits or rolls back.
+    """
+    transaction = db.get_transaction()
+    if transaction is not None and db.info.get("audit_chain_locked_tx") is transaction:
+        return
+
+    if db.get_bind().dialect.name == "sqlite":
+        db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+
+    result = db.execute(
+        update(AuditChainState)
+        .where(AuditChainState.id == 1)
+        .values(version=AuditChainState.version + 1)
+    )
+    if result.rowcount != 1:
+        raise RuntimeError(
+            "Audit chain state is missing; apply database migrations before writing audit events."
+        )
+
+    db.info["audit_chain_locked_tx"] = db.get_transaction()
 
 
 def _digest(prev: str, ts: str, actor: str, action: str, entity: str, payload: dict) -> str:
@@ -15,6 +42,7 @@ def _digest(prev: str, ts: str, actor: str, action: str, entity: str, payload: d
 
 
 def record(db: Session, actor: str, action: str, entity: str, payload: dict) -> None:
+    acquire_chain_lock(db)
     last = db.scalars(select(AuditEntry).order_by(AuditEntry.id.desc()).limit(1)).first()
     prev = last.hash if last else GENESIS
     ts = utcnow().isoformat()
