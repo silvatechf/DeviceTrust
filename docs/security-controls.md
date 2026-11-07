@@ -45,7 +45,7 @@ The current persistence model stores `support_until` on a device. It does not ye
 
 ## Audit guarantees
 
-The hash chain can detect modification of retained entries and gaps when a later retained entry references a missing predecessor. It cannot detect deletion of the final entry or suffix without an independently retained checkpoint. A privileged attacker able to rewrite the database can recompute the chain. Application writers sharing one database are serialized by a singleton state-row update held for the domain/audit transaction; SQLite acquires `BEGIN IMMEDIATE`, while PostgreSQL holds a row lock. This does not coordinate external writers that bypass the application or provide an independent checkpoint.
+The hash chain can detect modification of retained entries and gaps when a later retained entry references a missing predecessor. It cannot detect deletion of the final entry or suffix without an independently retained checkpoint. A privileged attacker able to rewrite the database can recompute the chain. Application writers sharing one database are serialized by a singleton state-row update held for the domain/audit transaction; SQLite acquires `BEGIN IMMEDIATE` with a 10-second busy timeout, while PostgreSQL holds a row lock with a 10-second transaction-local lock timeout. This does not coordinate external writers that bypass the application or provide an independent checkpoint.
 
 ## Before production use
 
