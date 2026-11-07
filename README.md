@@ -59,7 +59,7 @@ The import digest is calculated from the exact request bytes. A repeated digest 
 
 The diff endpoint reports additions, removals, version changes and source-name changes. It removes the PURL version segment when matching package identity. Repeated PURLs are reported as ambiguous; components without a PURL are listed as unidentified and are never matched by name alone. The comparison is read-only and does not assess vulnerability impact.
 
-This API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). The merge commit passed CI and CodeQL. The API is part of the current prototype, not a production-ready service. The diff is deterministic for uniquely identified PURLs; incomplete or duplicate identifiers remain explicitly unresolved.
+The product-release import and component endpoints were merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). The merge commit passed CI and CodeQL. The comparison endpoint is proposed in [PR #24](https://github.com/silvatechf/DeviceTrust/pull/24) and remains subject to review and CI validation. These APIs are part of an early-stage prototype, not a production-ready service. The diff is deterministic for uniquely identified PURLs; incomplete or duplicate identifiers remain explicitly unresolved.
 
 ## What is not implemented
 
