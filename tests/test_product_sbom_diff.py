@@ -63,6 +63,7 @@ def test_product_sbom_diff_reports_add_remove_version_and_unidentified(client):
         ],
     )
 
+    audit_before = client.get("/audit", headers=H).json()
     response = client.get(
         f"/product-releases/{release_id}/sbom/diff",
         params={"from_import_id": previous_id, "to_import_id": current_id},
@@ -70,6 +71,7 @@ def test_product_sbom_diff_reports_add_remove_version_and_unidentified(client):
     )
 
     assert response.status_code == 200
+    assert client.get("/audit", headers=H).json() == audit_before
     body = response.json()
     assert body["summary"] == {
         "added": 1,
