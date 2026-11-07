@@ -38,7 +38,8 @@ Implemented prototype workflows:
 5. Record vulnerability-triage decisions with a mandatory justification.
 6. Generate JSON/Markdown reports and verify a SHA-256-linked audit history.
 7. Persist accepted product-release SBOM imports, component occurrences and product-scoped findings through the authenticated product SBOM API.
-8. Use a same-origin local operator console.
+8. Compare accepted SBOM imports for a product release using version-independent PURL identity.
+9. Use a same-origin local operator console.
 
 Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. It is covered by CI and CodeQL on the merge commit; local PostgreSQL integration and API-flow validation were also performed.
 
@@ -50,16 +51,19 @@ The persistent SBOM work introduces these authenticated endpoints:
 - `POST /products/{product_id}/releases` — create a product release.
 - `POST /product-releases/{release_id}/sbom` — import a bounded CycloneDX JSON 1.5 document.
 - `GET /product-releases/{release_id}/sbom` — list accepted imports.
+- `GET /product-releases/{release_id}/sbom/diff?from_import_id=1&to_import_id=2` — compare two accepted imports for the same release.
 - `GET /sbom/imports/{import_id}/components` — list immutable component occurrences.
 - `GET /sbom/components/{component_id}/findings` — list findings tied to a component occurrence.
 
 The import digest is calculated from the exact request bytes. A repeated digest for the same release and format returns the existing import. Only fully validated imports are persisted. The API does not store raw SBOM documents or infer a relationship between a product and a device.
 
-This API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). The merge commit passed CI and CodeQL. The API is part of the current prototype, not a production-ready service.
+The diff endpoint reports additions, removals and matched-component changes. Matching removes only the PURL version segment; PURL qualifiers and subpath remain part of identity. Each matched component appears once in `changed`, with `changes` listing `version`, `name`, or both. The `version_changed` and `name_changed` summary counters count dimensions independently and can therefore overlap. Repeated identities are reported as ambiguous; components without a usable PURL are listed as unidentified and are never matched by name alone. Comparing an import with itself is deterministic: uniquely identified components are unchanged, while unidentified occurrences remain listed on both sides. The comparison is read-only and does not assess vulnerability impact.
+
+The product-release import and component endpoints were merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). The merge commit passed CI and CodeQL. The comparison endpoint is proposed in [PR #24](https://github.com/silvatechf/DeviceTrust/pull/24) and remains subject to review and CI validation. These APIs are part of an early-stage prototype, not a production-ready service. The diff is deterministic for uniquely identified PURLs; incomplete or duplicate identifiers remain explicitly unresolved.
 
 ## What is not implemented
 
-- SBOM history comparison/diffing and product-to-device relationship inference.
+- Product-to-device relationship inference.
 - SPDX ingestion or CycloneDX VEX generation.
 - KEV/EPSS enrichment and contextual product-version assessment.
 - Individual operator accounts, RBAC, tenant isolation or production browser sessions.
