@@ -49,13 +49,13 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Preserve source component name/version values and supported PURLs without inventing identifiers.
 - [x] Add duplicate detection and idempotent re-import behavior for the same release, format and content digest.
 - [x] Link synthetic vulnerability findings to exact component occurrences.
-- [ ] Compare SBOM imports and explain component additions, removals and version changes.
+- [x] Compare accepted SBOM imports and explain component additions, removals and version changes using version-independent PURL identity; report ambiguous and unidentified occurrences without speculative matching.
 - [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
 - [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
-**Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped synthetic findings. It does not yet provide SBOM diffing or re-evaluation when vulnerability intelligence changes.
+**Current status:** the initial persistence slice is implemented and merged in PR #22. The product SBOM comparison slice reports additions, removals, version changes and source-name changes across accepted imports for the same release. It matches by version-independent PURL identity; duplicate identities and components without PURLs remain explicitly ambiguous or unidentified. Comparison does not re-evaluate vulnerability intelligence.
 
-**Remaining exit criteria:** a reviewer can compare imports and trace a finding across product release, SBOM import and component identity; re-evaluation and broader format/field coverage are implemented and tested.
+**Remaining exit criteria:** stored product releases can be re-evaluated when intelligence changes, with broader format/field coverage and ecosystem-aware version semantics implemented and tested.
 
 ## Milestone 4 — Reviewed vulnerability decisions and intelligence (P2)
 
