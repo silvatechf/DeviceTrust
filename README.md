@@ -72,7 +72,7 @@ See [Prototype limitations](docs/prototype-limitations.md), [Threat model](docs/
 
 ## Architecture at a glance
 
-DeviceTrust is a **modular monolith**, not a set of microservices. FastAPI handles HTTP requests and authentication; route handlers coordinate domain logic; SQLAlchemy persists devices, evidence, vulnerabilities and audit events.
+DeviceTrust is a **modular monolith**, not a set of microservices. FastAPI handles HTTP requests and authentication; route handlers coordinate domain logic; SQLAlchemy persists devices, evidence, vulnerabilities and audit events. Authenticated write transactions serialize audit appends through a singleton database state row.
 
 ```mermaid
 flowchart LR
