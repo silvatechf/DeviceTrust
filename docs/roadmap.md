@@ -95,8 +95,8 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Implement individual identities, credential lifecycle, revocation and scoped authorization.
 - [ ] Add RBAC and tenant isolation before multi-customer operation.
 - [ ] Record actor identity, decision, rationale and evidence references for every security decision.
-- [ ] Add a durable audit checkpoint design with protected signing keys and independently stored checkpoints.
-- [ ] Serialize concurrent audit-chain updates and test tampering, deletion and recovery scenarios.
+- [ ] Add a durable audit checkpoint design with protected signing keys and independently stored checkpoints. Transactional writer serialization does not replace this independent trust boundary.
+- [x] Serialize concurrent audit-chain updates and test tampering, deletion and transaction rollback scenarios.
 - [ ] Define retention, backup/restore, operational monitoring, rate limits and deployment hardening.
 - [ ] Create an exportable Product Security File as a product concept, with clear provenance and limitations.
 - [ ] Prepare reviewed CRA reporting data only where a manufacturer has established the applicable reporting condition and authorised the action.
