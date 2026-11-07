@@ -17,6 +17,12 @@ This matrix connects security/product controls to concrete automated tests. It i
 | SBOM request size and JSON boundary | tests/test_sbom_input_limits.py | Malformed/non-object JSON and 2 MiB body cap | Deployment proxy limits need review |
 | CycloneDX component validation | tests/test_sbom_validation.py | Component object/name, PURL validity, package identity and version matching | Not full schema/dependency graph validation |
 | SBOM intelligence behavior | tests/test_sbom_osv_response.py, tests/test_sbom_validation.py | OSV response handling and deterministic synthetic feed | No complete CVE coverage or live-feed SLA |
+| Product/release SBOM API boundary | tests/test_api.py | Authenticated product/release creation and product-scoped route authentication | No individual identity, roles or tenant isolation |
+| Product SBOM import persistence and idempotency | tests/test_api.py, tests/test_sbom_persistence_models.py | Accepted import metadata, exact duplicate retry, digest uniqueness per release/format | Changed-content and cross-release import behavior lack explicit API tests |
+| Product SBOM rejection boundary | tests/test_api.py | Invalid document is rejected and no accepted import is listed | Not full CycloneDX schema validation |
+| Component occurrence provenance | tests/test_api.py, tests/test_sbom_persistence_models.py | Import-local ordinals, source name/version preservation, exact component-scoped findings | No global component identity or cross-import deduplication |
+| Product SBOM transaction rollback | — | No injected mid-import failure test currently exists | Must prove import, components, findings and audit entry roll back atomically |
+| Product SBOM PostgreSQL integration | — | Existing PostgreSQL integration covers device persistence only | Product/release/import/component/finding persistence is not yet exercised on PostgreSQL |
 | Audit chain integrity | tests/test_api.py, tests/test_audit_chain_boundaries.py | Tampering, interior deletion and final-suffix limitation | No external checkpoint or multi-writer serialization |
 | Operator console security headers | tests/test_operator_console.py | CSP, nosniff, frame denial, no-store and static assets | No real-browser security suite |
 | Console credential storage boundary | tests/test_operator_console.py | No localStorage/sessionStorage references in served script | No automated real-browser interaction suite |
@@ -34,6 +40,7 @@ A configured workflow is not a successful workflow. Before release, inspect the 
 - Real-browser desktop and mobile console walkthrough.
 - SBOM upload, triage and report download using seeded synthetic data.
 - API behavior under concurrent audit writes.
+- Product SBOM changed-content/cross-release behavior and transactional rollback on SQLite and PostgreSQL.
 - Backup/restore and deployment rollback.
 - Secret scanning and full Git-history review.
 - Branch protection / ruleset and commit-signature policy verification.
