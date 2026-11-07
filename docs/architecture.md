@@ -30,6 +30,7 @@ For normal typed endpoints, Pydantic validates request models. The SBOM route re
 | `app/db.py` | SQLAlchemy models, engine/session setup and database access |
 | `app/posture.py` | Rules that assess the declared device security profile |
 | `app/sbom.py` | CycloneDX subset parsing, PURL validation, local demo matching and optional OSV lookup |
+| `app/product_sbom.py` | Product/release SBOM persistence, component occurrences, idempotency and import comparison |
 | `app/evidence_normalization.py` | Pure normalizers for selected evidence attributes |
 | `app/audit.py` | SHA-256 audit hashing and chain verification |
 | `web/` | Static same-origin operator console |
@@ -65,6 +66,10 @@ The normalized endpoint is a read-only projection. It preserves the raw value an
 
 The API caps the request body at 2 MiB. The parser accepts a bounded CycloneDX JSON subset, validates component names/versions and PURLs, then checks the local synthetic advisory set. If `DEVICETRUST_OSV=1`, it also makes best-effort OSV queries. A failed or empty lookup is not proof that a component is safe.
 
+### Product SBOM comparison
+
+The authenticated `GET /product-releases/{release_id}/sbom/diff` endpoint compares two accepted imports belonging to the same product release. It matches components by a version-independent Package URL identity, then reports additions, removals, version changes and source-name changes. Duplicate package identities are reported as ambiguous. Components without a usable PURL remain unidentified and are not matched by name or ordinal. The comparison is read-only and does not re-evaluate vulnerability findings.
+
 ### Triage and audit
 
 A triage update requires a justification. State-changing operations append audit entries. Each entry hashes its content and the previous entry hash. The chain can reveal changes to retained entries, but it has no external checkpoint and is not immutable storage.
@@ -99,6 +104,7 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 | Automatic device association/conflict resolution | Not implemented |
 | Evidence-driven posture | Not implemented |
 | Bounded CycloneDX ingestion | Implemented prototype |
+| Product-release SBOM import comparison by unique PURL identity | Implemented prototype; ambiguous and PURL-less components remain unmatched |
 | Synthetic local advisory matching | Implemented demo behavior |
 | Optional OSV lookup | Best-effort integration |
 | Justified vulnerability triage | Implemented prototype |
@@ -114,6 +120,7 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 - Persistence: `app/db.py`
 - Posture rules: `app/posture.py`
 - SBOM parsing and matching: `app/sbom.py`
+- Product SBOM persistence and comparison: `app/product_sbom.py`
 - Evidence normalization: `app/evidence_normalization.py`
 - Audit hashing: `app/audit.py`
 - Tests: `tests/`
