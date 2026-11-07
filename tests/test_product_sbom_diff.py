@@ -46,6 +46,7 @@ def test_product_sbom_diff_reports_add_remove_version_and_unidentified(client):
         [
             _component("requests", "2.31.0", "pkg:pypi/requests@2.31.0"),
             _component("stable-lib", "1.0.0", "pkg:generic/stable-lib@1.0.0"),
+            _component("legacy-name", "1.0.0", "pkg:generic/renamed@1.0.0"),
             _component("removed-lib", "3.0.0", "pkg:generic/removed-lib@3.0.0"),
             _component("unidentified-old", "1.0.0"),
         ],
@@ -56,6 +57,7 @@ def test_product_sbom_diff_reports_add_remove_version_and_unidentified(client):
         [
             _component("requests", "2.32.0", "pkg:pypi/requests@2.32.0"),
             _component("stable-lib", "1.0.0", "pkg:generic/stable-lib@1.0.0"),
+            _component("new-name", "1.0.0", "pkg:generic/renamed@1.0.0"),
             _component("added-lib", "1.0.0", "pkg:generic/added-lib@1.0.0"),
             _component("unidentified-new", "2.0.0"),
         ],
@@ -73,7 +75,7 @@ def test_product_sbom_diff_reports_add_remove_version_and_unidentified(client):
         "added": 1,
         "removed": 1,
         "version_changed": 1,
-        "metadata_changed": 0,
+        "metadata_changed": 1,
         "unchanged": 1,
         "ambiguous": 0,
         "unidentified_previous": 1,
@@ -81,6 +83,8 @@ def test_product_sbom_diff_reports_add_remove_version_and_unidentified(client):
     }
     assert body["added"][0]["name"] == "added-lib"
     assert body["removed"][0]["name"] == "removed-lib"
+    assert body["metadata_changed"][0]["previous"]["name"] == "legacy-name"
+    assert body["metadata_changed"][0]["current"]["name"] == "new-name"
     assert body["version_changed"][0]["previous"]["version"] == "2.31.0"
     assert body["version_changed"][0]["current"]["version"] == "2.32.0"
     assert body["unidentified"]["previous"][0]["name"] == "unidentified-old"
