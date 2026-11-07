@@ -3,7 +3,7 @@ from pathlib import Path
 
 from sqlalchemy import update
 
-from app.db import AuditEntry, SessionLocal
+from app.db import AuditChainState, AuditEntry, SessionLocal
 from app.seed import DEVICES
 
 from .conftest import H
@@ -439,3 +439,22 @@ def test_product_sbom_findings_are_scoped_to_exact_component_occurrence(client):
         "DT-DEMO-0002"
     ]
     assert findings["pkg:pypi/openssl@1.1.1"] == []
+
+
+
+def test_unauthenticated_write_does_not_acquire_audit_chain_lock(client):
+    with SessionLocal() as db:
+        state = db.get(AuditChainState, 1)
+        assert state is not None
+        version_before = state.version
+
+    response = client.post(
+        "/products",
+        json={"manufacturer": "Unauthenticated", "product_name": "Must Not Persist"},
+    )
+    assert response.status_code == 401
+
+    with SessionLocal() as db:
+        state = db.get(AuditChainState, 1)
+        assert state is not None
+        assert state.version == version_before
