@@ -20,7 +20,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [x] Add Alembic baseline migration and PostgreSQL migration/persistence CI coverage.
 - [ ] Verify PostgreSQL startup, persistence and restart behavior in a clean local Compose deployment.
 - [ ] Verify console flows and API error paths in a real browser at desktop/mobile sizes.
-- [ ] Test concurrent audit writes and failure behavior.
+- [x] Test concurrent audit writes and transaction failure behavior on SQLite and PostgreSQL.
 - [ ] Demonstrate backup/restore and rollback.
 - [ ] Inspect CI and CodeQL results for the exact candidate SHA and record their URLs.
 - [ ] Capture genuine screenshots from the running app using synthetic data only.
@@ -45,7 +45,7 @@ A checkbox must be marked only when the check has actually been performed and ev
 - Browser console receives the shared key in page memory.
 - No server-side browser sessions or backend-for-frontend.
 - Alembic baseline and explicit migration workflow are implemented; future schema changes still require reviewed migration scripts.
-- Audit chain has no external checkpoint, immutable retention or multi-writer serialization.
+- Audit-chain appends are serialized for application writers sharing one database, but there is no external checkpoint or immutable retention; a privileged database administrator can still rewrite the chain.
 - CycloneDX support is a bounded subset.
 - Local advisories are synthetic; optional OSV lookup is best-effort.
 - Evidence normalization covers selected attributes only; observations are not associated automatically or consumed by posture.
