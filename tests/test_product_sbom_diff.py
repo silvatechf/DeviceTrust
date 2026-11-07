@@ -1,4 +1,3 @@
-import json
 from types import SimpleNamespace
 
 from app.product_sbom import _component_identity
@@ -141,14 +140,9 @@ def test_product_sbom_diff_reports_simultaneous_version_and_name_changes(client)
     assert body["summary"]["changed"] == 1
     assert body["summary"]["version_changed"] == 1
     assert body["summary"]["name_changed"] == 1
-    assert body["changed"] == [
-        {
-            "identity": "pkg:generic/shared",
-            "previous": body["changed"][0]["previous"],
-            "current": body["changed"][0]["current"],
-            "changes": ["version", "name"],
-        }
-    ]
+    assert len(body["changed"]) == 1
+    assert body["changed"][0]["identity"] == "pkg:generic/shared"
+    assert body["changed"][0]["changes"] == ["version", "name"]
     assert body["changed"][0]["previous"]["name"] == "old-name"
     assert body["changed"][0]["current"]["name"] == "new-name"
     assert body["changed"][0]["previous"]["version"] == "1.0.0"
@@ -171,6 +165,11 @@ def test_product_sbom_diff_preserves_qualifiers_and_subpath_identity(client):
                 "1.0.0",
                 "pkg:generic/subpath-lib@1.0.0?arch=x86#modules/alpha",
             ),
+            _component(
+                "same-context",
+                "1.0.0",
+                "pkg:generic/same-context@1.0.0?arch=x86#modules/core",
+            ),
         ],
     )
     current_id = _import(
@@ -187,6 +186,11 @@ def test_product_sbom_diff_preserves_qualifiers_and_subpath_identity(client):
                 "2.0.0",
                 "pkg:generic/subpath-lib@2.0.0?arch=x86#modules/beta",
             ),
+            _component(
+                "same-context",
+                "2.0.0",
+                "pkg:generic/same-context@2.0.0?arch=x86#modules/core",
+            ),
         ],
     )
 
@@ -196,8 +200,9 @@ def test_product_sbom_diff_preserves_qualifiers_and_subpath_identity(client):
     body = response.json()
     assert body["summary"]["added"] == 2
     assert body["summary"]["removed"] == 2
-    assert body["summary"]["changed"] == 0
-    assert body["summary"]["version_changed"] == 0
+    assert body["summary"]["changed"] == 1
+    assert body["summary"]["version_changed"] == 1
+    assert body["summary"]["name_changed"] == 0
     assert body["added"] == sorted(body["added"], key=lambda item: item["purl"])
     assert {item["name"] for item in body["added"]} == {
         "qualified-lib",
@@ -207,6 +212,12 @@ def test_product_sbom_diff_preserves_qualifiers_and_subpath_identity(client):
         "qualified-lib",
         "subpath-lib",
     }
+    assert body["changed"][0]["previous"]["purl"] == (
+        "pkg:generic/same-context@1.0.0?arch=x86#modules/core"
+    )
+    assert body["changed"][0]["current"]["purl"] == (
+        "pkg:generic/same-context@2.0.0?arch=x86#modules/core"
+    )
 
 
 def test_product_sbom_diff_handles_equivalent_component_content(client):
