@@ -17,7 +17,7 @@ This matrix connects security/product controls to concrete automated tests. It i
 | SBOM request size and JSON boundary | tests/test_sbom_input_limits.py | Malformed/non-object JSON and 2 MiB body cap | Deployment proxy limits need review |
 | CycloneDX component validation | tests/test_sbom_validation.py | Component object/name, PURL validity, package identity and version matching | Not full schema/dependency graph validation |
 | SBOM intelligence behavior | tests/test_sbom_osv_response.py, tests/test_sbom_validation.py | OSV response handling and deterministic synthetic feed | No complete CVE coverage or live-feed SLA |
-| Audit chain integrity | tests/test_api.py, tests/test_audit_chain_boundaries.py | Tampering, interior deletion and final-suffix limitation | No external checkpoint or multi-writer serialization |
+| Audit chain integrity and writer serialization | tests/test_api.py, tests/test_audit_chain_boundaries.py, tests/test_postgres_persistence.py | Tampering, interior deletion, final-suffix limitation, concurrent SQLite/PostgreSQL writers, lock-row rollback and unauthenticated-write lock boundary | No external checkpoint or immutable store |
 | Operator console security headers | tests/test_operator_console.py | CSP, nosniff, frame denial, no-store and static assets | No real-browser security suite |
 | Console credential storage boundary | tests/test_operator_console.py | No localStorage/sessionStorage references in served script | No automated real-browser interaction suite |
 | API documentation boundary | tests/test_operator_console.py | /docs remains available without console CSP header | Manual browser check required |
@@ -33,7 +33,7 @@ A configured workflow is not a successful workflow. Before release, inspect the 
 - Docker Compose PostgreSQL startup, restart persistence and failure behavior.
 - Real-browser desktop and mobile console walkthrough.
 - SBOM upload, triage and report download using seeded synthetic data.
-- API behavior under concurrent audit writes.
+- Audit lock contention under sustained load and external writers that bypass the application.
 - Backup/restore and deployment rollback.
 - Secret scanning and full Git-history review.
 - Branch protection / ruleset and commit-signature policy verification.
