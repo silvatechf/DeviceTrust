@@ -1,9 +1,17 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
+from time import sleep
+from uuid import uuid4
 
-from sqlalchemy import update
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, update
+from sqlalchemy.orm import Session
 
-from app.db import AuditEntry, SessionLocal
+from app import audit
+from app.db import AuditChainState, AuditEntry, Base, Product, SessionLocal
+from app.main import app, get_write_db
 from app.seed import DEVICES
 
 from .conftest import H
@@ -188,11 +196,13 @@ def test_audit_chain_cannot_detect_deleted_tail_without_checkpoint(tmp_path):
     from sqlalchemy.orm import Session
 
     from app.audit import record, verify
-    from app.db import Base
+    from app.db import AuditChainState, Base
 
     engine = create_engine(f"sqlite:///{tmp_path / 'audit-tail.db'}")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
+        db.add(AuditChainState(id=1, version=0))
+        db.commit()
         record(db, "test", "device.create", "DEVICE-1", {"id": 1})
         db.commit()
         record(db, "test", "device.update", "DEVICE-1", {"id": 1})
@@ -437,3 +447,177 @@ def test_product_sbom_findings_are_scoped_to_exact_component_occurrence(client):
         "DT-DEMO-0002"
     ]
     assert findings["pkg:pypi/openssl@1.1.1"] == []
+
+
+
+def test_unauthenticated_write_does_not_acquire_audit_chain_lock(client):
+    with SessionLocal() as db:
+        state = db.get(AuditChainState, 1)
+        assert state is not None
+        version_before = state.version
+
+    response = client.post(
+        "/products",
+        json={"manufacturer": "Unauthenticated", "product_name": "Must Not Persist"},
+    )
+    assert response.status_code == 401
+
+    with SessionLocal() as db:
+        state = db.get(AuditChainState, 1)
+        assert state is not None
+        assert state.version == version_before
+
+
+def _isolated_api_database(tmp_path):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'api-audit-atomicity.db'}",
+        connect_args={"check_same_thread": False, "timeout": 10},
+    )
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(AuditChainState(id=1, version=0))
+        db.commit()
+    return engine
+
+
+def _write_database_override(engine):
+    def override_write_db():
+        with Session(engine) as db:
+            audit.acquire_chain_lock(db)
+            yield db
+
+    return override_write_db
+
+
+def test_concurrent_product_api_writes_keep_domain_and_audit_atomic(
+    tmp_path, monkeypatch
+):
+    engine = _isolated_api_database(tmp_path)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        get_write_db,
+        _write_database_override(engine),
+    )
+    writer_count = 8
+    barrier = Barrier(writer_count)
+    original_digest = audit._digest
+
+    def slow_digest(prev, ts, actor, action, entity, payload):
+        sleep(0.02)
+        return original_digest(prev, ts, actor, action, entity, payload)
+
+    monkeypatch.setattr(audit, "_digest", slow_digest)
+
+    try:
+        with Session(engine) as db:
+            version_before = db.get(AuditChainState, 1).version
+
+        def create_product(index):
+            with TestClient(app) as api:
+                barrier.wait(timeout=10)
+                return api.post(
+                    "/products",
+                    json={
+                        "manufacturer": "Concurrent API Test",
+                        "product_name": f"concurrent-{uuid4().hex}-{index}",
+                    },
+                    headers=H,
+                )
+
+        with ThreadPoolExecutor(max_workers=writer_count) as executor:
+            responses = list(executor.map(create_product, range(writer_count)))
+
+        assert all(response.status_code == 201 for response in responses)
+        product_ids = {response.json()["id"] for response in responses}
+        assert len(product_ids) == writer_count
+
+        with Session(engine) as db:
+            products = db.query(Product).filter(Product.id.in_(product_ids)).all()
+            entries = (
+                db.query(AuditEntry)
+                .filter(
+                    AuditEntry.actor == "api-key",
+                    AuditEntry.action == "product.create",
+                    AuditEntry.entity.in_(
+                        [str(product_id) for product_id in product_ids]
+                    ),
+                )
+                .all()
+            )
+            state = db.get(AuditChainState, 1)
+            assert state is not None
+            assert {product.id for product in products} == product_ids
+            assert {entry.entity for entry in entries} == {
+                str(product_id) for product_id in product_ids
+            }
+            assert len(entries) == writer_count
+            assert state.version == version_before + writer_count
+            assert audit.verify(db) == {"valid": True, "entries": writer_count}
+    finally:
+        engine.dispose()
+
+
+def test_failed_product_api_write_rolls_back_domain_audit_and_releases_lock(
+    tmp_path, monkeypatch
+):
+    engine = _isolated_api_database(tmp_path)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        get_write_db,
+        _write_database_override(engine),
+    )
+    product_name = f"rollback-{uuid4().hex}"
+    original_record = audit.record
+
+    try:
+        with Session(engine) as db:
+            state = db.get(AuditChainState, 1)
+            assert state is not None
+            version_before = state.version
+            audit_count_before = db.query(AuditEntry).count()
+
+        def fail_after_audit_flush(db, actor, action, entity, payload):
+            original_record(db, actor, action, entity, payload)
+            raise RuntimeError("injected failure after audit flush")
+
+        monkeypatch.setattr(audit, "record", fail_after_audit_flush)
+        with TestClient(app, raise_server_exceptions=False) as api:
+            failed = api.post(
+                "/products",
+                json={"manufacturer": "Rollback Test", "product_name": product_name},
+                headers=H,
+            )
+            assert failed.status_code == 500
+
+            monkeypatch.setattr(audit, "record", original_record)
+            with Session(engine) as db:
+                state = db.get(AuditChainState, 1)
+                assert state is not None
+                assert state.version == version_before
+                assert db.query(Product).filter_by(product_name=product_name).count() == 0
+                assert db.query(AuditEntry).count() == audit_count_before
+
+            recovered = api.post(
+                "/products",
+                json={"manufacturer": "Rollback Test", "product_name": product_name},
+                headers=H,
+            )
+            assert recovered.status_code == 201
+
+        with Session(engine) as db:
+            state = db.get(AuditChainState, 1)
+            assert state is not None
+            assert state.version == version_before + 1
+            assert db.query(Product).filter_by(product_name=product_name).count() == 1
+            assert (
+                db.query(AuditEntry)
+                .filter(
+                    AuditEntry.action == "product.create",
+                    AuditEntry.entity == str(recovered.json()["id"]),
+                )
+                .count()
+                == 1
+            )
+            assert audit.verify(db) == {"valid": True, "entries": 1}
+    finally:
+        engine.dispose()

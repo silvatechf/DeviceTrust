@@ -25,6 +25,7 @@ def create_product(
     product_name: str,
     external_reference: str | None,
 ) -> Product:
+    audit.acquire_chain_lock(db)
     product = Product(
         manufacturer=manufacturer.strip(),
         product_name=product_name.strip(),
@@ -55,6 +56,7 @@ def create_release(
     hardware_revision: str | None,
     release_reference: str | None,
 ) -> ProductRelease:
+    audit.acquire_chain_lock(db)
     if db.get(Product, product_id) is None:
         raise LookupError("Product not found")
 
@@ -87,9 +89,6 @@ def import_cyclonedx(
     source_type: str,
     source_reference: str | None,
 ) -> tuple[SBOMImport, bool]:
-    if db.get(ProductRelease, release_id) is None:
-        raise LookupError("Product release not found")
-
     components = sbom.parse_cyclonedx(document)
     findings_by_component: dict[int, list[dict]] = {}
     for finding in sbom.scan(components, include_component_index=True):
@@ -97,6 +96,10 @@ def import_cyclonedx(
         findings_by_component.setdefault(component_index, []).append(finding)
 
     digest = hashlib.sha256(raw_document).hexdigest()
+    audit.acquire_chain_lock(db)
+    if db.get(ProductRelease, release_id) is None:
+        raise LookupError("Product release not found")
+
     existing = db.scalars(
         select(SBOMImport).where(
             SBOMImport.product_release_id == release_id,

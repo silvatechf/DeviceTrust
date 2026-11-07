@@ -15,7 +15,7 @@ This document describes what the current code does, where to find its tests and 
 | Local advisory matching | PURL package type/name and version-before-fixed comparison | `tests/test_sbom_validation.py` | Synthetic demo records, not a maintained feed |
 | OSV lookup | Optional exact PURL/version query | `tests/test_sbom_osv_response.py` | Best-effort; errors are skipped and coverage is not guaranteed |
 | Posture assessment | Missing data stays unverified; declared exposed management interface is high risk | `tests/test_posture_evidence_boundaries.py` | Uses declared metadata, not active discovery |
-| Audit | SHA-256 hash chain and verification endpoint | `tests/test_audit_chain_boundaries.py` | No external checkpoint, immutable store or concurrent writer serialization |
+| Audit | SHA-256 hash chain, transaction-scoped writer lock and verification endpoint | `tests/test_audit_chain_boundaries.py`, `tests/test_postgres_persistence.py` | No external checkpoint or immutable store; privileged DB writers remain in the trust boundary |
 | Console | Same-origin assets, CSP and baseline response headers | `tests/test_operator_console.py` | No real-browser security suite |
 
 ## Evidence handling
@@ -45,8 +45,8 @@ The current persistence model stores `support_until` on a device. It does not ye
 
 ## Audit guarantees
 
-The hash chain can detect modification of retained entries and gaps when a later retained entry references a missing predecessor. It cannot detect deletion of the final entry or suffix without an independently retained checkpoint. A privileged attacker able to rewrite the database can recompute the chain. Multi-worker concurrent writes need a serialized chain-head mechanism.
+The hash chain can detect modification of retained entries and gaps when a later retained entry references a missing predecessor. It cannot detect deletion of the final entry or suffix without an independently retained checkpoint. A privileged attacker able to rewrite the database can recompute the chain. Application writers sharing one database are serialized by a singleton state-row update held for the domain/audit transaction; SQLite acquires `BEGIN IMMEDIATE` with a 10-second busy timeout, while PostgreSQL holds a row lock with a 10-second transaction-local lock timeout. This does not coordinate external writers that bypass the application or provide an independent checkpoint.
 
 ## Before production use
 
-Add individual identity and authorization, key lifecycle, rate limiting, migration management, independent audit anchoring, retention policy, concurrency controls, PostgreSQL integration tests, operational monitoring and a documented deployment model. See [Threat model](threat-model.md) and [Release readiness](release-readiness.md).
+Add individual identity and authorization, key lifecycle, rate limiting, migration management, independent audit anchoring, retention policy, lock-contention monitoring, operational monitoring and a documented deployment model. See [Threat model](threat-model.md) and [Release readiness](release-readiness.md).

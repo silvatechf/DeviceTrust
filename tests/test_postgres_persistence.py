@@ -1,12 +1,22 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+from time import sleep
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, delete, select
+from alembic import command
+from alembic.config import Config
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, delete, inspect, select, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app.db import Device
+from app import audit
+from app.audit import record, verify
+from app.db import AuditChainState, AuditEntry, Device, Product
 from app.db import engine as application_engine
+from app.main import app
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("DATABASE_URL", "").startswith(("postgresql://", "postgresql+psycopg://")),
@@ -40,3 +50,244 @@ def test_device_survives_database_engine_disposal():
             session.execute(delete(Device).where(Device.device_id == device_id))
             session.commit()
         verification_engine.dispose()
+
+
+
+def test_audit_chain_serializes_concurrent_postgres_writers(monkeypatch):
+    writer_count = 8
+    barrier = Barrier(writer_count)
+    original_digest = audit._digest
+
+    def slow_digest(prev, ts, actor, action, entity, payload):
+        sleep(0.02)
+        return original_digest(prev, ts, actor, action, entity, payload)
+
+    monkeypatch.setattr(audit, "_digest", slow_digest)
+
+    with Session(application_engine) as session:
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        version_before = state.version
+
+    def write_event(index):
+        with Session(application_engine) as session:
+            barrier.wait(timeout=10)
+            record(
+                session,
+                "concurrency-test",
+                "audit.concurrent",
+                f"POSTGRES-{index}",
+                {"sequence": index},
+            )
+            session.commit()
+
+    with ThreadPoolExecutor(max_workers=writer_count) as executor:
+        list(executor.map(write_event, range(writer_count)))
+
+    with Session(application_engine) as session:
+        assert verify(session)["valid"] is True
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        assert state.version == version_before + writer_count
+        assert (
+            session.query(AuditEntry)
+            .filter_by(actor="concurrency-test", action="audit.concurrent")
+            .count()
+            == writer_count
+        )
+
+
+
+def test_concurrent_product_api_writes_keep_domain_and_audit_atomic_postgres(
+    monkeypatch,
+):
+    writer_count = 8
+    barrier = Barrier(writer_count)
+    original_digest = audit._digest
+
+    def slow_digest(prev, ts, actor, action, entity, payload):
+        sleep(0.02)
+        return original_digest(prev, ts, actor, action, entity, payload)
+
+    monkeypatch.setattr(audit, "_digest", slow_digest)
+
+    with Session(application_engine) as session:
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        version_before = state.version
+
+    def create_product(index):
+        with TestClient(app) as api:
+            barrier.wait(timeout=10)
+            return api.post(
+                "/products",
+                json={
+                    "manufacturer": "Concurrent PostgreSQL API Test",
+                    "product_name": f"concurrent-{uuid4().hex}-{index}",
+                },
+                headers={"X-API-Key": "test-key"},
+            )
+
+    with ThreadPoolExecutor(max_workers=writer_count) as executor:
+        responses = list(executor.map(create_product, range(writer_count)))
+
+    assert all(response.status_code == 201 for response in responses)
+    product_ids = {response.json()["id"] for response in responses}
+    assert len(product_ids) == writer_count
+
+    with Session(application_engine) as session:
+        products = session.scalars(
+            select(Product).where(Product.id.in_(product_ids))
+        ).all()
+        entries = session.scalars(
+            select(AuditEntry).where(
+                AuditEntry.actor == "api-key",
+                AuditEntry.action == "product.create",
+                AuditEntry.entity.in_([str(item) for item in product_ids]),
+            )
+        ).all()
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        assert {product.id for product in products} == product_ids
+        assert {entry.entity for entry in entries} == {
+            str(product_id) for product_id in product_ids
+        }
+        assert len(entries) == writer_count
+        assert state.version == version_before + writer_count
+        assert verify(session)["valid"] is True
+
+
+def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
+    monkeypatch,
+):
+    database_name = f"devicetrust_migration_{uuid4().hex}"
+    admin_engine = create_engine(os.environ["DATABASE_URL"])
+    target_engine = None
+    database_created = False
+
+    try:
+        with admin_engine.connect().execution_options(
+            isolation_level="AUTOCOMMIT"
+        ) as connection:
+            connection.exec_driver_sql(f'CREATE DATABASE "{database_name}"')
+        database_created = True
+
+        target_url = make_url(os.environ["DATABASE_URL"]).set(
+            database=database_name
+        )
+        target_engine = create_engine(target_url)
+        monkeypatch.setenv(
+            "DATABASE_URL",
+            target_url.render_as_string(hide_password=False),
+        )
+        config = Config("alembic.ini")
+        config.set_main_option(
+            "sqlalchemy.url",
+            target_url.render_as_string(hide_password=False),
+        )
+
+        command.upgrade(config, "0002_persistent_sbom")
+        assert not inspect(target_engine).has_table("audit_chain_state")
+
+        command.upgrade(config, "head")
+        assert inspect(target_engine).has_table("audit_chain_state")
+        with target_engine.connect() as connection:
+            assert connection.scalar(
+                text("SELECT version FROM audit_chain_state WHERE id = 1")
+            ) == 0
+            assert connection.scalar(
+                text("SELECT COUNT(*) FROM audit_chain_state")
+            ) == 1
+        command.check(config)
+
+        command.downgrade(config, "0002_persistent_sbom")
+        assert not inspect(target_engine).has_table("audit_chain_state")
+
+        command.upgrade(config, "head")
+        assert inspect(target_engine).has_table("audit_chain_state")
+        with target_engine.connect() as connection:
+            assert connection.scalar(
+                text("SELECT version FROM audit_chain_state WHERE id = 1")
+            ) == 0
+    finally:
+        if target_engine is not None:
+            target_engine.dispose()
+        if database_created:
+            with admin_engine.connect().execution_options(
+                isolation_level="AUTOCOMMIT"
+            ) as connection:
+                connection.exec_driver_sql(
+                    f'DROP DATABASE IF EXISTS "{database_name}" WITH (FORCE)'
+                )
+        admin_engine.dispose()
+
+
+
+def test_failed_product_api_write_rolls_back_and_releases_postgres_lock(
+    monkeypatch,
+):
+    product_name = f"postgres-rollback-{uuid4().hex}"
+    original_record = audit.record
+
+    with Session(application_engine) as session:
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        version_before = state.version
+        audit_count_before = session.query(AuditEntry).count()
+
+    def fail_after_audit_flush(session, actor, action, entity, payload):
+        original_record(session, actor, action, entity, payload)
+        raise RuntimeError("injected PostgreSQL failure after audit flush")
+
+    monkeypatch.setattr(audit, "record", fail_after_audit_flush)
+    with TestClient(app, raise_server_exceptions=False) as api:
+        failed = api.post(
+            "/products",
+            json={
+                "manufacturer": "PostgreSQL Rollback Test",
+                "product_name": product_name,
+            },
+            headers={"X-API-Key": "test-key"},
+        )
+    assert failed.status_code == 500
+
+    monkeypatch.setattr(audit, "record", original_record)
+    with Session(application_engine) as session:
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        assert state.version == version_before
+        assert (
+            session.query(Product).filter_by(product_name=product_name).count()
+            == 0
+        )
+        assert session.query(AuditEntry).count() == audit_count_before
+
+    with TestClient(app) as api:
+        recovered = api.post(
+            "/products",
+            json={
+                "manufacturer": "PostgreSQL Rollback Test",
+                "product_name": product_name,
+            },
+            headers={"X-API-Key": "test-key"},
+        )
+    assert recovered.status_code == 201
+
+    with Session(application_engine) as session:
+        state = session.get(AuditChainState, 1)
+        assert state is not None
+        assert state.version == version_before + 1
+        assert (
+            session.query(Product).filter_by(product_name=product_name).count()
+            == 1
+        )
+        assert (
+            session.query(AuditEntry)
+            .filter(
+                AuditEntry.action == "product.create",
+                AuditEntry.entity == str(recovered.json()["id"]),
+            )
+            .count()
+            == 1
+        )
+        assert verify(session)["valid"] is True
