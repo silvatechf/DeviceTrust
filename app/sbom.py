@@ -141,13 +141,17 @@ def scan_osv_with_status(
     hits = []
     queried = 0
     failed = False
-    exhausted = False
+    budget_exhausted = False
+    deadline_exhausted = False
     try:
         with httpx.Client() as client:
             for (purl, version), indexes in unique_queries.items():
                 remaining = deadline - clock()
-                if queried >= MAX_OSV_QUERIES_PER_IMPORT or remaining <= 0:
-                    exhausted = True
+                if queried >= MAX_OSV_QUERIES_PER_IMPORT:
+                    budget_exhausted = True
+                    break
+                if remaining <= 0:
+                    deadline_exhausted = True
                     break
                 try:
                     response = client.post(
@@ -199,7 +203,7 @@ def scan_osv_with_status(
         failed = True
 
     deduplicated = sum(len(indexes) - 1 for indexes in unique_queries.values())
-    incomplete = failed or exhausted or skipped_no_purl > 0
+    incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0
     status = {
         "status": "incomplete" if incomplete else "complete",
         "source": "osv",
@@ -209,7 +213,8 @@ def scan_osv_with_status(
         "skipped_without_purl": skipped_no_purl,
         "query_limit": MAX_OSV_QUERIES_PER_IMPORT,
         "deadline_seconds": OSV_ENRICHMENT_DEADLINE_SECONDS,
-        "deadline_exhausted": exhausted,
+        "budget_exhausted": budget_exhausted,
+        "deadline_exhausted": deadline_exhausted,
         "request_failures": failed,
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }
