@@ -65,7 +65,7 @@ This API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/p
 - Individual operator accounts, RBAC, tenant isolation or production browser sessions.
 - Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
 - Active LAN discovery, packet capture, device agents or independent firmware/hardware attestation.
-- Immutable/WORM audit storage, external audit checkpoints or multi-writer serialization.
+- Immutable/WORM audit storage, external audit checkpoints or independent audit anchoring.
 - Production operations, real-time intrusion detection, incident-response automation or attack prevention.
 
 See [Prototype limitations](docs/prototype-limitations.md), [Threat model](docs/threat-model.md) and [Release readiness](docs/release-readiness.md).
@@ -183,7 +183,8 @@ GitHub Actions validates the pre-commit configuration, provisions hook environme
 - Vulnerability triage requires a written justification.
 - KEV presence and EPSS scores are intelligence signals, not automatic CRA reporting triggers.
 - VEX statements require product-version context, evidence and reviewed justification.
-- Audit hash chaining provides tamper evidence, not immutable storage.
+- Application writers sharing one database are serialized transactionally through the singleton audit-chain state row: PostgreSQL holds the row lock through the transaction, while SQLite uses `BEGIN IMMEDIATE`.
+- Audit hash chaining provides tamper evidence, not immutable storage. A privileged database administrator or an external writer can still tamper with the chain; there is no external checkpoint or independent audit anchoring.
 - External intelligence failures or missing results do not mean that a component is vulnerability-free.
 - DeviceTrust is an assessment and evidence-management prototype, not an inline IDS/IPS or product conformity assessor.
 
