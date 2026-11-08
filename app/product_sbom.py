@@ -435,8 +435,9 @@ async def reassess_import(
         raise ValueError("Idempotency-Key must contain between 1 and 128 characters.")
 
     request_key_hash = hashlib.sha256(request_key.encode("utf-8")).hexdigest()
+    advisory_digest = hashlib.sha256(sbom.ADVISORIES.read_bytes()).hexdigest()
     source_configuration = (
-        f"parser={PARSER_VERSION};local=advisories-v1;"
+        f"parser={PARSER_VERSION};local_advisories={advisory_digest};"
         f"osv={'enabled' if os.getenv('DEVICETRUST_OSV') == '1' else 'disabled'}"
     )
     source_fingerprint = hashlib.sha256(
