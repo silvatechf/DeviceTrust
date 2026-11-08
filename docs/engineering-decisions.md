@@ -87,3 +87,23 @@ For each decision, explain the problem, why the current approach fits the protot
 **Security boundary:** This prevents concurrent application writers from forking the chain head. It does not prevent a privileged database administrator or external writer from rewriting the audit table, and it does not detect deletion of the final suffix without an independent checkpoint.
 
 **Verification:** Concurrent SQLite and PostgreSQL writer tests, transaction rollback of the lock generation and audit append, and an unauthenticated-write check.
+
+## DEC-008 — Versioned product SBOM reassessment
+
+**Decision:** Keep an accepted SBOM import and its component occurrences as immutable source evidence. Represent each vulnerability reassessment as a separate run linked to that import. Store generated findings under the run, together with source, retrieval time, coverage status and bounded-query metadata. Never replace findings from an earlier run.
+
+**Why:** Vulnerability intelligence changes independently of the submitted SBOM. Updating the original finding rows would erase what was known at import time and mix generated intelligence with operator decisions. A separate run makes the assessment reproducible and allows users to compare historical results.
+
+**Triage boundary:** Assessment findings are machine-generated evidence, not human decisions. A later run must not silently inherit a previous status or justification. This slice will not add product-finding triage; a future reviewed-decision model must reference a specific assessment finding and record actor, rationale and evidence. Existing device-scoped vulnerability triage remains unchanged.
+
+**Execution boundary:** Reuse the existing local matcher and bounded OSV query path. Perform external enrichment before opening the persistence/audit transaction or acquiring the audit writer lock. Persist the run, findings and audit event atomically after enrichment. A failed persistence transaction must not leave a partial run.
+
+**Idempotency:** Each run has an explicit request identity and source/configuration fingerprint. Repeating the same request for the same import must return the existing run rather than creating duplicate history. A deliberate refresh with a new request identity may create a new run even when the feed contents happen to be unchanged.
+
+**Coverage semantics:** Persist `disabled`, `complete` or `incomplete` enrichment status and the existing failure, deadline, query-budget and skipped-PURL metadata. A missing finding or unavailable feed is never evidence that a component is safe. A run records the assessment time; it does not claim a globally consistent OSV snapshot because the public API may change during the run.
+
+**Trade-offs:** The schema and API become more explicit, but historical runs increase storage. The current synchronous request model remains bounded but can still occupy an API worker for up to the enrichment budget. The current exact PURL/version query does not provide ecosystem-aware affected-version or backport semantics.
+
+**Out of scope:** Background scheduling, parallel fan-out, KEV/EPSS, VEX, SPDX, broad CycloneDX schema support, automatic triage inheritance and production-readiness claims.
+
+**Verification:** Test historical immutability, idempotency, duplicate/concurrent requests, incomplete/disabled coverage, partial findings, transaction rollback and PostgreSQL persistence.
