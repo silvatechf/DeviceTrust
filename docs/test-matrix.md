@@ -24,7 +24,7 @@ This matrix connects security/product controls to concrete automated tests. It i
 
 ## CI quality gates
 
-The current workflow at .github/workflows/ci.yml runs Node syntax validation, dependency installation, Ruff, Bandit, separate pip-audit checks for runtime (`requirements.txt`) and development (`requirements-dev.txt`) dependencies, and pytest. The development requirements include the runtime requirements. CodeQL is configured separately in .github/workflows/codeql.yml.
+The current workflow at .github/workflows/ci.yml runs Node syntax validation, dependency installation, pre-commit configuration validation and hook-environment installation, Ruff, Bandit, separate pip-audit checks for runtime (`requirements.txt`) and development (`requirements-dev.txt`) dependencies, and pytest. The development requirements include the runtime requirements. CodeQL is configured separately in .github/workflows/codeql.yml.
 
 A configured workflow is not a successful workflow. Before release, inspect the exact candidate commit's workflow runs, job conclusions and CodeQL status. Record the candidate SHA and date in the release evidence.
 
