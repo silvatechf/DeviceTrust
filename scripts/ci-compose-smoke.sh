@@ -189,8 +189,9 @@ with SessionLocal() as db:
             f"Restored audit entry does not match SBOM import {import_id}."
         )
 
+    verified_entries = result.get("entries")
     print(
-        f"Restored audit chain verified: {result.get("entries")} entries; "
+        f"Restored audit chain verified: {verified_entries} entries; "
         f"SBOM import {import_id} has its matching audit entry."
     )
 '
