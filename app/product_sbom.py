@@ -1,6 +1,7 @@
 """Transactional persistence for accepted CycloneDX SBOM imports."""
 
 import hashlib
+import os
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -436,7 +437,7 @@ async def reassess_import(
     request_key_hash = hashlib.sha256(request_key.encode("utf-8")).hexdigest()
     source_configuration = (
         f"parser={PARSER_VERSION};local=advisories-v1;"
-        f"osv={'enabled' if __import__('os').getenv('DEVICETRUST_OSV') == '1' else 'disabled'}"
+        f"osv={'enabled' if os.getenv('DEVICETRUST_OSV') == '1' else 'disabled'}"
     )
     source_fingerprint = hashlib.sha256(
         source_configuration.encode("utf-8")
@@ -453,6 +454,8 @@ async def reassess_import(
             )
         ).first()
         if existing is not None:
+            if existing.source_fingerprint != source_fingerprint:
+                raise ValueError("Idempotency-Key was already used with a different assessment configuration.")
             return _assessment_dict(existing), False
         component_rows = lookup_db.scalars(
             select(SBOMComponent)
@@ -489,8 +492,12 @@ async def reassess_import(
         )
     ).first()
     if existing is not None:
+        if existing.source_fingerprint != source_fingerprint:
+            db.rollback()
+            raise ValueError("Idempotency-Key was already used with a different assessment configuration.")
+        result = _assessment_dict(existing)
         db.rollback()
-        return _assessment_dict(existing), False
+        return result, False
 
     status = enrichment.get("status", "incomplete")
     if status not in {"disabled", "complete", "incomplete"}:
