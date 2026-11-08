@@ -206,7 +206,7 @@ async def import_product_sbom(
         raise HTTPException(422, "SBOM document must be a JSON object")
 
     try:
-        imported, created = product_sbom.import_cyclonedx(
+        imported, created = await product_sbom.import_cyclonedx(
             db, actor, release_id, bytes(raw), document, source_type, source_reference
         )
     except LookupError:

@@ -81,7 +81,7 @@ def create_release(
     return release
 
 
-def import_cyclonedx(
+async def import_cyclonedx(
     db: Session,
     actor: str,
     release_id: int,
@@ -107,7 +107,7 @@ def import_cyclonedx(
         if existing is not None:
             return existing, False
 
-    findings, osv_enrichment = sbom.scan_with_metadata(
+    findings, osv_enrichment = await sbom.scan_with_metadata_async(
         components, include_component_index=True
     )
     findings_by_component: dict[int, list[dict]] = {}

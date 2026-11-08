@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -421,7 +422,7 @@ def test_product_sbom_import_rolls_back_on_postgres_audit_failure(monkeypatch):
         monkeypatch.setattr(product_sbom.audit, "record", fail_import_audit)
 
         with pytest.raises(RuntimeError, match="injected PostgreSQL audit append failure"):
-            product_sbom.import_cyclonedx(
+            asyncio.run(product_sbom.import_cyclonedx(
                 session,
                 "postgres-integration",
                 release_id,
@@ -429,7 +430,7 @@ def test_product_sbom_import_rolls_back_on_postgres_audit_failure(monkeypatch):
                 document,
                 "manual",
                 None,
-            )
+            ))
 
         assert session.query(SBOMImport).filter_by(
             product_release_id=release_id

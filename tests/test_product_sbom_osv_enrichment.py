@@ -36,11 +36,11 @@ def test_product_import_persists_and_exposes_osv_coverage(client, monkeypatch):
         "checked_at": "2026-11-08T12:00:00+00:00",
     }
 
-    def fake_scan(components, *, include_component_index=False):
+    async def fake_scan(components, *, include_component_index=False):
         calls.append(components)
         return [], enrichment
 
-    monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata", fake_scan)
+    monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
     monkeypatch.setenv("DEVICETRUST_OSV", "1")
     payload = {
         "bomFormat": "CycloneDX",
@@ -71,11 +71,11 @@ def test_duplicate_product_import_does_not_repeat_osv_enrichment(client, monkeyp
     release_id = _release(client)
     calls = []
 
-    def fake_scan(components, *, include_component_index=False):
+    async def fake_scan(components, *, include_component_index=False):
         calls.append(components)
         return [], {"status": "complete", "source": "osv", "queried": 1}
 
-    monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata", fake_scan)
+    monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
     monkeypatch.setenv("DEVICETRUST_OSV", "1")
     payload = {
         "bomFormat": "CycloneDX",

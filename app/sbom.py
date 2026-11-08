@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import time
@@ -220,6 +221,119 @@ def scan_osv_with_status(
     }
     return hits, status
 
+
+
+async def scan_osv_with_status_async(
+    components: list[dict],
+    *,
+    include_component_index: bool = False,
+) -> tuple[list[dict], dict]:
+    """Run product-import OSV enrichment under a cancellable wall-clock deadline."""
+    started = time.monotonic()
+    deadline = started + OSV_ENRICHMENT_DEADLINE_SECONDS
+    unique_queries: dict[tuple[str, str], list[int]] = {}
+    skipped_no_purl = 0
+    for index, component in enumerate(components):
+        purl = component.get("purl")
+        if not purl:
+            skipped_no_purl += 1
+            continue
+        unique_queries.setdefault((purl, component["version"]), []).append(index)
+
+    hits = []
+    queried = 0
+    failed = False
+    budget_exhausted = False
+    deadline_exhausted = False
+    try:
+        async with asyncio.timeout(OSV_ENRICHMENT_DEADLINE_SECONDS):
+            async with httpx.AsyncClient() as client:
+                for (purl, version), indexes in unique_queries.items():
+                    remaining = deadline - time.monotonic()
+                    if queried >= MAX_OSV_QUERIES_PER_IMPORT:
+                        budget_exhausted = True
+                        break
+                    if remaining <= 0:
+                        deadline_exhausted = True
+                        break
+                    queried += 1
+                    try:
+                        response = await client.post(
+                            "https://api.osv.dev/v1/query",
+                            json={"package": {"purl": purl}, "version": version},
+                            timeout=_osv_timeout(remaining),
+                        )
+                        response.raise_for_status()
+                        payload = response.json()
+                    except (httpx.HTTPError, ValueError, TypeError):
+                        failed = True
+                        continue
+
+                    if not isinstance(payload, dict) or not isinstance(payload.get("vulns", []), list):
+                        failed = True
+                        continue
+                    for vulnerability in payload.get("vulns", []):
+                        if not isinstance(vulnerability, dict):
+                            failed = True
+                            continue
+                        vuln_id = vulnerability.get("id")
+                        if not isinstance(vuln_id, str) or not vuln_id.strip():
+                            failed = True
+                            continue
+                        database_specific = vulnerability.get("database_specific")
+                        severity = (
+                            database_specific.get("severity", "unknown")
+                            if isinstance(database_specific, dict)
+                            else "unknown"
+                        )
+                        if not isinstance(severity, str):
+                            severity = "unknown"
+                        for component_index in indexes:
+                            finding = {
+                                "component": components[component_index]["name"],
+                                "version": components[component_index]["version"],
+                                "vuln_id": vuln_id,
+                                "severity": severity.lower(),
+                                "fixed_in": None,
+                                "source": "osv",
+                            }
+                            if include_component_index:
+                                finding["component_index"] = component_index
+                            hits.append(finding)
+    except TimeoutError:
+        deadline_exhausted = True
+    except httpx.HTTPError:
+        failed = True
+
+    deduplicated = sum(len(indexes) - 1 for indexes in unique_queries.values())
+    incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0
+    return hits, {
+        "status": "incomplete" if incomplete else "complete",
+        "source": "osv",
+        "queried": queried,
+        "query_candidates": len(unique_queries),
+        "deduplicated_occurrences": deduplicated,
+        "skipped_without_purl": skipped_no_purl,
+        "query_limit": MAX_OSV_QUERIES_PER_IMPORT,
+        "deadline_seconds": OSV_ENRICHMENT_DEADLINE_SECONDS,
+        "budget_exhausted": budget_exhausted,
+        "deadline_exhausted": deadline_exhausted,
+        "request_failures": failed,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+async def scan_with_metadata_async(
+    components: list[dict], *, include_component_index: bool = False
+) -> tuple[list[dict], dict]:
+    """Product-import scanner; OSV requests are cancellable at the total deadline."""
+    hits = scan_local(components, include_component_index=include_component_index)
+    if os.getenv("DEVICETRUST_OSV") != "1":
+        return hits, {"status": "disabled", "source": "osv"}
+    osv_hits, status = await scan_osv_with_status_async(
+        components, include_component_index=include_component_index
+    )
+    return hits + osv_hits, status
 
 def scan_osv(
     components: list[dict], *, include_component_index: bool = False
