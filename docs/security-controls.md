@@ -40,7 +40,7 @@ The posture service evaluates declared security-profile fields. Unknown values r
 
 ## SBOM boundary
 
-CycloneDX parsing is a bounded subset. Components without PURLs are retained but cannot be matched by the local demo feed. Synthetic `DT-DEMO-*` advisories support deterministic demonstrations only. OSV lookup may be unavailable or incomplete; no result must not be interpreted as proof that a component is vulnerability-free.
+CycloneDX parsing is a bounded subset. Components without PURLs are retained but cannot be matched by the local demo feed. Synthetic `DT-DEMO-*` advisories support deterministic demonstrations only. Product-scoped OSV enrichment is optional and bounded per import: at most 50 unique exact PURL/version queries and a 10-second overall deadline. Duplicate occurrences share one query and findings map back to each occurrence. Import metadata records source, check time, query counts and `complete`/`incomplete`/`disabled` status. Failures, malformed responses, exhausted budgets and components without PURLs produce incomplete coverage; no result must not be interpreted as proof that a component is vulnerability-free.
 
 ## Lifecycle data
 
