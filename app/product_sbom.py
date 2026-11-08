@@ -453,8 +453,14 @@ async def reassess_import(
             "write_timeout_seconds": sbom.OSV_WRITE_TIMEOUT_SECONDS,
             "pool_timeout_seconds": sbom.OSV_POOL_TIMEOUT_SECONDS,
         },
-        "kev": {"enabled": os.getenv("DEVICETRUST_KEV") == "1"},
-        "epss": {"enabled": os.getenv("DEVICETRUST_EPSS") == "1"},
+        "kev": {
+            "enabled": os.getenv("DEVICETRUST_KEV") == "1",
+            "endpoint": intelligence.KEV_URL,
+        },
+        "epss": {
+            "enabled": os.getenv("DEVICETRUST_EPSS") == "1",
+            "endpoint": intelligence.EPSS_URL,
+        },
         "intelligence_cve_limit": intelligence.MAX_CVES_PER_ASSESSMENT,
         "intelligence_timeout_seconds": intelligence.REQUEST_TIMEOUT_SECONDS,
     }
@@ -501,6 +507,20 @@ async def reassess_import(
     findings, osv_enrichment = await sbom.scan_with_metadata_async(
         components, include_component_index=True
     )
+    for finding in findings:
+        if (
+            not isinstance(finding, dict)
+            or not isinstance(finding.get("component_index"), int)
+            or isinstance(finding.get("component_index"), bool)
+            or finding["component_index"] < 0
+            or finding["component_index"] >= len(components)
+            or not isinstance(finding.get("vuln_id"), str)
+            or not finding["vuln_id"].strip()
+            or not isinstance(finding.get("severity"), str)
+            or not isinstance(finding.get("source"), str)
+            or not finding["source"].strip()
+        ):
+            raise RuntimeError("Scanner returned a malformed or unscoped finding.")
     findings, intelligence_enrichment = await intelligence.enrich_findings(findings)
     enrichment = {**osv_enrichment, "intelligence": intelligence_enrichment}
     completed_at = datetime.now(timezone.utc)
