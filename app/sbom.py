@@ -302,6 +302,8 @@ async def scan_osv_with_status_async(
                             hits.append(finding)
     except TimeoutError:
         deadline_exhausted = True
+    except httpx.HTTPError:
+        failed = True
 
     deduplicated = sum(len(indexes) - 1 for indexes in unique_queries.values())
     incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0
