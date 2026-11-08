@@ -122,10 +122,11 @@ def scan_osv_with_status(
     components: list[dict],
     *,
     include_component_index: bool = False,
-    monotonic=time.monotonic,
+    monotonic=None,
 ) -> tuple[list[dict], dict]:
     """Perform bounded, deduplicated OSV queries and report coverage explicitly."""
-    started = monotonic()
+    clock = monotonic or time.monotonic
+    started = clock()
     deadline = started + OSV_ENRICHMENT_DEADLINE_SECONDS
     unique_queries: dict[tuple[str, str], list[int]] = {}
     skipped_no_purl = 0
@@ -144,7 +145,7 @@ def scan_osv_with_status(
     try:
         with httpx.Client() as client:
             for (purl, version), indexes in unique_queries.items():
-                remaining = deadline - monotonic()
+                remaining = deadline - clock()
                 if queried >= MAX_OSV_QUERIES_PER_IMPORT or remaining <= 0:
                     exhausted = True
                     break
