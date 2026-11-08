@@ -22,6 +22,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [ ] Verify console flows and API error paths in a real browser at desktop/mobile sizes.
 - [x] Test concurrent complete API/domain writes and transaction failure behavior on SQLite and PostgreSQL.
 - [x] Verify migration 0003 upgrade/downgrade on disposable SQLite and PostgreSQL databases in CI.
+- [x] Cover product-release SBOM comparison semantics (PURL identity boundaries, ambiguity, unidentified components, release isolation, authentication and read-only behavior) in automated tests; exact PR-head CI and CodeQL evidence is recorded in [PR #33](https://github.com/silvatechf/DeviceTrust/pull/33).
 - [ ] Demonstrate backup/restore and rollback.
 - [ ] Inspect exact-candidate CI results (pre-commit configuration, runtime and development dependency audits, Ruff, Bandit, tests, PostgreSQL and Compose), CodeQL and Gitleaks; record their URLs and manually triage findings.
 - [ ] Capture genuine screenshots from the running app using synthetic data only.
@@ -36,6 +37,7 @@ A checkbox must be marked only when the check has actually been performed and ev
 - Start the app with a disposable SQLite database and local API key.
 - Seed synthetic data and follow [the demo runbook](demo-runbook.md).
 - Verify inventory, posture, SBOM import, justified triage, report download and audit verification.
+- Verify product-release SBOM import, listing and read-only comparison of two accepted imports for the same release, using the [comparison walkthrough](demo-runbook.md).
 - Confirm the console key is not persisted in browser storage.
 - Confirm malformed and oversized SBOM requests are rejected.
 - Confirm no local database, credentials, environment files or generated artifacts are committed.
