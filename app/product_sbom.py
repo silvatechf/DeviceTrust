@@ -11,6 +11,8 @@ from .db import (
     Product,
     ProductFinding,
     ProductRelease,
+    SBOMAssessment,
+    SBOMAssessmentFinding,
     SBOMComponent,
     SBOMImport,
     SessionLocal,
@@ -364,3 +366,181 @@ def compare_imports(
             "current": current_unidentified,
         },
     }
+
+
+
+def _assessment_dict(assessment: SBOMAssessment) -> dict:
+    return {
+        "id": assessment.id,
+        "sbom_import_id": assessment.sbom_import_id,
+        "source_fingerprint": assessment.source_fingerprint,
+        "status": assessment.status,
+        "started_at": assessment.started_at,
+        "completed_at": assessment.completed_at,
+        "component_count": assessment.component_count,
+        "finding_count": assessment.finding_count,
+        "enrichment_metadata": assessment.enrichment_metadata,
+    }
+
+
+def list_assessments(db: Session, import_id: int) -> list[dict]:
+    imported = db.get(SBOMImport, import_id)
+    if imported is None or imported.status != "accepted":
+        raise LookupError("Accepted SBOM import not found")
+    rows = db.scalars(
+        select(SBOMAssessment)
+        .where(SBOMAssessment.sbom_import_id == import_id)
+        .order_by(SBOMAssessment.started_at, SBOMAssessment.id)
+    ).all()
+    return [_assessment_dict(row) for row in rows]
+
+
+def list_assessment_findings(
+    db: Session, import_id: int, assessment_id: int
+) -> list[dict]:
+    assessment = db.get(SBOMAssessment, assessment_id)
+    if assessment is None or assessment.sbom_import_id != import_id:
+        raise LookupError("SBOM assessment not found")
+    rows = db.scalars(
+        select(SBOMAssessmentFinding)
+        .where(SBOMAssessmentFinding.assessment_id == assessment_id)
+        .order_by(
+            SBOMAssessmentFinding.sbom_component_id,
+            SBOMAssessmentFinding.vuln_id,
+            SBOMAssessmentFinding.source,
+        )
+    ).all()
+    return [
+        {
+            "id": row.id,
+            "sbom_component_id": row.sbom_component_id,
+            "vuln_id": row.vuln_id,
+            "severity": row.severity,
+            "fixed_in": row.fixed_in,
+            "source": row.source,
+        }
+        for row in rows
+    ]
+
+
+async def reassess_import(
+    db: Session,
+    actor: str,
+    import_id: int,
+    request_key: str,
+) -> tuple[dict, bool]:
+    """Reassess immutable imported components and append a historical run."""
+    if not request_key or len(request_key) > 128:
+        raise ValueError("Idempotency-Key must contain between 1 and 128 characters.")
+
+    request_key_hash = hashlib.sha256(request_key.encode("utf-8")).hexdigest()
+    source_configuration = (
+        f"parser={PARSER_VERSION};local=advisories-v1;"
+        f"osv={'enabled' if __import__('os').getenv('DEVICETRUST_OSV') == '1' else 'disabled'}"
+    )
+    source_fingerprint = hashlib.sha256(
+        source_configuration.encode("utf-8")
+    ).hexdigest()
+
+    with SessionLocal() as lookup_db:
+        imported = lookup_db.get(SBOMImport, import_id)
+        if imported is None or imported.status != "accepted":
+            raise LookupError("Accepted SBOM import not found")
+        existing = lookup_db.scalars(
+            select(SBOMAssessment).where(
+                SBOMAssessment.sbom_import_id == import_id,
+                SBOMAssessment.request_key_hash == request_key_hash,
+            )
+        ).first()
+        if existing is not None:
+            return _assessment_dict(existing), False
+        component_rows = lookup_db.scalars(
+            select(SBOMComponent)
+            .where(SBOMComponent.sbom_import_id == import_id)
+            .order_by(SBOMComponent.ordinal)
+        ).all()
+        components = [
+            {
+                "name": row.name.strip().lower(),
+                "source_name": row.name,
+                "version": row.version.strip(),
+                "source_version": row.version,
+                "purl": row.purl,
+            }
+            for row in component_rows
+        ]
+        component_ids = [row.id for row in component_rows]
+
+    started_at = sbom.datetime.now(sbom.timezone.utc)
+    findings, enrichment = await sbom.scan_with_metadata_async(
+        components, include_component_index=True
+    )
+    completed_at = sbom.datetime.now(sbom.timezone.utc)
+
+    # External enrichment is complete before the audit writer transaction starts.
+    audit.acquire_chain_lock(db)
+    imported = db.get(SBOMImport, import_id)
+    if imported is None or imported.status != "accepted":
+        raise LookupError("Accepted SBOM import not found")
+    existing = db.scalars(
+        select(SBOMAssessment).where(
+            SBOMAssessment.sbom_import_id == import_id,
+            SBOMAssessment.request_key_hash == request_key_hash,
+        )
+    ).first()
+    if existing is not None:
+        db.rollback()
+        return _assessment_dict(existing), False
+
+    status = enrichment.get("status", "incomplete")
+    if status not in {"disabled", "complete", "incomplete"}:
+        status = "incomplete"
+        enrichment = {**enrichment, "status": status, "invalid_status": True}
+
+    assessment = SBOMAssessment(
+        sbom_import_id=import_id,
+        request_key_hash=request_key_hash,
+        source_fingerprint=source_fingerprint,
+        status=status,
+        started_at=started_at,
+        completed_at=completed_at,
+        component_count=len(components),
+        finding_count=len(findings),
+        enrichment_metadata=enrichment,
+    )
+    db.add(assessment)
+    try:
+        db.flush()
+        for finding in findings:
+            index = finding.get("component_index")
+            if not isinstance(index, int) or index < 0 or index >= len(component_ids):
+                raise ValueError("Scanner returned a finding with an invalid component index.")
+            db.add(
+                SBOMAssessmentFinding(
+                    assessment_id=assessment.id,
+                    sbom_component_id=component_ids[index],
+                    vuln_id=finding["vuln_id"],
+                    severity=finding["severity"],
+                    fixed_in=finding.get("fixed_in"),
+                    source=finding["source"],
+                )
+            )
+        audit.record(
+            db,
+            actor,
+            "sbom.assessment",
+            str(assessment.id),
+            {
+                "sbom_import_id": import_id,
+                "status": status,
+                "component_count": len(components),
+                "finding_count": len(findings),
+                "source_fingerprint": source_fingerprint,
+            },
+        )
+        db.commit()
+        db.refresh(assessment)
+        return _assessment_dict(assessment), True
+    except Exception:
+        db.rollback()
+        raise
