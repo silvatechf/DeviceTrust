@@ -1,3 +1,7 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
 import pytest
 
 from app import product_sbom
@@ -182,3 +186,45 @@ def test_reassessment_rolls_back_malformed_scanner_findings(client, monkeypatch)
         assert db.query(SBOMAssessment).filter_by(
             sbom_import_id=import_id
         ).count() == 0
+
+
+
+def test_concurrent_reassessment_requests_with_same_key_create_one_run(
+    client, monkeypatch
+):
+    import_id = _import(client)
+    request_count = 4
+    barrier = Barrier(request_count)
+    scan_count = []
+
+    async def fake_scan(components, *, include_component_index=False):
+        scan_count.append(1)
+        await asyncio.sleep(0.05)
+        return [], {"status": "disabled", "source": "osv"}
+
+    monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
+
+    def submit(_):
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        with TestClient(app) as concurrent_client:
+            barrier.wait(timeout=10)
+            return concurrent_client.post(
+                f"/sbom/imports/{import_id}/assessments",
+                headers={**H, "Idempotency-Key": "concurrent-same-key"},
+            )
+
+    with ThreadPoolExecutor(max_workers=request_count) as executor:
+        responses = list(executor.map(submit, range(request_count)))
+
+    assert all(response.status_code in {200, 201} for response in responses)
+    assert sum(response.status_code == 201 for response in responses) == 1
+    assert len({
+        response.json()["id"] for response in responses
+    }) == 1
+    history = client.get(
+        f"/sbom/imports/{import_id}/assessments", headers=H
+    )
+    assert history.status_code == 200
+    assert len(history.json()) == 1
