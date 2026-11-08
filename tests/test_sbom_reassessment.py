@@ -1,7 +1,7 @@
 import pytest
 
 from app import product_sbom
-from app.db import ProductFinding, SBOMAssessment, SessionLocal
+from app.db import ProductFinding, SBOMAssessment, SBOMComponent, SessionLocal
 
 from .conftest import H
 
@@ -41,6 +41,21 @@ def test_reassessment_persists_versioned_findings_and_is_idempotent(
     client, monkeypatch
 ):
     import_id = _import(client)
+    with SessionLocal() as db:
+        component = db.query(SBOMComponent).filter_by(
+            sbom_import_id=import_id
+        ).one()
+        legacy_finding = ProductFinding(
+            sbom_component_id=component.id,
+            vuln_id="CVE-2099-TRIAGE",
+            severity="medium",
+            source="legacy-test",
+            status="accepted",
+            justification="Previously reviewed evidence remains separate.",
+        )
+        db.add(legacy_finding)
+        db.commit()
+        legacy_finding_id = legacy_finding.id
     calls = []
 
     async def fake_scan(components, *, include_component_index=False):
@@ -79,6 +94,10 @@ def test_reassessment_persists_versioned_findings_and_is_idempotent(
     assert len(calls) == 1
     with SessionLocal() as db:
         assert db.query(ProductFinding).count() == legacy_findings_before
+        preserved = db.get(ProductFinding, legacy_finding_id)
+        assert preserved is not None
+        assert preserved.status == "accepted"
+        assert preserved.justification == "Previously reviewed evidence remains separate."
 
     assessment_id = first.json()["id"]
     history = client.get(
