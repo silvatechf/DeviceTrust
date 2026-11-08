@@ -205,6 +205,8 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
 
         command.upgrade(config, "head")
         assert inspect(target_engine).has_table("audit_chain_state")
+        assert inspect(target_engine).has_table("sbom_assessments")
+        assert inspect(target_engine).has_table("sbom_assessment_findings")
         with target_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
@@ -216,6 +218,8 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
 
         command.downgrade(config, "0002_persistent_sbom")
         assert not inspect(target_engine).has_table("audit_chain_state")
+        assert not inspect(target_engine).has_table("sbom_assessments")
+        assert not inspect(target_engine).has_table("sbom_assessment_findings")
 
         command.upgrade(config, "head")
         assert inspect(target_engine).has_table("audit_chain_state")
