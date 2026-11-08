@@ -65,6 +65,10 @@ The normalized endpoint is a read-only projection. It preserves the raw value an
 
 The API caps the request body at 2 MiB. The parser accepts a bounded CycloneDX JSON subset, validates component names/versions and PURLs, then checks the local synthetic advisory set. If `DEVICETRUST_OSV=1`, it also makes best-effort OSV queries. A failed or empty lookup is not proof that a component is safe.
 
+### Product SBOM comparison
+
+The authenticated `GET /product-releases/{release_id}/sbom/diff` endpoint compares two accepted imports belonging to the same product release. It removes only the PURL version segment when constructing component identity; qualifiers and subpath remain identity boundaries. Additions and removals are reported separately. Matched components with changes appear once with a `changes` array containing `version`, `name`, or both. Duplicate identities are reported as ambiguous. Components without a usable PURL remain unidentified and are never matched by name or ordinal. The comparison is read-only and does not re-evaluate vulnerability findings. PURL identity does not prove artifact or supplier equivalence.
+
 ### Triage and audit
 
 A triage update requires a justification. State-changing operations append audit entries in the same database transaction as the domain mutation. Authenticated write requests acquire the singleton audit-chain state row before database reads; PostgreSQL serializes through the row update lock, while SQLite starts an IMMEDIATE write transaction. Both backends use a 10-second lock wait bound. The lock is held until commit or rollback, so concurrent application writers sharing the same database cannot append from the same chain head. Each entry hashes its content and the previous entry hash. The chain has no external checkpoint and is not immutable storage.
