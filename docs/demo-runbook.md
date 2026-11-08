@@ -200,7 +200,7 @@ After PR #45 is merged and the local database has been migrated with `alembic up
 curl -sS -X POST "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments" -H "X-API-Key: $API_KEY" -H "Idempotency-Key: demo-assessment-001"
 ```
 
-The request returns an assessment ID, the component/finding counts, timestamps, source fingerprint, and OSV enrichment coverage. Repeating the same request with the same key and source configuration returns the existing assessment. Use a new key to deliberately append another assessment run.
+The request returns an assessment ID, component/finding counts, timestamps, source fingerprint, aggregate coverage status and provider-specific enrichment metadata under `enrichment_metadata.osv` and `enrichment_metadata.intelligence`. Repeating the same request with the same key and source configuration returns the existing assessment. Use a new key to deliberately append another assessment run.
 
 List the assessment history:
 
@@ -247,7 +247,7 @@ Inspect the findings for that assessment:
 curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments/ASSESSMENT_ID/findings" -H "X-API-Key: $API_KEY"
 ```
 
-The response records per-finding KEV and EPSS states and provider provenance. KEV membership includes the CISA catalog version/release date and entry details. EPSS includes score, percentile and score date. Both are CVE-level signals: they do not prove that a specific product component is affected.
+The response records per-finding KEV and EPSS states and provider provenance. KEV membership includes the CISA catalog version/release date and entry details. The assessment-level `status` aggregates OSV, KEV and EPSS coverage: any incomplete enabled provider makes the run incomplete; at least one complete provider with no incomplete provider makes it complete; all disabled/not-applicable providers produce disabled. EPSS includes score, percentile and score date. Both are CVE-level signals: they do not prove that a specific product component is affected.
 
 Provider states such as `disabled`, `not_checked`, `not_applicable`, `not_found`, `unavailable` and `incomplete` are intentionally distinct. A missing EPSS record or absent KEV membership is not proof that a vulnerability is harmless. Enrichment is bounded to 100 unique CVEs per assessment; provider failures do not erase the local or OSV findings.
 
