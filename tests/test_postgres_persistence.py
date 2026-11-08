@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -477,8 +478,6 @@ def test_versioned_sbom_assessment_survives_postgres_engine_disposal(monkeypatch
             "fixed_in": "1.0.1",
             "source": "local-demo",
         }], {"status": "disabled", "source": "osv"}
-
-    import hashlib
 
     monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
     monkeypatch.delenv("DEVICETRUST_OSV", raising=False)
