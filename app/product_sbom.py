@@ -181,3 +181,171 @@ def import_cyclonedx(
     except Exception:
         db.rollback()
         raise
+
+
+def _component_identity(component: SBOMComponent) -> str | None:
+    """Return a version-independent Package URL identity when one is available."""
+    if not component.purl:
+        return None
+
+    from packageurl import PackageURL
+
+    try:
+        parsed = PackageURL.from_string(component.purl)
+        return PackageURL(
+            type=parsed.type,
+            namespace=parsed.namespace,
+            name=parsed.name,
+            version=None,
+            qualifiers=parsed.qualifiers,
+            subpath=parsed.subpath,
+        ).to_string()
+    except (TypeError, ValueError):
+        # Persisted PURLs were validated at import time. Treat unexpected legacy
+        # values as unidentifiable rather than creating a speculative match.
+        return None
+
+
+def _component_snapshot(component: SBOMComponent) -> dict:
+    return {
+        "id": component.id,
+        "ordinal": component.ordinal,
+        "name": component.name,
+        "version": component.version,
+        "purl": component.purl,
+    }
+
+
+def compare_imports(
+    db: Session,
+    release_id: int,
+    from_import_id: int,
+    to_import_id: int,
+) -> dict:
+    """Compare accepted imports without mutating stored SBOM evidence.
+
+    PURL identity excludes only the PURL version. Qualifiers and subpath remain
+    part of identity. Duplicate identities and components without a usable PURL
+    are never matched speculatively.
+    """
+    if db.get(ProductRelease, release_id) is None:
+        raise LookupError("Product release not found")
+
+    previous = db.get(SBOMImport, from_import_id)
+    current = db.get(SBOMImport, to_import_id)
+    if (
+        previous is None
+        or current is None
+        or previous.product_release_id != release_id
+        or current.product_release_id != release_id
+        or previous.status != "accepted"
+        or current.status != "accepted"
+    ):
+        raise LookupError("Accepted SBOM imports not found for product release")
+
+    previous_rows = db.scalars(
+        select(SBOMComponent)
+        .where(SBOMComponent.sbom_import_id == from_import_id)
+        .order_by(SBOMComponent.ordinal)
+    ).all()
+    current_rows = db.scalars(
+        select(SBOMComponent)
+        .where(SBOMComponent.sbom_import_id == to_import_id)
+        .order_by(SBOMComponent.ordinal)
+    ).all()
+
+    previous_groups: dict[str, list[SBOMComponent]] = {}
+    current_groups: dict[str, list[SBOMComponent]] = {}
+    previous_unidentified = []
+    current_unidentified = []
+
+    for component in previous_rows:
+        identity = _component_identity(component)
+        if identity is None:
+            previous_unidentified.append(_component_snapshot(component))
+        else:
+            previous_groups.setdefault(identity, []).append(component)
+
+    for component in current_rows:
+        identity = _component_identity(component)
+        if identity is None:
+            current_unidentified.append(_component_snapshot(component))
+        else:
+            current_groups.setdefault(identity, []).append(component)
+
+    added = []
+    removed = []
+    changed = []
+    ambiguous = []
+    unchanged = 0
+    version_changed = 0
+    name_changed = 0
+
+    for identity in sorted(previous_groups.keys() | current_groups.keys()):
+        before = previous_groups.get(identity, [])
+        after = current_groups.get(identity, [])
+        if len(before) > 1 or len(after) > 1:
+            ambiguous.append({
+                "identity": identity,
+                "previous": [_component_snapshot(item) for item in before],
+                "current": [_component_snapshot(item) for item in after],
+            })
+            continue
+        if not before:
+            added.append(_component_snapshot(after[0]))
+            continue
+        if not after:
+            removed.append(_component_snapshot(before[0]))
+            continue
+
+        old_item = before[0]
+        new_item = after[0]
+        dimensions = []
+        if old_item.version != new_item.version:
+            dimensions.append("version")
+            version_changed += 1
+        if old_item.name != new_item.name:
+            dimensions.append("name")
+            name_changed += 1
+
+        if dimensions:
+            changed.append({
+                "identity": identity,
+                "previous": _component_snapshot(old_item),
+                "current": _component_snapshot(new_item),
+                "changes": dimensions,
+            })
+        else:
+            unchanged += 1
+
+    added.sort(key=lambda item: (item["purl"] or "", item["ordinal"]))
+    removed.sort(key=lambda item: (item["purl"] or "", item["ordinal"]))
+    changed.sort(key=lambda item: item["identity"])
+    ambiguous.sort(key=lambda item: item["identity"])
+    previous_unidentified.sort(key=lambda item: item["ordinal"])
+    current_unidentified.sort(key=lambda item: item["ordinal"])
+
+    return {
+        "product_release_id": release_id,
+        "from_import_id": from_import_id,
+        "to_import_id": to_import_id,
+        "summary": {
+            "added": len(added),
+            "removed": len(removed),
+            "changed": len(changed),
+            "version_changed": version_changed,
+            "name_changed": name_changed,
+            "unchanged": unchanged,
+            "ambiguous": len(ambiguous),
+            "unidentified_previous": len(previous_unidentified),
+            "unidentified_current": len(current_unidentified),
+        },
+        "added": added,
+        "removed": removed,
+        "changed": changed,
+        "ambiguous": ambiguous,
+        "unidentified": {
+            "previous": previous_unidentified,
+            "current": current_unidentified,
+        },
+    }
