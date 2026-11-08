@@ -287,3 +287,14 @@ def test_fetch_kev_falls_back_to_cisa_maintained_github_mirror():
     assert metadata["source"] == intelligence.KEV_MIRROR_URL
     assert metadata["canonical_source"] == intelligence.KEV_URL
     assert rows["CVE-2025-1234"]["status"] == "listed"
+
+
+def test_intelligence_response_body_limit_is_enforced():
+    response = httpx.Response(
+        200,
+        content=b"0123456789",
+        request=httpx.Request("GET", intelligence.KEV_URL),
+    )
+
+    with pytest.raises(ValueError, match="size limit"):
+        asyncio.run(intelligence._read_bounded(response, 5))
