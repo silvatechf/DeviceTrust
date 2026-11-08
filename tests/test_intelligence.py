@@ -1,5 +1,6 @@
 import asyncio
 
+import httpx
 import pytest
 
 from app import intelligence
@@ -252,3 +253,37 @@ def test_parse_kev_catalog_normalizes_malformed_optional_ransomware_value():
     })
 
     assert rows["CVE-2025-1234"]["known_ransomware_campaign_use"] == "Unknown"
+
+
+def test_fetch_kev_falls_back_to_cisa_maintained_github_mirror():
+    calls = []
+
+    def handler(request):
+        calls.append(str(request.url))
+        if request.url.host == "www.cisa.gov":
+            return httpx.Response(403, request=request)
+        return httpx.Response(
+            200,
+            json={
+                "catalogVersion": "2026.11.04",
+                "dateReleased": "2026-11-04T18:52:56.063Z",
+                "count": 1,
+                "vulnerabilities": [_kev_entry()],
+            },
+            request=request,
+        )
+
+    async def run():
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler)
+        ) as client:
+            return await intelligence._fetch_kev(client)
+
+    rows, metadata = asyncio.run(run())
+
+    assert len(calls) == 2
+    assert calls[0].startswith(intelligence.KEV_URL)
+    assert calls[1].startswith(intelligence.KEV_MIRROR_URL)
+    assert metadata["source"] == intelligence.KEV_MIRROR_URL
+    assert metadata["canonical_source"] == intelligence.KEV_URL
+    assert rows["CVE-2025-1234"]["status"] == "listed"
