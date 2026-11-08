@@ -518,6 +518,8 @@ def test_versioned_sbom_assessment_survives_postgres_engine_disposal(monkeypatch
         )
         session.add(component)
         session.commit()
+        product_id = product.id
+        release_id = release.id
         import_id = imported.id
         component_id = component.id
 
@@ -559,7 +561,7 @@ def test_versioned_sbom_assessment_survives_postgres_engine_disposal(monkeypatch
             )
             session.execute(delete(SBOMComponent).where(SBOMComponent.id == component_id))
             session.execute(delete(SBOMImport).where(SBOMImport.id == import_id))
-            session.execute(delete(ProductRelease).where(ProductRelease.id == release.id))
-            session.execute(delete(Product).where(Product.id == product.id))
+            session.execute(delete(ProductRelease).where(ProductRelease.id == release_id))
+            session.execute(delete(Product).where(Product.id == product_id))
             session.commit()
         verification_engine.dispose()
