@@ -1,5 +1,5 @@
 from app import product_sbom
-from app.db import ProductFinding, SBOMAssessment, SessionLocal
+from app.db import SBOMAssessment, SessionLocal
 
 from .conftest import H
 
