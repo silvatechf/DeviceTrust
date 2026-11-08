@@ -1,6 +1,7 @@
 """Transactional persistence for accepted CycloneDX SBOM imports."""
 
 import hashlib
+import json
 import os
 from datetime import datetime, timezone
 
@@ -437,12 +438,27 @@ async def reassess_import(
 
     request_key_hash = hashlib.sha256(request_key.encode("utf-8")).hexdigest()
     advisory_digest = hashlib.sha256(sbom.ADVISORIES.read_bytes()).hexdigest()
-    source_configuration = (
-        f"parser={PARSER_VERSION};local_advisories={advisory_digest};"
-        f"osv={'enabled' if os.getenv('DEVICETRUST_OSV') == '1' else 'disabled'}"
-    )
+    osv_enabled = os.getenv("DEVICETRUST_OSV") == "1"
+    source_configuration = {
+        "parser_version": PARSER_VERSION,
+        "local_advisories_sha256": advisory_digest,
+        "osv": {
+            "enabled": osv_enabled,
+            "endpoint": "https://api.osv.dev/v1/query",
+            "query_limit": sbom.MAX_OSV_QUERIES_PER_IMPORT,
+            "deadline_seconds": sbom.OSV_ENRICHMENT_DEADLINE_SECONDS,
+            "connect_timeout_seconds": sbom.OSV_CONNECT_TIMEOUT_SECONDS,
+            "read_timeout_seconds": sbom.OSV_READ_TIMEOUT_SECONDS,
+            "write_timeout_seconds": sbom.OSV_WRITE_TIMEOUT_SECONDS,
+            "pool_timeout_seconds": sbom.OSV_POOL_TIMEOUT_SECONDS,
+        },
+    }
     source_fingerprint = hashlib.sha256(
-        source_configuration.encode("utf-8")
+        json.dumps(
+            source_configuration,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
     ).hexdigest()
 
     with SessionLocal() as lookup_db:
@@ -480,7 +496,7 @@ async def reassess_import(
     findings, enrichment = await sbom.scan_with_metadata_async(
         components, include_component_index=True
     )
-    completed_at = sbom.datetime.now(sbom.timezone.utc)
+    completed_at = datetime.now(timezone.utc)
 
     # External enrichment is complete before the audit writer transaction starts.
     audit.acquire_chain_lock(db)
@@ -522,8 +538,19 @@ async def reassess_import(
         db.flush()
         for finding in findings:
             index = finding.get("component_index")
-            if not isinstance(index, int) or index < 0 or index >= len(component_ids):
-                raise ValueError("Scanner returned a finding with an invalid component index.")
+            if (
+                not isinstance(finding, dict)
+                or not isinstance(index, int)
+                or isinstance(index, bool)
+                or index < 0
+                or index >= len(component_ids)
+                or not isinstance(finding.get("vuln_id"), str)
+                or not finding["vuln_id"].strip()
+                or not isinstance(finding.get("severity"), str)
+                or not isinstance(finding.get("source"), str)
+                or not finding["source"].strip()
+            ):
+                raise ValueError("Scanner returned a malformed or unscoped finding.")
             db.add(
                 SBOMAssessmentFinding(
                     assessment_id=assessment.id,
