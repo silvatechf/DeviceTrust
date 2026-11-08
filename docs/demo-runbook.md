@@ -189,3 +189,31 @@ Stop the server. Delete only the disposable local `devicetrust.db` file if you w
 ## 7. Evidence to capture
 
 Capture genuine screenshots from the running application at desktop and mobile widths. Use synthetic data only. Avoid screenshots that expose API keys, environment variables, local usernames, file paths or private data. Record the exact commit SHA used for the capture.
+
+
+
+### Reassess a stored product SBOM import (proposed in PR #45)
+
+After PR #45 is merged and the local database has been migrated with `alembic upgrade head`, request a new assessment for the accepted import:
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments" -H "X-API-Key: $API_KEY" -H "Idempotency-Key: demo-assessment-001"
+```
+
+The request returns an assessment ID, the component/finding counts, timestamps, source fingerprint, and OSV enrichment coverage. Repeating the same request with the same key and source configuration returns the existing assessment. Use a new key to deliberately append another assessment run.
+
+List the assessment history:
+
+```bash
+curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments" -H "X-API-Key: $API_KEY"
+```
+
+Inspect findings from one specific assessment:
+
+```bash
+curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments/ASSESSMENT_ID/findings" -H "X-API-Key: $API_KEY"
+```
+
+Assessment findings are separate from the original import-time findings and their human triage fields. A new assessment does not inherit or overwrite prior triage decisions. An OSV status of `disabled` means OSV enrichment was not run; it does not mean that the import has no vulnerabilities. `incomplete` means the available intelligence did not cover the entire requested assessment.
+
+This workflow is under review in PR #45 and must not be presented as available on `main` until it is merged. OSV is best-effort and does not provide a globally consistent feed snapshot.
