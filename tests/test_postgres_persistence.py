@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -24,6 +25,8 @@ from app.db import (
     Product,
     ProductFinding,
     ProductRelease,
+    SBOMAssessment,
+    SBOMAssessmentFinding,
     SBOMComponent,
     SBOMImport,
 )
@@ -202,6 +205,8 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
 
         command.upgrade(config, "head")
         assert inspect(target_engine).has_table("audit_chain_state")
+        assert inspect(target_engine).has_table("sbom_assessments")
+        assert inspect(target_engine).has_table("sbom_assessment_findings")
         with target_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
@@ -213,6 +218,8 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
 
         command.downgrade(config, "0002_persistent_sbom")
         assert not inspect(target_engine).has_table("audit_chain_state")
+        assert not inspect(target_engine).has_table("sbom_assessments")
+        assert not inspect(target_engine).has_table("sbom_assessment_findings")
 
         command.upgrade(config, "head")
         assert inspect(target_engine).has_table("audit_chain_state")
@@ -458,3 +465,103 @@ def test_product_sbom_import_rolls_back_on_postgres_audit_failure(monkeypatch):
         session.execute(delete(ProductRelease).where(ProductRelease.id == release_id))
         session.execute(delete(Product).where(Product.id == product.id))
         session.commit()
+
+
+
+def test_versioned_sbom_assessment_survives_postgres_engine_disposal(monkeypatch):
+    suffix = uuid4().hex
+    actor = f"assessment-pg-{suffix[:12]}"
+    digest = hashlib.sha256(suffix.encode()).hexdigest()
+
+    async def fake_scan(components, *, include_component_index=False):
+        assert include_component_index is True
+        return [{
+            "component_index": 0,
+            "vuln_id": "CVE-2099-9001",
+            "severity": "high",
+            "fixed_in": "1.0.1",
+            "source": "local-demo",
+        }], {"status": "disabled", "source": "osv"}
+
+    monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
+    monkeypatch.delenv("DEVICETRUST_OSV", raising=False)
+
+    with Session(application_engine) as session:
+        product = Product(
+            manufacturer="PostgreSQL Assessment Test",
+            product_name=f"Assessment {suffix}",
+        )
+        session.add(product)
+        session.flush()
+        release = ProductRelease(product_id=product.id, version="1.0.0")
+        session.add(release)
+        session.flush()
+        imported = SBOMImport(
+            product_release_id=release.id,
+            format="CycloneDX",
+            spec_version="1.5",
+            source_type="manual",
+            content_sha256=digest,
+            parser_version="0.3.0",
+            status="accepted",
+            component_count=1,
+            validation_summary={"valid": True},
+        )
+        session.add(imported)
+        session.flush()
+        component = SBOMComponent(
+            sbom_import_id=imported.id,
+            ordinal=0,
+            name="Example Library",
+            version="1.0.0",
+            purl="pkg:generic/example-library@1.0.0",
+        )
+        session.add(component)
+        session.commit()
+        product_id = product.id
+        release_id = release.id
+        import_id = imported.id
+        component_id = component.id
+
+        assessment, created = asyncio.run(
+            product_sbom.reassess_import(
+                session, actor, import_id, f"request-{suffix}"
+            )
+        )
+        assert created is True
+        assessment_id = assessment["id"]
+
+    application_engine.dispose()
+    verification_engine = create_engine(os.environ["DATABASE_URL"])
+    try:
+        with Session(verification_engine) as session:
+            persisted = session.get(SBOMAssessment, assessment_id)
+            findings = session.scalars(
+                select(SBOMAssessmentFinding).where(
+                    SBOMAssessmentFinding.assessment_id == assessment_id
+                )
+            ).all()
+            assert persisted is not None
+            assert persisted.status == "disabled"
+            assert persisted.component_count == 1
+            assert persisted.finding_count == 1
+            assert len(findings) == 1
+            assert findings[0].sbom_component_id == component_id
+            assert findings[0].vuln_id == "CVE-2099-9001"
+            assert verify(session)["valid"] is True
+    finally:
+        with Session(verification_engine) as session:
+            session.execute(
+                delete(SBOMAssessmentFinding).where(
+                    SBOMAssessmentFinding.assessment_id == assessment_id
+                )
+            )
+            session.execute(
+                delete(SBOMAssessment).where(SBOMAssessment.id == assessment_id)
+            )
+            session.execute(delete(SBOMComponent).where(SBOMComponent.id == component_id))
+            session.execute(delete(SBOMImport).where(SBOMImport.id == import_id))
+            session.execute(delete(ProductRelease).where(ProductRelease.id == release_id))
+            session.execute(delete(Product).where(Product.id == product_id))
+            session.commit()
+        verification_engine.dispose()

@@ -54,10 +54,15 @@ The persistent SBOM work introduces these authenticated endpoints:
 - `GET /product-releases/{release_id}/sbom/diff?from_import_id=1&to_import_id=2` — compare two accepted imports for the same release.
 - `GET /sbom/imports/{import_id}/components` — list immutable component occurrences.
 - `GET /sbom/components/{component_id}/findings` — list findings tied to a component occurrence.
+- `POST /sbom/imports/{import_id}/assessments` — request a new assessment with an `Idempotency-Key`.
+- `GET /sbom/imports/{import_id}/assessments` — list historical assessment runs.
+- `GET /sbom/imports/{import_id}/assessments/{assessment_id}/findings` — list findings for one run.
 
 The import digest is calculated from the exact request bytes. A repeated digest for the same release and format returns the existing import. Only fully validated imports are persisted. The API does not store raw SBOM documents or infer a relationship between a product and a device.
 
 The comparison reports additions, removals and matched-component changes. Matching excludes only the PURL version; qualifiers and subpath remain identity boundaries. Duplicate identities are marked ambiguous, and components without usable PURLs remain unidentified rather than being matched by name or ordinal. The comparison is read-only and does not re-evaluate vulnerability findings. PURL identity is a conservative heuristic, not proof of artifact or supplier equivalence.
+
+A versioned reassessment workflow is under review in [PR #45](https://github.com/silvatechf/DeviceTrust/pull/45). It introduces separate assessment runs and findings for stored imports, preserves the original SBOM evidence and legacy findings, and exposes authenticated history. Treat this workflow as proposed until the pull request is merged and its checks pass.
 
 The product SBOM persistence API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). Comparison is implemented in the current prototype; see the PR history and test matrix for exact validation evidence. Neither workflow makes DeviceTrust a production-ready service.
 

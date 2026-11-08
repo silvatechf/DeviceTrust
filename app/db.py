@@ -165,3 +165,50 @@ class ProductFinding(Base):
     status: Mapped[str] = mapped_column(String(20), default="open")
     justification: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
+
+
+class SBOMAssessment(Base):
+    __tablename__ = "sbom_assessments"
+    __table_args__ = (
+        UniqueConstraint(
+            "sbom_import_id",
+            "request_key_hash",
+            name="uq_sbom_assessment_import_request",
+        ),
+        CheckConstraint(
+            "status IN ('disabled', 'complete', 'incomplete')",
+            name="ck_sbom_assessment_status",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sbom_import_id: Mapped[int] = mapped_column(ForeignKey("sbom_imports.id"), index=True)
+    request_key_hash: Mapped[str] = mapped_column(String(64))
+    source_fingerprint: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    component_count: Mapped[int] = mapped_column(Integer)
+    finding_count: Mapped[int] = mapped_column(Integer)
+    enrichment_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class SBOMAssessmentFinding(Base):
+    __tablename__ = "sbom_assessment_findings"
+    __table_args__ = (
+        UniqueConstraint(
+            "assessment_id",
+            "sbom_component_id",
+            "vuln_id",
+            "source",
+            name="uq_sbom_assessment_finding_identity",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    assessment_id: Mapped[int] = mapped_column(ForeignKey("sbom_assessments.id"), index=True)
+    sbom_component_id: Mapped[int] = mapped_column(ForeignKey("sbom_components.id"), index=True)
+    vuln_id: Mapped[str] = mapped_column(String(100))
+    severity: Mapped[str] = mapped_column(String(20))
+    fixed_in: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    source: Mapped[str] = mapped_column(String(20))

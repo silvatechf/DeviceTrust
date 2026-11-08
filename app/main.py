@@ -4,7 +4,7 @@ import os
 from datetime import timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import or_, select
@@ -245,6 +245,53 @@ def compare_product_sbom_imports(
     try:
         return product_sbom.compare_imports(
             db, release_id, from_import_id, to_import_id
+        )
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from None
+
+
+@app.post("/sbom/imports/{import_id}/assessments")
+async def reassess_product_sbom(
+    import_id: int,
+    response: Response,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    db: Session = Depends(get_db),
+    actor: str = Depends(auth),
+):
+    try:
+        assessment, created = await product_sbom.reassess_import(
+            db, actor, import_id, idempotency_key
+        )
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from None
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from None
+    response.status_code = 201 if created else 200
+    return {**assessment, "created": created}
+
+
+@app.get("/sbom/imports/{import_id}/assessments")
+def list_product_sbom_assessments(
+    import_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    try:
+        return product_sbom.list_assessments(db, import_id)
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from None
+
+
+@app.get("/sbom/imports/{import_id}/assessments/{assessment_id}/findings")
+def list_product_sbom_assessment_findings(
+    import_id: int,
+    assessment_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    try:
+        return product_sbom.list_assessment_findings(
+            db, import_id, assessment_id
         )
     except LookupError as error:
         raise HTTPException(404, str(error)) from None
