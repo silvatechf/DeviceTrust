@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -475,7 +476,7 @@ async def reassess_import(
         ]
         component_ids = [row.id for row in component_rows]
 
-    started_at = sbom.datetime.now(sbom.timezone.utc)
+    started_at = datetime.now(timezone.utc)
     findings, enrichment = await sbom.scan_with_metadata_async(
         components, include_component_index=True
     )
