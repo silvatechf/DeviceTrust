@@ -1,5 +1,5 @@
 from app import product_sbom
-from app.db import SBOMAssessment, SessionLocal
+from app.db import ProductFinding, SBOMAssessment, SessionLocal
 
 from .conftest import H
 
@@ -55,6 +55,9 @@ def test_reassessment_persists_versioned_findings_and_is_idempotent(
     monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
     monkeypatch.delenv("DEVICETRUST_OSV", raising=False)
 
+    with SessionLocal() as db:
+        legacy_findings_before = db.query(ProductFinding).count()
+
     first = client.post(
         f"/sbom/imports/{import_id}/assessments",
         headers={**H, "Idempotency-Key": "assessment-run-001"},
@@ -72,6 +75,8 @@ def test_reassessment_persists_versioned_findings_and_is_idempotent(
     assert first.json()["status"] == "disabled"
     assert first.json()["finding_count"] == 1
     assert len(calls) == 1
+    with SessionLocal() as db:
+        assert db.query(ProductFinding).count() == legacy_findings_before
 
     assessment_id = first.json()["id"]
     history = client.get(
@@ -125,3 +130,34 @@ def test_reassessment_rejects_idempotency_key_reuse_after_config_change(
         assert db.query(SBOMAssessment).filter_by(
             sbom_import_id=import_id
         ).count() == 1
+
+
+
+def test_reassessment_rejects_unauthenticated_requests(client):
+    import_id = _import(client)
+    response = client.post(
+        f"/sbom/imports/{import_id}/assessments",
+        headers={"Idempotency-Key": "unauthenticated"},
+    )
+    assert response.status_code == 401
+
+
+def test_reassessment_rolls_back_malformed_scanner_findings(client, monkeypatch):
+    import_id = _import(client)
+
+    async def malformed_scan(components, *, include_component_index=False):
+        return [{"component_index": 999}], {"status": "disabled", "source": "osv"}
+
+    monkeypatch.setattr(
+        product_sbom.sbom, "scan_with_metadata_async", malformed_scan
+    )
+    response = client.post(
+        f"/sbom/imports/{import_id}/assessments",
+        headers={**H, "Idempotency-Key": "malformed-finding"},
+    )
+    assert response.status_code == 500
+
+    with SessionLocal() as db:
+        assert db.query(SBOMAssessment).filter_by(
+            sbom_import_id=import_id
+        ).count() == 0
