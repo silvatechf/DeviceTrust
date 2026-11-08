@@ -23,10 +23,11 @@ This matrix connects security/product controls to concrete automated tests. It i
 | Console credential storage boundary | tests/test_operator_console.py | No localStorage/sessionStorage references in served script | No automated real-browser interaction suite |
 | API documentation boundary | tests/test_operator_console.py | /docs remains available without console CSP header | Manual browser check required |
 | Docker Compose deployment and recovery smoke | scripts/ci-compose-smoke.sh | Fresh PostgreSQL startup/migrations, API authentication, seed fail-closed behavior, product SBOM persistence across API/DB restarts, audit verification against the restored database, pg_dump/restore into a separate database | CI smoke does not replace a local Windows/Linux or real-browser walkthrough; no backup retention schedule |
+| Full-history secret scanning | Gitleaks v8.30.1 in .github/workflows/ci.yml | Full-depth checkout and git log --all --full-history; official release archive SHA-256 checked before execution; findings redacted | Pattern-based detection is not complete; manually review private/customer data and scan findings; no allowlist is configured |
 
 ## CI quality gates
 
-The current workflow at .github/workflows/ci.yml runs Node syntax check, dependency installation, Ruff, Bandit, pip-audit and pytest. CodeQL is configured separately in .github/workflows/codeql.yml.
+The current .github/workflows/ci.yml workflow uses read-only contents permissions and bounded job timeouts. Its quality job runs Node syntax validation, installs requirements-dev.txt, validates the pre-commit configuration and installs hook environments, runs Ruff and Bandit, audits runtime (requirements.txt) and development (requirements-dev.txt) dependencies separately, and runs pytest. The PostgreSQL integration job exercises migrations and persistence; compose-smoke runs the disposable Docker Compose recovery flow. A separate secret-history job checks the official Gitleaks v8.30.1 archive SHA-256 and scans all Git history reachable from the checked-out refs with redacted output. CodeQL is configured separately in .github/workflows/codeql.yml.
 
 A configured workflow is not a successful workflow. Before release, inspect the exact candidate commit's workflow runs, job conclusions and CodeQL status. Record the candidate SHA and date in the release evidence.
 
@@ -40,7 +41,7 @@ The `compose-smoke` job runs the Docker Compose stack on a disposable GitHub run
 - Audit lock contention under sustained load and external writers that bypass the application.
 - Production migration rollback and application/database version coordination; automated downgrade coverage uses isolated disposable databases only.
 - Production backup retention, off-host storage, restore-point objectives and deployment rollback.
-- Secret scanning and full Git-history review.
+- Manual review of private/customer data and any Gitleaks findings; automated Gitleaks coverage is pattern-based and does not prove complete secret detection.
 - Branch protection / ruleset and commit-signature policy verification.
 
 ## Adding a new control

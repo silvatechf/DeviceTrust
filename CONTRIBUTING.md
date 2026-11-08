@@ -27,9 +27,12 @@ Thanks for taking an interest in DeviceTrust. The project is an evidence-oriente
 
 ```bash
 pip install -r requirements-dev.txt
+pre-commit validate-config
+pre-commit install-hooks
 ruff check .
 bandit -q -r app
 pip-audit -r requirements.txt
+pip-audit -r requirements-dev.txt
 node --check web/app.js
 pytest -q
 ```

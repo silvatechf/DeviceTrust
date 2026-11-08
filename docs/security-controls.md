@@ -50,3 +50,21 @@ The hash chain can detect modification of retained entries and gaps when a later
 ## Before production use
 
 Add individual identity and authorization, key lifecycle, rate limiting, migration management, independent audit anchoring, retention policy, lock-contention monitoring, operational monitoring and a documented deployment model. See [Threat model](threat-model.md) and [Release readiness](release-readiness.md).
+
+## Repository and CI security gates
+
+The repository workflow applies separate controls to the development and delivery toolchain:
+
+- pip-audit -r requirements.txt audits the runtime dependency set.
+- pip-audit -r requirements-dev.txt audits the development dependency set, including runtime requirements inherited through -r requirements.txt.
+- pre-commit validate-config validates the hook configuration; pre-commit install-hooks provisions the configured hook environments in CI. This does not mean CI executes every hook on all files.
+- Gitleaks v8.30.1 scans Git history reachable from the checked-out refs. CI uses actions/checkout with fetch-depth: 0, passes --all --full-history to Git, verifies the official Linux x64 release archive SHA-256 (551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb) before execution, and uses full redaction. The artifact is downloaded from the Gitleaks v8.30.1 GitHub release. No repository-specific Gitleaks allowlist or ignore file is configured.
+- The CI workflow has read-only contents permissions and bounded job timeouts. CodeQL uses its separate workflow permissions.
+
+These gates improve visibility into known dependency advisories and detected secret patterns. They do not establish complete secret detection, complete supply-chain assurance, or production security. A clean scan is not a substitute for manual review of private data, history and findings.
+
+### Temporary ggshield upstream pin
+
+The current development requirements and pre-commit hook pin GitGuardian ggshield to upstream commit e7dc8bcc117079882e6521d16b1016419878af9e. The latest official release observed during this review is v1.56.1, whose dependency metadata constrains oauthlib below 4; that selects a vulnerable pre-4.x version in the affected environment. The [pinned upstream merge commit](https://github.com/GitGuardian/ggshield/commit/e7dc8bcc117079882e6521d16b1016419878af9e) is GitHub-signature verified (API verification reason: valid), is reachable from the official GitGuardian main history, and includes the dependency update to oauthlib 4.0.1. Its pyproject.toml permits oauthlib>=3.2.1,<5, and its lock file records 4.0.1.
+
+This is a temporary source commit pin, not an official ggshield release. Replace both pins with an appropriate official release as soon as GitGuardian publishes one with the patched dependency constraint. Keep the runtime and development dependency audits enabled; do not suppress the finding.

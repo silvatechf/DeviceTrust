@@ -13,7 +13,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [x] Security reporting and contribution guidance exist.
 - [x] A local synthetic-data demo runbook exists.
 - [ ] Select and add an explicit license, or formally decide to retain all rights.
-- [ ] Review the complete Git history for secrets, private/customer data and unintended files.
+- [ ] Manually review the complete Git history for private/customer data and unintended files; review and triage Gitleaks findings without treating a clean scan as proof of complete secret detection.
 - [ ] Verify branch protection/rulesets and required checks on the default branch.
 - [ ] Define any prospective commit-signature policy in repository settings.
 - [ ] Run the candidate from a clean checkout with a disposable database.
@@ -23,7 +23,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [x] Test concurrent complete API/domain writes and transaction failure behavior on SQLite and PostgreSQL.
 - [x] Verify migration 0003 upgrade/downgrade on disposable SQLite and PostgreSQL databases in CI.
 - [ ] Demonstrate backup/restore and rollback.
-- [ ] Inspect CI and CodeQL results for the exact candidate SHA and record their URLs.
+- [ ] Inspect exact-candidate CI results (pre-commit configuration, runtime and development dependency audits, Ruff, Bandit, tests, PostgreSQL and Compose), CodeQL and Gitleaks; record their URLs and manually triage findings.
 - [ ] Capture genuine screenshots from the running app using synthetic data only.
 - [ ] Complete the documentation and residual-risk review.
 
@@ -32,7 +32,7 @@ A checkbox must be marked only when the check has actually been performed and ev
 ## Demo acceptance
 
 - Install dependencies using the documented development requirements.
-- Run Ruff, Bandit, pip-audit, Node syntax validation and pytest.
+- Run pre-commit configuration validation, Ruff, Bandit, pip-audit -r requirements.txt, pip-audit -r requirements-dev.txt, Node syntax validation and pytest.
 - Start the app with a disposable SQLite database and local API key.
 - Seed synthetic data and follow [the demo runbook](demo-runbook.md).
 - Verify inventory, posture, SBOM import, justified triage, report download and audit verification.

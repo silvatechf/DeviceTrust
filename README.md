@@ -65,14 +65,14 @@ This API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/p
 - Individual operator accounts, RBAC, tenant isolation or production browser sessions.
 - Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
 - Active LAN discovery, packet capture, device agents or independent firmware/hardware attestation.
-- Immutable/WORM audit storage and external audit checkpoints. Writers sharing one database are serialized transactionally; independent audit anchoring is not implemented.
+- Immutable/WORM audit storage, external audit checkpoints or independent audit anchoring.
 - Production operations, real-time intrusion detection, incident-response automation or attack prevention.
 
 See [Prototype limitations](docs/prototype-limitations.md), [Threat model](docs/threat-model.md) and [Release readiness](docs/release-readiness.md).
 
 ## Architecture at a glance
 
-DeviceTrust is a **modular monolith**, not a set of microservices. FastAPI handles HTTP requests and authentication; route handlers coordinate domain logic; SQLAlchemy persists devices, evidence, vulnerabilities and audit events. Authenticated write transactions serialize audit appends through a singleton database state row.
+DeviceTrust is a **modular monolith**, not a set of microservices. FastAPI handles HTTP requests and authentication; route handlers coordinate domain logic; SQLAlchemy persists devices, evidence, vulnerabilities and audit events.
 
 ```mermaid
 flowchart LR
@@ -163,14 +163,17 @@ The container applies Alembic migrations before starting the API. The API port i
 ## Run quality checks
 
 ```bash
+pre-commit validate-config
+pre-commit install-hooks
 ruff check .
 bandit -q -r app
 pip-audit -r requirements.txt
+pip-audit -r requirements-dev.txt
 node --check web/app.js
 pytest -q
 ```
 
-GitHub Actions runs the configured checks on pushes and pull requests; CodeQL is configured separately. Check the exact commit's workflow results before claiming they passed. Tests and static analysis provide useful evidence, not proof that the application is secure or production-ready. The [test matrix](docs/test-matrix.md) maps controls to test locations and records remaining gaps.
+GitHub Actions validates the pre-commit configuration, provisions hook environments, audits runtime and development dependencies separately, scans reachable Git history with checksum-verified Gitleaks, and runs PostgreSQL and disposable Compose checks. CodeQL is configured separately. Check the exact commit's workflow results before claiming they passed. Tests and static analysis provide useful evidence, not proof that the application is secure or production-ready. The [test matrix](docs/test-matrix.md) maps controls to test locations and records remaining gaps.
 
 ## Security principles
 
@@ -180,7 +183,8 @@ GitHub Actions runs the configured checks on pushes and pull requests; CodeQL is
 - Vulnerability triage requires a written justification.
 - KEV presence and EPSS scores are intelligence signals, not automatic CRA reporting triggers.
 - VEX statements require product-version context, evidence and reviewed justification.
-- Audit hash chaining provides tamper evidence, not immutable storage. App writers sharing the same database are serialized, but a privileged database administrator can still rewrite the chain without an external checkpoint.
+- Application writers sharing one database are serialized transactionally through the singleton audit-chain state row: PostgreSQL holds the row lock through the transaction, while SQLite uses `BEGIN IMMEDIATE`.
+- Audit hash chaining provides tamper evidence, not immutable storage. A privileged database administrator or an external writer can still tamper with the chain; there is no external checkpoint or independent audit anchoring.
 - External intelligence failures or missing results do not mean that a component is vulnerability-free.
 - DeviceTrust is an assessment and evidence-management prototype, not an inline IDS/IPS or product conformity assessor.
 
