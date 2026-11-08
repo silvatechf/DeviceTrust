@@ -13,6 +13,7 @@ from .db import (
     ProductRelease,
     SBOMComponent,
     SBOMImport,
+    SessionLocal,
 )
 
 PARSER_VERSION = "0.3.0"
@@ -92,17 +93,19 @@ def import_cyclonedx(
     components = sbom.parse_cyclonedx(document)
     digest = hashlib.sha256(raw_document).hexdigest()
 
-    if db.get(ProductRelease, release_id) is None:
-        raise LookupError("Product release not found")
-
     existing_query = select(SBOMImport).where(
         SBOMImport.product_release_id == release_id,
         SBOMImport.format == "CycloneDX",
         SBOMImport.content_sha256 == digest,
     )
-    existing = db.scalars(existing_query).first()
-    if existing is not None:
-        return existing, False
+    # Preflight in a separate session: SQLite must acquire BEGIN IMMEDIATE
+    # before the write session performs any read.
+    with SessionLocal() as lookup_db:
+        if lookup_db.get(ProductRelease, release_id) is None:
+            raise LookupError("Product release not found")
+        existing = lookup_db.scalars(existing_query).first()
+        if existing is not None:
+            return existing, False
 
     findings, osv_enrichment = sbom.scan_with_metadata(
         components, include_component_index=True
