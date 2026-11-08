@@ -201,3 +201,42 @@ def test_provider_failure_is_incomplete_not_a_clean_result(monkeypatch):
     assert metadata["epss"]["status"] == "incomplete"
     assert findings[0]["intelligence"]["kev"]["status"] == "unavailable"
     assert findings[0]["intelligence"]["epss"]["status"] == "unavailable"
+
+
+def test_cve_limit_marks_only_unqueried_findings_not_checked(monkeypatch):
+    async def fake_kev(_client):
+        return {
+            "CVE-2025-0001": {"status": "listed", "catalog_version": "test"}
+        }, {"status": "complete"}
+
+    async def fake_epss(_client, cves):
+        return {
+            cve: {
+                "status": "scored",
+                "score": 0.2,
+                "percentile": 0.3,
+                "score_date": "2026-11-08",
+                "source": intelligence.EPSS_URL,
+            }
+            for cve in cves
+        }, {"status": "complete", "scored_cve_count": len(cves)}
+
+    monkeypatch.setattr(intelligence, "_fetch_kev", fake_kev)
+    monkeypatch.setattr(intelligence, "_fetch_epss", fake_epss)
+    findings = [
+        {"vuln_id": f"CVE-2025-{index:04d}"}
+        for index in range(1, intelligence.MAX_CVES_PER_ASSESSMENT + 2)
+    ]
+
+    enriched, metadata = asyncio.run(
+        intelligence.enrich_findings(
+            findings, kev_enabled=True, epss_enabled=True
+        )
+    )
+
+    assert metadata["kev"]["status"] == "incomplete"
+    assert metadata["epss"]["status"] == "incomplete"
+    assert enriched[0]["intelligence"]["kev"]["status"] == "listed"
+    assert enriched[0]["intelligence"]["epss"]["status"] == "scored"
+    assert enriched[-1]["intelligence"]["kev"]["status"] == "not_checked"
+    assert enriched[-1]["intelligence"]["epss"]["status"] == "not_checked"
