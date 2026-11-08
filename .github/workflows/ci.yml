@@ -22,6 +22,10 @@ jobs:
         run: node --check web/app.js
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
+      - name: Validate pre-commit configuration
+        run: pre-commit validate-config
+      - name: Install pre-commit hook environments
+        run: pre-commit install-hooks
       - name: Ruff
         run: ruff check .
       - name: Bandit
