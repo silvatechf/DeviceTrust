@@ -228,28 +228,29 @@ async def scan_osv_with_status_async(
     *,
     include_component_index: bool = False,
 ) -> tuple[list[dict], dict]:
-    """Run product-import OSV enrichment under a cancellable wall-clock deadline."""
-    started = time.monotonic()
-    deadline = started + OSV_ENRICHMENT_DEADLINE_SECONDS
+    """Run product-import OSV enrichment against one absolute deadline."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + OSV_ENRICHMENT_DEADLINE_SECONDS
     unique_queries: dict[tuple[str, str], list[int]] = {}
     skipped_no_purl = 0
-    for index, component in enumerate(components):
-        purl = component.get("purl")
-        if not purl:
-            skipped_no_purl += 1
-            continue
-        unique_queries.setdefault((purl, component["version"]), []).append(index)
-
     hits = []
     queried = 0
     failed = False
     budget_exhausted = False
     deadline_exhausted = False
+
     try:
-        async with asyncio.timeout(OSV_ENRICHMENT_DEADLINE_SECONDS):
+        async with asyncio.timeout_at(deadline):
+            for index, component in enumerate(components):
+                purl = component.get("purl")
+                if not purl:
+                    skipped_no_purl += 1
+                    continue
+                unique_queries.setdefault((purl, component["version"]), []).append(index)
+
             async with httpx.AsyncClient() as client:
                 for (purl, version), indexes in unique_queries.items():
-                    remaining = deadline - time.monotonic()
+                    remaining = deadline - loop.time()
                     if queried >= MAX_OSV_QUERIES_PER_IMPORT:
                         budget_exhausted = True
                         break

@@ -234,3 +234,38 @@ def test_async_osv_enrichment_completes_within_deadline(monkeypatch):
     assert findings == []
     assert status["status"] == "complete"
     assert status["queried"] == 1
+
+
+def test_async_osv_deadline_includes_query_preparation(monkeypatch):
+    import asyncio
+    import time
+
+    class _SlowComponents(list):
+        def __iter__(self):
+            time.sleep(0.02)
+            return super().__iter__()
+
+    class _AsyncClient:
+        async def __aenter__(self):
+            await asyncio.sleep(0)
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def post(self, *_args, **_kwargs):
+            raise AssertionError("OSV request must not start after the absolute deadline")
+
+    monkeypatch.setattr(sbom.httpx, "AsyncClient", _AsyncClient)
+    monkeypatch.setattr(sbom, "OSV_ENRICHMENT_DEADLINE_SECONDS", 0.01)
+
+    findings, status = asyncio.run(
+        sbom.scan_osv_with_status_async(
+            _SlowComponents([_component()])
+        )
+    )
+
+    assert findings == []
+    assert status["status"] == "incomplete"
+    assert status["deadline_exhausted"] is True
+    assert status["queried"] == 0
