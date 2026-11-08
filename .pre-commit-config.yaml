@@ -9,7 +9,8 @@
         stages: [pre-commit]
 
   - repo: https://github.com/gitguardian/ggshield
-    rev: v1.56.1
+    # Verified upstream merge with oauthlib 4.0.1 support; replace with the next release tag.
+    rev: e7dc8bcc117079882e6521d16b1016419878af9e
     hooks:
       - id: ggshield
         language_version: python3

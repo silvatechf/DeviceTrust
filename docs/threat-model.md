@@ -31,6 +31,7 @@ The prototype manages device metadata, posture evidence, SBOM documents, vulnera
 | Incorrect CVE matching | PURL type/name matching for local demo records; version-specific OSV query | Tests cover ecosystem/package mismatch and fixed versions; local feed is synthetic |
 | False compliance from missing data | `unverified` state | Posture tests cover unknown exposure and management interfaces |
 | Internet-exposed management | Separate management-plane posture assessment | API test covers exposed admin interface even when authentication is required; exposure is declared metadata |
+| Concurrent audit writers | Singleton state-row lock; SQLite IMMEDIATE transaction and PostgreSQL row lock | Concurrent application writers cannot append from the same head; lock-row update and audit append share the domain transaction |
 | Audit database rewriting | SHA-256 hash chain | Tests detect mutation; final-entry deletion and privileged recomputation are not detectable without external checkpoints |
 | Compromised API key | Shared key and constant-time comparison | No per-client revocation, scopes, rotation workflow or RBAC |
 | Resource exhaustion | SBOM body and component limits | No global request rate limit, concurrency quota or reverse-proxy policy |

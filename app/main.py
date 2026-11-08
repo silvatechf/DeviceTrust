@@ -79,6 +79,13 @@ def auth(x_api_key: str = Header(default="")) -> str:
     return "api-key"
 
 
+def get_write_db(_: str = Depends(auth)):
+    """Acquire the audit writer lock after authentication and before route reads."""
+    with SessionLocal() as db:
+        audit.acquire_chain_lock(db)
+        yield db
+
+
 def _device(db: Session, device_id: str) -> Device:
     device = db.get(Device, device_id)
     if not device:
@@ -162,14 +169,14 @@ async def _read_sbom_document(request: Request) -> dict:
 
 
 @app.post("/products", status_code=201)
-def create_product(body: ProductIn, db: Session = Depends(get_db), actor: str = Depends(auth)):
+def create_product(body: ProductIn, db: Session = Depends(get_write_db), actor: str = Depends(auth)):
     product = product_sbom.create_product(db, actor, body.manufacturer, body.product_name, body.external_reference)
     return {"id": product.id, "manufacturer": product.manufacturer, "product_name": product.product_name,
             "external_reference": product.external_reference, "created_at": product.created_at}
 
 
 @app.post("/products/{product_id}/releases", status_code=201)
-def create_product_release(product_id: int, body: ProductReleaseIn, db: Session = Depends(get_db), actor: str = Depends(auth)):
+def create_product_release(product_id: int, body: ProductReleaseIn, db: Session = Depends(get_write_db), actor: str = Depends(auth)):
     try:
         release = product_sbom.create_release(db, actor, product_id, body.version, body.hardware_revision, body.release_reference)
     except LookupError:
@@ -197,6 +204,7 @@ async def import_product_sbom(
         raise HTTPException(422, "Request body must contain valid UTF-8 JSON") from None
     if not isinstance(document, dict):
         raise HTTPException(422, "SBOM document must be a JSON object")
+
     try:
         imported, created = product_sbom.import_cyclonedx(
             db, actor, release_id, bytes(raw), document, source_type, source_reference
@@ -252,7 +260,7 @@ def health():
 @app.post("/evidence", status_code=201)
 def record_evidence(
     body: EvidenceObservationIn,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_write_db),
     actor: str = Depends(auth),
 ):
     if body.device_id is not None:
@@ -325,7 +333,7 @@ def list_normalized_evidence(
 
 
 @app.post("/devices", status_code=201)
-def create_device(body: DeviceIn, db: Session = Depends(get_db), actor: str = Depends(auth)):
+def create_device(body: DeviceIn, db: Session = Depends(get_write_db), actor: str = Depends(auth)):
     device = Device(
         device_id=body.device_id,
         manufacturer=body.manufacturer,
@@ -358,7 +366,7 @@ def get_device(device_id: str, db: Session = Depends(get_db), _: str = Depends(a
 def update_security(
     device_id: str,
     body: SecurityProfile,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_write_db),
     actor: str = Depends(auth),
 ):
     device = _device(db, device_id)
@@ -387,15 +395,18 @@ async def import_sbom(
     db: Session = Depends(get_db),
     actor: str = Depends(auth),
 ):
-    _device(db, device_id)
     document = await _read_sbom_document(request)
     try:
         components = sbom.parse_cyclonedx(document)
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
 
+    scan_results = sbom.scan(components)
+    audit.acquire_chain_lock(db)
+    _device(db, device_id)
+
     new_findings = 0
-    for finding in sbom.scan(components):
+    for finding in scan_results:
         existing = db.scalars(
             select(Vulnerability).where(
                 Vulnerability.device_id == device_id,
@@ -429,7 +440,7 @@ def list_vulnerabilities(device_id: str, db: Session = Depends(get_db), _: str =
 def triage(
     vuln_pk: int,
     body: TriageIn,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_write_db),
     actor: str = Depends(auth),
 ):
     vulnerability = db.get(Vulnerability, vuln_pk)

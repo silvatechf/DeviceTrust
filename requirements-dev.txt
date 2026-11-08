@@ -6,4 +6,6 @@ pip-audit>=2.7
 
 pre-commit>=4.0,<5.0
 
-ggshield>=1.56,<2.0
+# Upstream v1.56.1 caps oauthlib below 4. Pin the verified upstream merge
+# that permits patched oauthlib 4.0.1 until a corresponding release is published.
+ggshield @ git+https://github.com/GitGuardian/ggshield.git@e7dc8bcc117079882e6521d16b1016419878af9e
