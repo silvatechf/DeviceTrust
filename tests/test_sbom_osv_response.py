@@ -101,7 +101,8 @@ def test_osv_query_budget_marks_remaining_components_incomplete(monkeypatch):
     assert findings == []
     assert len(client.calls) == 1
     assert status["status"] == "incomplete"
-    assert status["deadline_exhausted"] is True
+    assert status["budget_exhausted"] is True
+    assert status["deadline_exhausted"] is False
     assert status["queried"] == 1
 
 
