@@ -54,6 +54,9 @@ The persistent SBOM work introduces these authenticated endpoints:
 - `GET /product-releases/{release_id}/sbom/diff?from_import_id=1&to_import_id=2` — compare two accepted imports for the same release.
 - `GET /sbom/imports/{import_id}/components` — list immutable component occurrences.
 - `GET /sbom/components/{component_id}/findings` — list findings tied to a component occurrence.
+- `POST /sbom/imports/{import_id}/assessments` — request a new assessment with an `Idempotency-Key`.
+- `GET /sbom/imports/{import_id}/assessments` — list historical assessment runs.
+- `GET /sbom/imports/{import_id}/assessments/{assessment_id}/findings` — list findings for one run.
 
 The import digest is calculated from the exact request bytes. A repeated digest for the same release and format returns the existing import. Only fully validated imports are persisted. The API does not store raw SBOM documents or infer a relationship between a product and a device.
 
