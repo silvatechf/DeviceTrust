@@ -26,12 +26,14 @@ def upgrade() -> None:
             "SET intelligence = '{}' WHERE intelligence IS NULL"
         )
     )
-    op.alter_column(
-        "sbom_assessment_findings",
-        "intelligence",
-        existing_type=sa.JSON(),
-        nullable=False,
-    )
+    # Batch mode recreates the table on SQLite (which does not support
+    # ALTER COLUMN) and emits a normal ALTER on PostgreSQL.
+    with op.batch_alter_table("sbom_assessment_findings") as batch_op:
+        batch_op.alter_column(
+            "intelligence",
+            existing_type=sa.JSON(),
+            nullable=False,
+        )
 
 
 def downgrade() -> None:
