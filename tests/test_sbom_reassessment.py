@@ -1,3 +1,5 @@
+import pytest
+
 from app import product_sbom
 from app.db import ProductFinding, SBOMAssessment, SessionLocal
 
@@ -151,11 +153,11 @@ def test_reassessment_rolls_back_malformed_scanner_findings(client, monkeypatch)
     monkeypatch.setattr(
         product_sbom.sbom, "scan_with_metadata_async", malformed_scan
     )
-    response = client.post(
-        f"/sbom/imports/{import_id}/assessments",
-        headers={**H, "Idempotency-Key": "malformed-finding"},
-    )
-    assert response.status_code == 500
+    with pytest.raises(RuntimeError, match="malformed or unscoped finding"):
+        client.post(
+            f"/sbom/imports/{import_id}/assessments",
+            headers={**H, "Idempotency-Key": "malformed-finding"},
+        )
 
     with SessionLocal() as db:
         assert db.query(SBOMAssessment).filter_by(
