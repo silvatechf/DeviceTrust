@@ -1,5 +1,7 @@
 import json
 import os
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -11,6 +13,12 @@ MAX_COMPONENT_NAME = 200
 MAX_COMPONENT_VERSION = 100
 MAX_PURL_LENGTH = 512
 SUPPORTED_CYCLONEDX_SPEC_VERSION = "1.5"
+MAX_OSV_QUERIES_PER_IMPORT = 50
+OSV_ENRICHMENT_DEADLINE_SECONDS = 10.0
+OSV_CONNECT_TIMEOUT_SECONDS = 2.0
+OSV_READ_TIMEOUT_SECONDS = 3.0
+OSV_WRITE_TIMEOUT_SECONDS = 2.0
+OSV_POOL_TIMEOUT_SECONDS = 1.0
 ADVISORIES = Path(__file__).parent / "data" / "advisories.json"
 
 
@@ -100,68 +108,145 @@ def scan_local(
     return hits
 
 
+def _osv_timeout(remaining: float) -> httpx.Timeout:
+    return httpx.Timeout(
+        timeout=max(0.001, remaining),
+        connect=max(0.001, min(OSV_CONNECT_TIMEOUT_SECONDS, remaining)),
+        read=max(0.001, min(OSV_READ_TIMEOUT_SECONDS, remaining)),
+        write=max(0.001, min(OSV_WRITE_TIMEOUT_SECONDS, remaining)),
+        pool=max(0.001, min(OSV_POOL_TIMEOUT_SECONDS, remaining)),
+    )
+
+
+def scan_osv_with_status(
+    components: list[dict],
+    *,
+    include_component_index: bool = False,
+    monotonic=None,
+) -> tuple[list[dict], dict]:
+    """Perform bounded, deduplicated OSV queries and report coverage explicitly."""
+    clock = monotonic or time.monotonic
+    started = clock()
+    deadline = started + OSV_ENRICHMENT_DEADLINE_SECONDS
+    unique_queries: dict[tuple[str, str], list[int]] = {}
+    skipped_no_purl = 0
+    for index, component in enumerate(components):
+        purl = component.get("purl")
+        if not purl:
+            skipped_no_purl += 1
+            continue
+        key = (purl, component["version"])
+        unique_queries.setdefault(key, []).append(index)
+
+    hits = []
+    queried = 0
+    failed = False
+    budget_exhausted = False
+    deadline_exhausted = False
+    try:
+        with httpx.Client() as client:
+            for (purl, version), indexes in unique_queries.items():
+                remaining = deadline - clock()
+                if queried >= MAX_OSV_QUERIES_PER_IMPORT:
+                    budget_exhausted = True
+                    break
+                if remaining <= 0:
+                    deadline_exhausted = True
+                    break
+                try:
+                    response = client.post(
+                        "https://api.osv.dev/v1/query",
+                        json={"package": {"purl": purl}, "version": version},
+                        timeout=_osv_timeout(remaining),
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                except (httpx.HTTPError, ValueError, TypeError):
+                    failed = True
+                    queried += 1
+                    continue
+
+                queried += 1
+                if not isinstance(payload, dict) or not isinstance(payload.get("vulns", []), list):
+                    failed = True
+                    continue
+
+                for vulnerability in payload.get("vulns", []):
+                    if not isinstance(vulnerability, dict):
+                        failed = True
+                        continue
+                    vuln_id = vulnerability.get("id")
+                    if not isinstance(vuln_id, str) or not vuln_id.strip():
+                        failed = True
+                        continue
+                    database_specific = vulnerability.get("database_specific")
+                    severity = (
+                        database_specific.get("severity", "unknown")
+                        if isinstance(database_specific, dict)
+                        else "unknown"
+                    )
+                    if not isinstance(severity, str):
+                        severity = "unknown"
+                    for component_index in indexes:
+                        finding = {
+                            "component": components[component_index]["name"],
+                            "version": components[component_index]["version"],
+                            "vuln_id": vuln_id,
+                            "severity": severity.lower(),
+                            "fixed_in": None,
+                            "source": "osv",
+                        }
+                        if include_component_index:
+                            finding["component_index"] = component_index
+                        hits.append(finding)
+    except httpx.HTTPError:
+        failed = True
+
+    deduplicated = sum(len(indexes) - 1 for indexes in unique_queries.values())
+    incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0
+    status = {
+        "status": "incomplete" if incomplete else "complete",
+        "source": "osv",
+        "queried": queried,
+        "query_candidates": len(unique_queries),
+        "deduplicated_occurrences": deduplicated,
+        "skipped_without_purl": skipped_no_purl,
+        "query_limit": MAX_OSV_QUERIES_PER_IMPORT,
+        "deadline_seconds": OSV_ENRICHMENT_DEADLINE_SECONDS,
+        "budget_exhausted": budget_exhausted,
+        "deadline_exhausted": deadline_exhausted,
+        "request_failures": failed,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return hits, status
+
+
 def scan_osv(
     components: list[dict], *, include_component_index: bool = False
 ) -> list[dict]:
-    """Optional OSV lookup scoped to each exact package URL and component version."""
-    hits = []
-    with httpx.Client(timeout=8) as client:
-        for component_index, component in enumerate(components):
-            if not component.get("purl"):
-                continue
-            try:
-                response = client.post(
-                    "https://api.osv.dev/v1/query",
-                    json={
-                        "package": {"purl": component["purl"]},
-                        "version": component["version"],
-                    },
-                )
-                response.raise_for_status()
-                payload = response.json()
-            except (httpx.HTTPError, ValueError, TypeError):
-                continue
+    """Compatibility wrapper for callers that only consume findings."""
+    findings, _ = scan_osv_with_status(
+        components, include_component_index=include_component_index
+    )
+    return findings
 
-            if not isinstance(payload, dict):
-                continue
-            vulnerabilities = payload.get("vulns", [])
-            if not isinstance(vulnerabilities, list):
-                continue
 
-            for vulnerability in vulnerabilities:
-                if not isinstance(vulnerability, dict):
-                    continue
-                vuln_id = vulnerability.get("id")
-                if not isinstance(vuln_id, str) or not vuln_id.strip():
-                    continue
-
-                database_specific = vulnerability.get("database_specific")
-                severity = (
-                    database_specific.get("severity", "unknown")
-                    if isinstance(database_specific, dict)
-                    else "unknown"
-                )
-                if not isinstance(severity, str):
-                    severity = "unknown"
-
-                finding = {
-                    "component": component["name"],
-                    "version": component["version"],
-                    "vuln_id": vuln_id,
-                    "severity": severity.lower(),
-                    "fixed_in": None,
-                    "source": "osv",
-                }
-                if include_component_index:
-                    finding["component_index"] = component_index
-                hits.append(finding)
-    return hits
+def scan_with_metadata(
+    components: list[dict], *, include_component_index: bool = False
+) -> tuple[list[dict], dict]:
+    hits = scan_local(components, include_component_index=include_component_index)
+    if os.getenv("DEVICETRUST_OSV") != "1":
+        return hits, {"status": "disabled", "source": "osv"}
+    osv_hits, osv_status = scan_osv_with_status(
+        components, include_component_index=include_component_index
+    )
+    return hits + osv_hits, osv_status
 
 
 def scan(
     components: list[dict], *, include_component_index: bool = False
 ) -> list[dict]:
-    hits = scan_local(components, include_component_index=include_component_index)
-    if os.getenv("DEVICETRUST_OSV") == "1":
-        hits += scan_osv(components, include_component_index=include_component_index)
-    return hits
+    findings, _ = scan_with_metadata(
+        components, include_component_index=include_component_index
+    )
+    return findings

@@ -218,7 +218,8 @@ async def import_product_sbom(
         raise HTTPException(409, "SBOM import conflicts with an existing database record") from None
     return {"id": imported.id, "product_release_id": imported.product_release_id, "format": imported.format,
             "spec_version": imported.spec_version, "content_sha256": imported.content_sha256,
-            "status": imported.status, "component_count": imported.component_count, "created": created}
+            "status": imported.status, "component_count": imported.component_count,
+            "validation_summary": imported.validation_summary, "created": created}
 
 
 @app.get("/product-releases/{release_id}/sbom")
@@ -229,7 +230,8 @@ def list_product_sbom_imports(release_id: int, db: Session = Depends(get_db), _:
                          .order_by(SBOMImport.imported_at, SBOMImport.id)).all()
     return [{"id": item.id, "format": item.format, "spec_version": item.spec_version,
              "content_sha256": item.content_sha256, "imported_at": item.imported_at,
-             "component_count": item.component_count, "status": item.status} for item in imports]
+             "component_count": item.component_count, "status": item.status,
+             "validation_summary": item.validation_summary} for item in imports]
 
 
 @app.get("/product-releases/{release_id}/sbom/diff")

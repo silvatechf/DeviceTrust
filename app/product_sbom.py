@@ -13,6 +13,7 @@ from .db import (
     ProductRelease,
     SBOMComponent,
     SBOMImport,
+    SessionLocal,
 )
 
 PARSER_VERSION = "0.3.0"
@@ -90,23 +91,36 @@ def import_cyclonedx(
     source_reference: str | None,
 ) -> tuple[SBOMImport, bool]:
     components = sbom.parse_cyclonedx(document)
+    digest = hashlib.sha256(raw_document).hexdigest()
+
+    existing_query = select(SBOMImport).where(
+        SBOMImport.product_release_id == release_id,
+        SBOMImport.format == "CycloneDX",
+        SBOMImport.content_sha256 == digest,
+    )
+    # Preflight in a separate session: SQLite must acquire BEGIN IMMEDIATE
+    # before the write session performs any read.
+    with SessionLocal() as lookup_db:
+        if lookup_db.get(ProductRelease, release_id) is None:
+            raise LookupError("Product release not found")
+        existing = lookup_db.scalars(existing_query).first()
+        if existing is not None:
+            return existing, False
+
+    findings, osv_enrichment = sbom.scan_with_metadata(
+        components, include_component_index=True
+    )
     findings_by_component: dict[int, list[dict]] = {}
-    for finding in sbom.scan(components, include_component_index=True):
+    for finding in findings:
         component_index = finding["component_index"]
         findings_by_component.setdefault(component_index, []).append(finding)
 
-    digest = hashlib.sha256(raw_document).hexdigest()
     audit.acquire_chain_lock(db)
     if db.get(ProductRelease, release_id) is None:
         raise LookupError("Product release not found")
 
-    existing = db.scalars(
-        select(SBOMImport).where(
-            SBOMImport.product_release_id == release_id,
-            SBOMImport.format == "CycloneDX",
-            SBOMImport.content_sha256 == digest,
-        )
-    ).first()
+    # Recheck after acquiring the serialized writer lock to handle concurrent imports.
+    existing = db.scalars(existing_query).first()
     if existing is not None:
         return existing, False
 
@@ -123,6 +137,7 @@ def import_cyclonedx(
         validation_summary={
             "valid": True,
             "component_count": len(components),
+            "enrichment": osv_enrichment,
         },
     )
 

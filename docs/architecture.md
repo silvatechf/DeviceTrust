@@ -63,7 +63,7 @@ The normalized endpoint is a read-only projection. It preserves the raw value an
 
 ### SBOM and vulnerability findings
 
-The API caps the request body at 2 MiB. The parser accepts a bounded CycloneDX JSON subset, validates component names/versions and PURLs, then checks the local synthetic advisory set. If `DEVICETRUST_OSV=1`, it also makes best-effort OSV queries. A failed or empty lookup is not proof that a component is safe.
+The API caps the request body at 2 MiB. The parser accepts a bounded CycloneDX JSON subset, validates component names/versions and PURLs, then checks the local synthetic advisory set. If `DEVICETRUST_OSV=1`, product-scoped imports also perform best-effort OSV enrichment, deduplicated by exact PURL/version and bounded to 50 unique queries and a 10-second overall deadline. The persisted import summary records source, timestamp, counts and `complete`/`incomplete`/`disabled` status. Failures, malformed responses, deadline/query-budget exhaustion and components without PURLs are explicitly incomplete; a missing finding is not proof that a component is safe.
 
 ### Product SBOM comparison
 
