@@ -26,7 +26,7 @@ KEV and EPSS are different signals:
 
 ### CISA KEV
 
-Use the official CISA JSON catalog. Validate the top-level catalog version, release timestamp, declared count, vulnerability array, CVE identifiers and required date fields before accepting a snapshot. Retain only the fields required to explain the signal: CVE ID, vendor/project, product, date added, due date, ransomware-use indicator, required action, catalog version and release timestamp.
+Use the official CISA JSON catalog, with the CISA-maintained `cisagov/kev-data` GitHub mirror as a fallback when the canonical endpoint is unavailable. Record which endpoint supplied the snapshot and retain the canonical CISA source reference. Validate the top-level catalog version, release timestamp, declared count, vulnerability array, CVE identifiers and required date fields before accepting a snapshot. Retain only the fields required to explain the signal: CVE ID, vendor/project, product, date added, due date, ransomware-use indicator, required action, catalog version and release timestamp.
 
 ### FIRST EPSS
 
@@ -43,6 +43,7 @@ Use the FIRST API for bounded batches of CVE lookups. Validate CVE identifiers a
 ## References
 
 - CISA KEV catalog: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+- CISA-maintained KEV data mirror: https://github.com/cisagov/kev-data
 - CISA KEV JSON schema: https://github.com/cisagov/kev-data/blob/develop/known_exploited_vulnerabilities_schema.json
 - FIRST EPSS API: https://api.first.org/data/v1/epss
 - FIRST EPSS data guidance: https://www.first.org/epss/data
