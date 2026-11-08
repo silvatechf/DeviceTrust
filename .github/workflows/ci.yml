@@ -60,3 +60,12 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: PostgreSQL migration and persistence test
         run: pytest -q tests/test_postgres_persistence.py
+
+  compose-smoke:
+    name: Docker Compose PostgreSQL smoke and recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise Docker Compose startup, persistence and recovery
+        run: bash scripts/ci-compose-smoke.sh

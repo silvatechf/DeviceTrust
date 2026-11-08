@@ -22,6 +22,7 @@ This matrix connects security/product controls to concrete automated tests. It i
 | Operator console security headers | tests/test_operator_console.py | CSP, nosniff, frame denial, no-store and static assets | No real-browser security suite |
 | Console credential storage boundary | tests/test_operator_console.py | No localStorage/sessionStorage references in served script | No automated real-browser interaction suite |
 | API documentation boundary | tests/test_operator_console.py | /docs remains available without console CSP header | Manual browser check required |
+| Docker Compose deployment and recovery smoke | scripts/ci-compose-smoke.sh | Fresh PostgreSQL startup/migrations, API authentication, seed fail-closed behavior, product SBOM persistence across API/DB restarts, audit verification against the restored database, pg_dump/restore into a separate database | CI smoke does not replace a local Windows/Linux or real-browser walkthrough; no backup retention schedule |
 
 ## CI quality gates
 
@@ -29,14 +30,16 @@ The current workflow at .github/workflows/ci.yml runs Node syntax check, depende
 
 A configured workflow is not a successful workflow. Before release, inspect the exact candidate commit's workflow runs, job conclusions and CodeQL status. Record the candidate SHA and date in the release evidence.
 
+The `compose-smoke` job runs the Docker Compose stack on a disposable GitHub runner and exercises migration startup, fail-closed seeding, authenticated product SBOM import, API/DB restart persistence, audit-chain verification against the restored database and PostgreSQL backup/restore into a separate disposable database.
+
 ## Manual / integration verification not yet evidenced
 - Clean-checkout setup on supported Windows and Linux environments.
-- Docker Compose PostgreSQL startup, restart persistence and failure behavior.
+- Local Docker Compose startup on supported developer environments; CI now covers PostgreSQL startup, restart persistence, fail-closed seeding and backup/restore.
 - Real-browser desktop and mobile console walkthrough.
 - SBOM upload, triage and report download using seeded synthetic data.
 - Audit lock contention under sustained load and external writers that bypass the application.
 - Production migration rollback and application/database version coordination; automated downgrade coverage uses isolated disposable databases only.
-- Backup/restore and deployment rollback.
+- Production backup retention, off-host storage, restore-point objectives and deployment rollback.
 - Secret scanning and full Git-history review.
 - Branch protection / ruleset and commit-signature policy verification.
 
