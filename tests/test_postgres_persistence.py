@@ -207,6 +207,11 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert inspect(target_engine).has_table("audit_chain_state")
         assert inspect(target_engine).has_table("sbom_assessments")
         assert inspect(target_engine).has_table("sbom_assessment_findings")
+        assert "intelligence" in {
+            column["name"] for column in inspect(target_engine).get_columns(
+                "sbom_assessment_findings"
+            )
+        }
         with target_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
