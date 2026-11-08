@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import audit, sbom
+from . import audit, intelligence, sbom
 from .db import (
     Product,
     ProductFinding,
@@ -421,6 +421,7 @@ def list_assessment_findings(
             "severity": row.severity,
             "fixed_in": row.fixed_in,
             "source": row.source,
+            "intelligence": row.intelligence,
         }
         for row in rows
     ]
@@ -452,6 +453,10 @@ async def reassess_import(
             "write_timeout_seconds": sbom.OSV_WRITE_TIMEOUT_SECONDS,
             "pool_timeout_seconds": sbom.OSV_POOL_TIMEOUT_SECONDS,
         },
+        "kev": {"enabled": os.getenv("DEVICETRUST_KEV") == "1"},
+        "epss": {"enabled": os.getenv("DEVICETRUST_EPSS") == "1"},
+        "intelligence_cve_limit": intelligence.MAX_CVES_PER_ASSESSMENT,
+        "intelligence_timeout_seconds": intelligence.REQUEST_TIMEOUT_SECONDS,
     }
     source_fingerprint = hashlib.sha256(
         json.dumps(
@@ -493,9 +498,11 @@ async def reassess_import(
         component_ids = [row.id for row in component_rows]
 
     started_at = datetime.now(timezone.utc)
-    findings, enrichment = await sbom.scan_with_metadata_async(
+    findings, osv_enrichment = await sbom.scan_with_metadata_async(
         components, include_component_index=True
     )
+    findings, intelligence_enrichment = await intelligence.enrich_findings(findings)
+    enrichment = {**osv_enrichment, "intelligence": intelligence_enrichment}
     completed_at = datetime.now(timezone.utc)
 
     # External enrichment is complete before the audit writer transaction starts.
@@ -560,6 +567,7 @@ async def reassess_import(
                     severity=finding["severity"],
                     fixed_in=finding.get("fixed_in"),
                     source=finding["source"],
+                    intelligence=finding.get("intelligence", {}),
                 )
             )
         audit.record(
