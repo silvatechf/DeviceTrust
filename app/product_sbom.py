@@ -522,7 +522,22 @@ async def reassess_import(
         ):
             raise RuntimeError("Scanner returned a malformed or unscoped finding.")
     findings, intelligence_enrichment = await intelligence.enrich_findings(findings)
-    enrichment = {**osv_enrichment, "intelligence": intelligence_enrichment}
+    provider_statuses = [
+        osv_enrichment.get("status", "incomplete"),
+        intelligence_enrichment.get("kev", {}).get("status", "incomplete"),
+        intelligence_enrichment.get("epss", {}).get("status", "incomplete"),
+    ]
+    if "incomplete" in provider_statuses:
+        assessment_status = "incomplete"
+    elif "complete" in provider_statuses:
+        assessment_status = "complete"
+    else:
+        assessment_status = "disabled"
+    enrichment = {
+        "status": assessment_status,
+        "osv": osv_enrichment,
+        "intelligence": intelligence_enrichment,
+    }
     completed_at = datetime.now(timezone.utc)
 
     # External enrichment is complete before the audit writer transaction starts.
@@ -544,7 +559,7 @@ async def reassess_import(
         db.rollback()
         return result, False
 
-    status = enrichment.get("status", "incomplete")
+    status = assessment_status
     if status not in {"disabled", "complete", "incomplete"}:
         status = "incomplete"
         enrichment = {**enrichment, "status": status, "invalid_status": True}
