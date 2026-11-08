@@ -21,7 +21,8 @@ cleanup() {
     if [[ $status -ne 0 ]]; then
         docker compose --env-file "$ENV_FILE" logs --no-color api db || true
     fi
-    docker compose --env-file "$ENV_FILE" down --remove-orphans || true
+    dc exec -T db dropdb --if-exists -U devicetrust devicetrust_restore >/dev/null 2>&1 || true
+    dc down --volumes --remove-orphans || true
     rm -f "$ENV_FILE" "$DUMP_FILE" "$SEED_LOG"
     exit "$status"
 }
@@ -138,5 +139,61 @@ if [[ "$restored_audit_count" != "1" ]]; then
     exit 1
 fi
 
+content_sha256="$(jq -r '.content_sha256' <<<"$import_json")"
+if [[ ! "$content_sha256" =~ ^[a-f0-9]{64}$ ]]; then
+    echo "API returned an invalid SBOM content digest." >&2
+    exit 1
+fi
+
+# Override DATABASE_URL only for this one-off process. The API service keeps
+# using the source database; the verifier opens a separate session on restore.
+dc exec -T \
+    -e "DATABASE_URL=postgresql+psycopg://devicetrust:$DB_PASSWORD@db:5432/devicetrust_restore" \
+    -e "EXPECTED_IMPORT_ID=$import_id" \
+    -e "EXPECTED_RELEASE_ID=$release_id" \
+    -e "EXPECTED_CONTENT_SHA256=$content_sha256" \
+    api python -c '
+import os
+
+from sqlalchemy import select
+
+from app import audit
+from app.db import AuditEntry, SessionLocal
+
+import_id = int(os.environ["EXPECTED_IMPORT_ID"])
+release_id = int(os.environ["EXPECTED_RELEASE_ID"])
+expected_digest = os.environ["EXPECTED_CONTENT_SHA256"]
+
+with SessionLocal() as db:
+    result = audit.verify(db)
+    if result.get("valid") is not True:
+        raise SystemExit(f"Restored audit chain is invalid: {result}")
+
+    entries = db.scalars(
+        select(AuditEntry).where(
+            AuditEntry.action == "sbom.product_import",
+            AuditEntry.entity == str(import_id),
+        )
+    ).all()
+    if len(entries) != 1:
+        raise SystemExit(
+            f"Expected one audit entry for SBOM import {import_id}; found {len(entries)}."
+        )
+
+    payload = entries[0].payload or {}
+    if (
+        payload.get("product_release_id") != release_id
+        or payload.get("content_sha256") != expected_digest
+    ):
+        raise SystemExit(
+            f"Restored audit entry does not match SBOM import {import_id}."
+        )
+
+    print(
+        f"Restored audit chain verified: {result['entries']} entries; "
+        f"SBOM import {import_id} has its matching audit entry."
+    )
+'
+
 dc exec -T db dropdb -U devicetrust devicetrust_restore
-echo "Compose smoke passed: migrations, API auth, seed fail-closed behavior, product SBOM persistence, API/DB restart, audit verification and PostgreSQL backup/restore."
+echo "Compose smoke passed: migrations, API auth, seed fail-closed behavior, product SBOM persistence, API/DB restart, source and restored audit-chain verification and PostgreSQL backup/restore."
