@@ -116,7 +116,7 @@ def test_reassessment_persists_versioned_findings_and_is_idempotent(
     assert first.json()["id"] == repeated.json()["id"]
     assert first.json()["created"] is True
     assert repeated.json()["created"] is False
-    assert first.json()["status"] == "disabled"
+    assert first.json()["status"] == "complete"
     assert first.json()["finding_count"] == 1
     assert len(calls) == 1
     with SessionLocal() as db:
