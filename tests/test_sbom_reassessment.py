@@ -205,8 +205,8 @@ def test_concurrent_reassessment_requests_with_same_key_create_one_run(
     monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
 
     def submit(_):
-        from fastapi.testclient import TestClient
         from app.main import app
+        from fastapi.testclient import TestClient
 
         with TestClient(app) as concurrent_client:
             barrier.wait(timeout=10)
