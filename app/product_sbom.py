@@ -537,10 +537,11 @@ async def reassess_import(
     try:
         db.flush()
         for finding in findings:
+            if not isinstance(finding, dict):
+                raise ValueError("Scanner returned a malformed finding.")
             index = finding.get("component_index")
             if (
-                not isinstance(finding, dict)
-                or not isinstance(index, int)
+                not isinstance(index, int)
                 or isinstance(index, bool)
                 or index < 0
                 or index >= len(component_ids)
