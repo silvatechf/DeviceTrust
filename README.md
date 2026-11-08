@@ -41,7 +41,7 @@ Implemented prototype workflows:
 8. Compare accepted SBOM imports for a product release using version-independent PURL identity.
 9. Use a same-origin local operator console.
 
-Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. It is covered by CI and CodeQL on the merge commit; local PostgreSQL integration and API-flow validation were also performed.
+Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. The corresponding pull-request head passed CI and CodeQL before merge; no post-merge workflow run is currently recorded for the merge commit. PostgreSQL integration and API-flow tests are included in the automated test suite, while a clean local Compose walkthrough remains part of the release gate.
 
 ### Product-scoped SBOM API
 
