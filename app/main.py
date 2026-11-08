@@ -232,6 +232,22 @@ def list_product_sbom_imports(release_id: int, db: Session = Depends(get_db), _:
              "component_count": item.component_count, "status": item.status} for item in imports]
 
 
+@app.get("/product-releases/{release_id}/sbom/diff")
+def compare_product_sbom_imports(
+    release_id: int,
+    from_import_id: int = Query(gt=0),
+    to_import_id: int = Query(gt=0),
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    try:
+        return product_sbom.compare_imports(
+            db, release_id, from_import_id, to_import_id
+        )
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from None
+
+
 @app.get("/sbom/imports/{import_id}/components")
 def list_sbom_components(import_id: int, db: Session = Depends(get_db), _: str = Depends(auth)):
     if db.get(SBOMImport, import_id) is None:
