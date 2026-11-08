@@ -163,6 +163,8 @@ The container applies Alembic migrations before starting the API. The API port i
 ## Run quality checks
 
 ```bash
+pre-commit validate-config
+pre-commit install-hooks
 ruff check .
 bandit -q -r app
 pip-audit -r requirements.txt
@@ -171,7 +173,7 @@ node --check web/app.js
 pytest -q
 ```
 
-GitHub Actions runs the configured checks on pushes and pull requests; CodeQL is configured separately. Check the exact commit's workflow results before claiming they passed. Tests and static analysis provide useful evidence, not proof that the application is secure or production-ready. The [test matrix](docs/test-matrix.md) maps controls to test locations and records remaining gaps.
+GitHub Actions validates the pre-commit configuration, provisions hook environments, audits runtime and development dependencies separately, scans reachable Git history with checksum-verified Gitleaks, and runs PostgreSQL and disposable Compose checks. CodeQL is configured separately. Check the exact commit's workflow results before claiming they passed. Tests and static analysis provide useful evidence, not proof that the application is secure or production-ready. The [test matrix](docs/test-matrix.md) maps controls to test locations and records remaining gaps.
 
 ## Security principles
 
