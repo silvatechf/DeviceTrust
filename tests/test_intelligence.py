@@ -240,3 +240,15 @@ def test_cve_limit_marks_only_unqueried_findings_not_checked(monkeypatch):
     assert enriched[0]["intelligence"]["epss"]["status"] == "scored"
     assert enriched[-1]["intelligence"]["kev"]["status"] == "not_checked"
     assert enriched[-1]["intelligence"]["epss"]["status"] == "not_checked"
+
+
+def test_parse_kev_catalog_normalizes_malformed_optional_ransomware_value():
+    entry = {**_kev_entry(), "knownRansomwareCampaignUse": ["unexpected"]}
+    rows, _ = intelligence.parse_kev_catalog({
+        "catalogVersion": "2026.11.04",
+        "dateReleased": "2026-11-04T18:52:56.063Z",
+        "count": 1,
+        "vulnerabilities": [entry],
+    })
+
+    assert rows["CVE-2025-1234"]["known_ransomware_campaign_use"] == "Unknown"
