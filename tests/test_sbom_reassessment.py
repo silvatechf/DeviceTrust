@@ -74,6 +74,29 @@ def test_reassessment_persists_versioned_findings_and_is_idempotent(
         }], {"status": "disabled", "source": "osv"}
 
     monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
+
+    async def fake_intelligence(findings):
+        enriched = [
+            {
+                **finding,
+                "intelligence": {
+                    "kev": {"status": "listed", "catalog_version": "2026.11.04"},
+                    "epss": {
+                        "status": "scored",
+                        "score": 0.9,
+                        "percentile": 0.99,
+                        "score_date": "2026-11-08",
+                    },
+                },
+            }
+            for finding in findings
+        ]
+        return enriched, {
+            "kev": {"status": "complete", "catalog_version": "2026.11.04"},
+            "epss": {"status": "complete", "scored_cve_count": 1},
+        }
+
+    monkeypatch.setattr(product_sbom.intelligence, "enrich_findings", fake_intelligence)
     monkeypatch.delenv("DEVICETRUST_OSV", raising=False)
 
     with SessionLocal() as db:
@@ -114,6 +137,8 @@ def test_reassessment_persists_versioned_findings_and_is_idempotent(
     assert history.status_code == findings.status_code == 200
     assert len(history.json()) == 1
     assert findings.json()[0]["vuln_id"] == "CVE-2099-0001"
+    assert findings.json()[0]["intelligence"]["kev"]["status"] == "listed"
+    assert findings.json()[0]["intelligence"]["epss"]["score"] == 0.9
 
     # A deliberate new request identity appends another historical run.
     second = client.post(
