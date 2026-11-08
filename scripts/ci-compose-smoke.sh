@@ -4,6 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ "${CI:-}" != "true" ]]; then
+    echo "This smoke test is restricted to disposable CI environments." >&2
+    exit 2
+fi
+
 ENV_FILE="$(mktemp)"
 DUMP_FILE="$(mktemp)"
 SEED_LOG="$(mktemp)"
@@ -120,7 +125,7 @@ if [[ "$restored_import_count" != "1" ]]; then
 fi
 
 restored_audit_count="$(dc exec -T db psql -U devicetrust -d devicetrust_restore -Atc \
-    "SELECT count(*) FROM audit_entries WHERE action = 'sbom.product_import';" | tr -d '\r')"
+    "SELECT count(*) FROM audit_log WHERE action = 'sbom.product_import';" | tr -d '\r')"
 if [[ "$restored_audit_count" != "1" ]]; then
     echo "Restored database does not contain the corresponding SBOM audit entry." >&2
     exit 1
