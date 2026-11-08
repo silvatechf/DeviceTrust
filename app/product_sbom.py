@@ -538,7 +538,7 @@ async def reassess_import(
         db.flush()
         for finding in findings:
             if not isinstance(finding, dict):
-                raise ValueError("Scanner returned a malformed finding.")
+                raise RuntimeError("Scanner returned a malformed finding.")
             index = finding.get("component_index")
             if (
                 not isinstance(index, int)
@@ -551,7 +551,7 @@ async def reassess_import(
                 or not isinstance(finding.get("source"), str)
                 or not finding["source"].strip()
             ):
-                raise ValueError("Scanner returned a malformed or unscoped finding.")
+                raise RuntimeError("Scanner returned a malformed or unscoped finding.")
             db.add(
                 SBOMAssessmentFinding(
                     assessment_id=assessment.id,
