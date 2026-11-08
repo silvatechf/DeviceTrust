@@ -190,7 +190,7 @@ with SessionLocal() as db:
         )
 
     print(
-        f"Restored audit chain verified: {result['entries']} entries; "
+        f"Restored audit chain verified: {result.get("entries")} entries; "
         f"SBOM import {import_id} has its matching audit entry."
     )
 '
