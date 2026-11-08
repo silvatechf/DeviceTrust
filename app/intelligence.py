@@ -259,7 +259,7 @@ async def enrich_findings(
                 kev = {"status": "not_checked"}
             elif cve_id not in bounded_cves:
                 kev = {"status": "not_checked", "reason": "assessment_cve_limit"}
-            elif metadata["kev"]["status"] == "incomplete":
+            elif metadata["kev"].get("error_type"):
                 kev = {"status": "unavailable"}
             else:
                 kev = kev_rows.get(cve_id, {"status": "not_listed"})
@@ -267,7 +267,7 @@ async def enrich_findings(
                 epss = {"status": "not_checked"}
             elif cve_id not in bounded_cves:
                 epss = {"status": "not_checked", "reason": "assessment_cve_limit"}
-            elif metadata["epss"]["status"] == "incomplete":
+            elif metadata["epss"].get("error_type"):
                 epss = {"status": "unavailable"}
             else:
                 epss = epss_rows.get(cve_id, {"status": "not_found"})
