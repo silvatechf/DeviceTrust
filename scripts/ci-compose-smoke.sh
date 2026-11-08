@@ -92,6 +92,13 @@ import_json="$(curl --fail --silent --show-error -X POST \
     --data-binary "@samples/cold_chain_gateway_sbom.json")"
 import_id="$(jq -r '.id' <<<"$import_json")"
 
+for record_id in "$product_id" "$release_id" "$import_id"; do
+    if [[ ! "$record_id" =~ ^[0-9]+$ ]]; then
+        echo "API returned a non-numeric record ID." >&2
+        exit 1
+    fi
+done
+
 components_json="$(curl --fail --silent --show-error \
     "$BASE_URL/sbom/imports/$import_id/components" --header "X-API-Key: $API_KEY")"
 component_count="$(jq 'length' <<<"$components_json")"
