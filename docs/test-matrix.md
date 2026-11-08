@@ -15,34 +15,40 @@ This matrix connects security/product controls to concrete automated tests. It i
 | Normalized evidence API projection | tests/test_api.py | Authentication, canonical/raw values, unknown/invalid values and bounds | Stale/conflicting observations are not resolved |
 | Posture uncertainty and exposure | tests/test_api.py, tests/test_posture_evidence_boundaries.py | Unknown remains unverified; exposed management interface remains high risk | Normalized observations do not feed posture |
 | SBOM request size and JSON boundary | tests/test_sbom_input_limits.py | Malformed/non-object JSON and 2 MiB body cap | Deployment proxy limits need review |
-| CycloneDX component validation | tests/test_sbom_validation.py | Component object/name, PURL validity, package identity and version matching | Not full schema/dependency graph validation |
-| SBOM intelligence behavior | tests/test_sbom_osv_response.py, tests/test_sbom_validation.py | OSV response handling and deterministic synthetic feed | No complete CVE coverage or live-feed SLA |
-| Product/release SBOM API boundary | tests/test_api.py | Authenticated product/release creation and product-scoped route authentication | No individual identity, roles or tenant isolation |
-| Product SBOM import persistence and idempotency | tests/test_api.py, tests/test_sbom_persistence_models.py | Accepted import metadata, exact duplicate retry, digest uniqueness per release/format | Changed-content and cross-release import behavior lack explicit API tests |
-| Product SBOM rejection boundary | tests/test_api.py | Invalid document is rejected and no accepted import is listed | Not full CycloneDX schema validation |
-| Component occurrence provenance | tests/test_api.py, tests/test_sbom_persistence_models.py | Import-local ordinals, source name/version preservation, exact component-scoped findings | No global component identity or cross-import deduplication |
-| Product SBOM transaction rollback | — | No injected mid-import failure test currently exists | Must prove import, components, findings and audit entry roll back atomically |
-| Product SBOM PostgreSQL integration | — | Existing PostgreSQL integration covers device persistence only | Product/release/import/component/finding persistence is not yet exercised on PostgreSQL |
-| Audit chain integrity | tests/test_api.py, tests/test_audit_chain_boundaries.py | Tampering, interior deletion and final-suffix limitation | No external checkpoint or multi-writer serialization |
+| CycloneDX component validation | tests/test_sbom_validation.py | CycloneDX JSON `specVersion` allow-list (1.5), component shape/name/version, PURL syntax and version consistency, package identity and version-before-fixed matching | Bounded parser; not full CycloneDX schema or dependency-graph validation |
+| SBOM intelligence behavior | tests/test_sbom_osv_response.py, tests/test_sbom_validation.py | Malformed OSV payload/entry handling and severity normalization; deterministic synthetic package/advisory matching | No complete CVE coverage or live-feed SLA |
+| Product/release SBOM API boundary | tests/test_api.py | Authenticated product and release creation, import/list/component/finding route authentication, missing/invalid key rejection | Shared API key only; no per-user identity, roles or tenant isolation |
+| Product SBOM import persistence and idempotency | tests/test_api.py, tests/test_sbom_persistence_models.py | Accepted import metadata and component occurrences persist; exact-byte digest idempotency on same release/format; uniqueness constraints on import digest and import-local component ordinal | Raw SBOM documents are not retained; no global component identity or cross-import deduplication |
+| Product SBOM validation and rejection | tests/test_api.py, tests/test_sbom_input_limits.py, tests/test_sbom_validation.py | Invalid documents are rejected without accepted-import persistence; malformed/non-object JSON and oversized bodies are rejected; bounded CycloneDX 1.5 and PURL rules are enforced | Not full CycloneDX schema or dependency-graph validation |
+| Product SBOM changed-content and release isolation | tests/test_api.py | Changed request bytes create a new import with digest over exact bytes; identical bytes imported to distinct releases remain release-scoped | No cross-product relationship inference or cross-import component deduplication |
+| Product SBOM component/finding provenance | tests/test_api.py, tests/test_sbom_persistence_models.py | Import-local component ordinals; original component name/version retained; findings returned only for the exact component occurrence | No global component identity or external provenance attestation |
+| Product SBOM transaction atomicity | tests/test_api.py, tests/test_postgres_persistence.py | Injected audit-append failure rolls back product SBOM import rows on SQLite and PostgreSQL; failed product API writes roll back domain/audit state and release the lock | Sustained contention/load behavior remains unmeasured |
+| Product SBOM PostgreSQL persistence | tests/test_postgres_persistence.py | Product/release/import/component/finding records survive engine disposal; import rollback on audit failure; concurrent API writes preserve domain/audit atomicity | CI PostgreSQL coverage is automated integration evidence, not production operational validation |
+| Audit-chain integrity and application-writer serialization | tests/test_api.py, tests/test_audit_chain_boundaries.py, tests/test_postgres_persistence.py | Retained-entry tampering, interior deletion and final-suffix limitation; concurrent complete API writes on SQLite/PostgreSQL with domain/audit pairing; direct concurrent writers; transactional rollback and lock reacquisition; unauthenticated writes do not acquire the audit lock | No independent external checkpoint or immutable/WORM store; privileged DB administrators and external writers remain trusted |
+| Audit-chain migration lifecycle | tests/test_migrations.py, tests/test_postgres_persistence.py | Upgrade from `0002_persistent_sbom`, verify singleton state row/default version, downgrade to `0002` and verify table removal, then re-upgrade on disposable SQLite and PostgreSQL databases | Downgrade removes the lock state; production rollback requires coordinated application/database rollback and a preserved backup |
 | Operator console security headers | tests/test_operator_console.py | CSP, nosniff, frame denial, no-store and static assets | No real-browser security suite |
 | Console credential storage boundary | tests/test_operator_console.py | No localStorage/sessionStorage references in served script | No automated real-browser interaction suite |
 | API documentation boundary | tests/test_operator_console.py | /docs remains available without console CSP header | Manual browser check required |
+| Docker Compose CI smoke and recovery | scripts/ci-compose-smoke.sh, .github/workflows/ci.yml | Disposable CI stack startup/migrations, API authentication, seed fail-closed behavior, product SBOM import/listing across API restart, DB restart and audit verification; `pg_dump`/restore to a separate DB followed by restored audit-chain and SBOM audit-event verification | CI-only smoke; does not validate developer Windows/Linux environments, backup retention, off-host storage, RPO/RTO or production rollback |
+| Full-history secret scanning (CI evidence) | .github/workflows/ci.yml | CI configures full-depth checkout, `--all --full-history`, checksum verification of the Gitleaks v8.30.1 release archive, and redacted findings | Workflow configuration is not proof of a successful scan; detection is pattern-based. Manually review private/customer data and Gitleaks findings; no allowlist is configured |
 
 ## CI quality gates
 
-The current workflow at .github/workflows/ci.yml runs Node syntax check, dependency installation, Ruff, Bandit, pip-audit and pytest. CodeQL is configured separately in .github/workflows/codeql.yml.
+The CI workflow configures separate quality, PostgreSQL integration, disposable Compose smoke/recovery and full-history Gitleaks jobs, with read-only contents permissions and bounded job timeouts. The quality job configures Node syntax validation, pre-commit configuration validation and hook-environment installation, Ruff, Bandit, runtime/development dependency audits and pytest. The PostgreSQL job runs `tests/test_postgres_persistence.py`; the Compose job runs `scripts/ci-compose-smoke.sh`; the secret-history job verifies the official Gitleaks v8.30.1 archive checksum before scanning reachable Git history with redacted findings. CodeQL is configured separately in `.github/workflows/codeql.yml`. These are workflow definitions; inspect exact-head run/job conclusions before treating any CI evidence as completed.
 
 A configured workflow is not a successful workflow. Before release, inspect the exact candidate commit's workflow runs, job conclusions and CodeQL status. Record the candidate SHA and date in the release evidence.
 
+The `compose-smoke` job is an automated disposable-runner check, not a developer-environment or production recovery exercise. It verifies startup/migrations, seed fail-closed behavior, product SBOM persistence across API/DB restarts, audit-chain verification and PostgreSQL backup/restore into a separate disposable database.
+
 ## Manual / integration verification not yet evidenced
 - Clean-checkout setup on supported Windows and Linux environments.
-- Docker Compose PostgreSQL startup, restart persistence and failure behavior.
+- Local Docker Compose startup on supported developer environments; CI now covers PostgreSQL startup, restart persistence, fail-closed seeding and backup/restore.
 - Real-browser desktop and mobile console walkthrough.
-- SBOM upload, triage and report download using seeded synthetic data.
-- API behavior under concurrent audit writes.
-- Product SBOM changed-content/cross-release behavior and transactional rollback on SQLite and PostgreSQL.
-- Backup/restore and deployment rollback.
-- Secret scanning and full Git-history review.
+- Real-browser end-to-end SBOM upload, triage and report-download walkthrough using seeded synthetic data (API and CI Compose checks are not browser validation).
+- Sustained audit-lock contention/load testing and behavior of external database writers that bypass the application.
+- Production migration rollback and application/database version coordination; automated downgrade coverage uses isolated disposable databases only.
+- Backup retention, off-host storage, defined RPO/RTO and production rollback procedures.
+- Manual review of private/customer data and triage of Gitleaks findings; configured pattern-based scanning does not prove complete secret detection.
 - Branch protection / ruleset and commit-signature policy verification.
 
 ## Adding a new control
