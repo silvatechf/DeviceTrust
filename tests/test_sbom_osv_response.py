@@ -143,3 +143,94 @@ def test_osv_components_without_purl_make_coverage_incomplete(monkeypatch):
     assert status["status"] == "incomplete"
     assert status["skipped_without_purl"] == 1
     assert status["queried"] == 0
+
+
+
+def test_async_osv_enrichment_cancels_at_total_deadline(monkeypatch):
+    import asyncio
+
+    class _SlowAsyncClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def post(self, *_args, **_kwargs):
+            await asyncio.sleep(1)
+            return _FakeResponse({"vulns": []})
+
+    monkeypatch.setattr(sbom.httpx, "AsyncClient", _SlowAsyncClient)
+    monkeypatch.setattr(sbom, "OSV_ENRICHMENT_DEADLINE_SECONDS", 0.01)
+
+    findings, status = asyncio.run(sbom.scan_osv_with_status_async([_component()]))
+
+    assert findings == []
+    assert status["status"] == "incomplete"
+    assert status["deadline_exhausted"] is True
+    assert status["queried"] == 1
+
+
+def test_async_osv_enrichment_preserves_partial_findings_on_deadline(monkeypatch):
+    import asyncio
+
+    class _PartialAsyncClient:
+        def __init__(self):
+            self.calls = 0
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def post(self, *_args, **_kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return _FakeResponse({
+                    "vulns": [{"id": "GHSA-partial", "database_specific": {"severity": "HIGH"}}]
+                })
+            await asyncio.sleep(1)
+            return _FakeResponse({"vulns": []})
+
+    client = _PartialAsyncClient()
+    monkeypatch.setattr(sbom.httpx, "AsyncClient", lambda: client)
+    monkeypatch.setattr(sbom, "OSV_ENRICHMENT_DEADLINE_SECONDS", 0.01)
+    components = [
+        _component("first", purl="pkg:generic/first@1"),
+        _component("second", purl="pkg:generic/second@1"),
+    ]
+
+    findings, status = asyncio.run(
+        sbom.scan_osv_with_status_async(components, include_component_index=True)
+    )
+
+    assert [finding["vuln_id"] for finding in findings] == ["GHSA-partial"]
+    assert findings[0]["component_index"] == 0
+    assert status["status"] == "incomplete"
+    assert status["deadline_exhausted"] is True
+    assert status["queried"] == 2
+
+
+def test_async_osv_enrichment_completes_within_deadline(monkeypatch):
+    import asyncio
+
+    client = _FakeClient({"vulns": []})
+
+    class _AsyncClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def post(self, *_args, **_kwargs):
+            return _FakeResponse(client.payload)
+
+    monkeypatch.setattr(sbom.httpx, "AsyncClient", _AsyncClient)
+
+    findings, status = asyncio.run(sbom.scan_osv_with_status_async([_component()]))
+
+    assert findings == []
+    assert status["status"] == "complete"
+    assert status["queried"] == 1
