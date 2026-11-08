@@ -137,6 +137,32 @@ curl -sS "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom" -H "X-API-Key:
 curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/components" -H "X-API-Key: $API_KEY"
 ```
 
+### Compare two accepted imports for the same product release
+
+The comparison endpoint is read-only. To make the change visible, create a second synthetic SBOM with a changed version and one added component. This is demonstration data only.
+
+Import a second document into the same `RELEASE_ID`:
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom?source_type=manual&source_reference=local-demo-comparison" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"type":"library","name":"requests","version":"2.32.0","purl":"pkg:pypi/requests@2.32.0"},{"type":"library","name":"demo-added-lib","version":"1.0.0","purl":"pkg:generic/demo-added-lib@1.0.0"}]}'
+```
+
+List the imports again and copy the IDs for the original and follow-up imports. Keep the same release ID; the endpoint rejects imports from another release.
+
+```bash
+curl -sS "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom" -H "X-API-Key: $API_KEY"
+```
+
+Compare the original import to the follow-up import:
+
+```bash
+curl -sS "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom/diff?from_import_id=BASELINE_IMPORT_ID&to_import_id=FOLLOWUP_IMPORT_ID" -H "X-API-Key: $API_KEY"
+```
+
+Inspect the summary and component groups: the changed `requests` version should be reported as changed, and `demo-added-lib` as added. The result can also include removed, unchanged, ambiguous and unidentified components depending on the source SBOMs. Matching uses PURL identity with only the version segment excluded; qualifiers and subpath remain significant. This is a bounded structural comparison, not proof of artifact/supplier equivalence or a vulnerability re-assessment.
+
+The comparison GET does not create audit events or mutate either import. Do not infer that a missing or unidentified component is safe.
+
 For a component with findings, use its returned component `id`:
 
 ```bash
