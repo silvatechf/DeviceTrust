@@ -236,7 +236,7 @@ async def enrich_findings(
         if epss_enabled and bounded_cves:
             calls.append(("epss", _provider_call(_fetch_epss(client, bounded_cves), "epss")))
         results = await asyncio.gather(*(call for _, call in calls))
-    for (provider, _), (rows, provider_meta) in zip(calls, results):
+    for (provider, _), (rows, provider_meta) in zip(calls, results, strict=True):
         metadata[provider] = provider_meta
         if provider == "kev":
             kev_rows = rows
