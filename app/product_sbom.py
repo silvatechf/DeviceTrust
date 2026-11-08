@@ -456,6 +456,7 @@ async def reassess_import(
         "kev": {
             "enabled": os.getenv("DEVICETRUST_KEV") == "1",
             "endpoint": intelligence.KEV_URL,
+            "fallback_endpoint": intelligence.KEV_MIRROR_URL,
         },
         "epss": {
             "enabled": os.getenv("DEVICETRUST_EPSS") == "1",
