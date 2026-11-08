@@ -51,6 +51,8 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Link synthetic vulnerability findings to exact component occurrences.
 - [x] Compare accepted SBOM imports and explain additions, removals and matched-component changes using PURL identity that excludes only the version segment while preserving qualifiers and subpath; report ambiguous and unidentified occurrences without speculative matching.
 - [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
+
+**Implementation under review:** PR #45 adds append-only assessment runs and findings for an accepted SBOM import, reuses the bounded local/OSV scanner, records enrichment coverage, and persists the run with its audit event after external I/O. It is not complete until review, CI/CodeQL, merge and release documentation are finished.
 - [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
 **Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped synthetic findings. It now includes read-only comparison of accepted imports for the same release. Duplicate identities and components without usable PURLs remain unresolved. Comparison does not re-evaluate vulnerability intelligence.
