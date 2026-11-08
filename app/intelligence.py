@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import httpx
 
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+KEV_MIRROR_URL = "https://raw.githubusercontent.com/cisagov/kev-data/develop/known_exploited_vulnerabilities.json"
 EPSS_URL = "https://api.first.org/data/v1/epss"
 CVE_PATTERN = re.compile(r"^CVE-[0-9]{4}-[0-9]{4,19}$")
 MAX_CVES_PER_ASSESSMENT = 100
@@ -151,11 +152,23 @@ async def _read_bounded(response: httpx.Response, limit: int) -> bytes:
 
 
 async def _fetch_kev(client: httpx.AsyncClient) -> tuple[dict, dict]:
-    async with client.stream("GET", KEV_URL) as response:
-        response.raise_for_status()
-        raw = await _read_bounded(response, MAX_KEV_BYTES)
-    payload = json.loads(raw)
-    return parse_kev_catalog(payload)
+    """Fetch CISA's catalog, falling back to CISA's official GitHub mirror."""
+    last_error = None
+    for source_url in (KEV_URL, KEV_MIRROR_URL):
+        try:
+            async with client.stream("GET", source_url) as response:
+                response.raise_for_status()
+                raw = await _read_bounded(response, MAX_KEV_BYTES)
+            rows, metadata = parse_kev_catalog(json.loads(raw))
+            metadata["source"] = source_url
+            metadata["canonical_source"] = KEV_URL
+            return rows, metadata
+        except (httpx.HTTPError, ValueError, TypeError) as error:
+            last_error = error
+    raise ValueError(
+        f"CISA KEV catalog and official mirror are unavailable: "
+        f"{type(last_error).__name__ if last_error else 'unknown error'}"
+    )
 
 
 async def _fetch_epss(
