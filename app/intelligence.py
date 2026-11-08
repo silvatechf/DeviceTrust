@@ -73,7 +73,7 @@ def parse_kev_catalog(payload: object) -> tuple[dict[str, dict], dict]:
         if cve_id in indexed:
             raise ValueError(f"KEV catalog contains duplicate CVE {cve_id}")
         ransomware = row.get("knownRansomwareCampaignUse", "Unknown")
-        if ransomware not in {"Known", "Unknown"}:
+        if not isinstance(ransomware, str) or ransomware not in {"Known", "Unknown"}:
             ransomware = "Unknown"
         indexed[cve_id] = {
             "status": "listed",
@@ -187,7 +187,7 @@ async def _provider_call(coro, provider: str) -> tuple[dict, dict]:
     try:
         async with asyncio.timeout(REQUEST_TIMEOUT_SECONDS):
             return await coro
-    except (TimeoutError, httpx.HTTPError, ValueError, json.JSONDecodeError) as error:
+    except (TimeoutError, httpx.HTTPError, ValueError, TypeError) as error:
         return {}, {
             "status": "incomplete",
             "source": KEV_URL if provider == "kev" else EPSS_URL,
