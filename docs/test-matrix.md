@@ -24,7 +24,7 @@ This matrix connects security/product controls to concrete automated tests. It i
 
 ## CI quality gates
 
-The current workflow at .github/workflows/ci.yml runs Node syntax validation, dependency installation, pre-commit configuration validation and hook-environment installation, Ruff, Bandit, separate pip-audit checks for runtime (`requirements.txt`) and development (`requirements-dev.txt`) dependencies, and pytest. The development requirements include the runtime requirements. CodeQL is configured separately in .github/workflows/codeql.yml.
+The current workflow at .github/workflows/ci.yml runs Node syntax validation, dependency installation, pre-commit configuration validation and hook-environment installation, Ruff, Bandit, separate pip-audit checks for runtime (`requirements.txt`) and development (`requirements-dev.txt`) dependencies, and pytest. A separate Gitleaks job scans all reachable Git history using a checksum-verified CLI release. The development requirements include the runtime requirements. CodeQL is configured separately in .github/workflows/codeql.yml.
 
 A configured workflow is not a successful workflow. Before release, inspect the exact candidate commit's workflow runs, job conclusions and CodeQL status. Record the candidate SHA and date in the release evidence.
 
@@ -35,7 +35,7 @@ A configured workflow is not a successful workflow. Before release, inspect the 
 - SBOM upload, triage and report download using seeded synthetic data.
 - API behavior under concurrent audit writes.
 - Backup/restore and deployment rollback.
-- Secret scanning and full Git-history review.
+- Manual review of any secret-scan findings and private-data exposure; Gitleaks now scans all reachable Git history in CI.
 - Branch protection / ruleset and commit-signature policy verification.
 
 ## Adding a new control
