@@ -30,6 +30,7 @@ pip install -r requirements-dev.txt
 ruff check .
 bandit -q -r app
 pip-audit -r requirements.txt
+pip-audit -r requirements-dev.txt
 node --check web/app.js
 pytest -q
 ```
