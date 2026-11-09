@@ -52,7 +52,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Compare accepted SBOM imports and explain additions, removals and matched-component changes using PURL identity that excludes only the version segment while preserving qualifiers and subpath; report ambiguous and unidentified occurrences without speculative matching.
 - [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
 
-**Implementation under review:** PR #45 adds append-only assessment runs and findings for an accepted SBOM import, reuses the bounded local/OSV scanner, records enrichment coverage, and persists the run with its audit event after external I/O. It is not complete until review, CI/CodeQL, merge and release documentation are finished.
+**Implemented:** PR #45 was merged into main. It adds append-only assessment runs and findings for an accepted SBOM import, reuses the bounded local/OSV scanner, records enrichment coverage, and persists the run with its audit event after external I/O. KEV/EPSS enrichment is tracked separately in PR #47 and remains pending merge.
 - [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
 **Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped synthetic findings. It now includes read-only comparison of accepted imports for the same release. Duplicate identities and components without usable PURLs remain unresolved. Comparison does not re-evaluate vulnerability intelligence.
@@ -63,8 +63,8 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Goal:** provide explainable product-version impact assessments, not automatic compliance conclusions.
 
-- [ ] Add CISA KEV enrichment with source, retrieval timestamp and catalog metadata.
-- [ ] Add FIRST EPSS enrichment with score, model/date metadata and retrieval timestamp.
+- [ ] Merge and release the bounded CISA KEV enrichment proposed in [PR #47](https://github.com/silvatechf/DeviceTrust/pull/47), retaining source, retrieval timestamp and catalog metadata.
+- [ ] Merge and release the bounded FIRST EPSS enrichment proposed in [PR #47](https://github.com/silvatechf/DeviceTrust/pull/47), retaining score, model/date metadata and retrieval timestamp.
 - [ ] Preserve feed provenance, freshness and lookup failures; missing intelligence must not mean no risk.
 - [ ] Match findings against product/component versions with ecosystem-aware semantics and explicit uncertainty.
 - [ ] Add human-reviewed affected/not-affected decisions with evidence and rationale.
@@ -90,7 +90,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Exit criteria:** CLI and API produce consistent assessments; pipeline results distinguish policy findings from assessment/runtime errors and incomplete intelligence.
 
-## Milestone 6 — Identity, governance and audit assurance (P4)
+## Milestone 6 — Identity, governance and audit assurance (P2 prerequisite)
 
 **Goal:** prepare for attributable multi-user and controlled customer evaluation.
 
@@ -104,6 +104,23 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Prepare reviewed CRA reporting data only where a manufacturer has established the applicable reporting condition and authorised the action.
 
 **Exit criteria:** no shared credential for multi-user operation; decisions are attributable; audit checkpoints have an independent trust boundary; tenant isolation and operational recovery are tested.
+
+## Milestone 7 — Credential exposure evidence (P3, proposed)
+
+**Goal:** correlate externally detected credential-exposure signals with product releases and retain safe, attributable remediation evidence.
+
+- [ ] Select one supported secret-scanning report contract (initial candidate: sanitised Gitleaks CI output) and pin/version its parser contract.
+- [ ] Define a bounded ingestion schema for tool/rule, source, artifact digest, sanitised location, observation time and coverage metadata.
+- [ ] Prove that raw API keys, passwords, JWT material, database URLs, RTSP/ONVIF credentials and private keys never enter persistence, API responses, logs or audit events.
+- [ ] Associate findings only with explicitly declared product/release/artifact references; retain ambiguous or missing relationships as unassigned.
+- [ ] Preserve immutable scan observations, provenance, idempotency and explicit incomplete/unverified states.
+- [ ] Add attributable review and remediation evidence only after individual identity, scoped authorisation and audit attribution are available.
+- [ ] Evaluate PKI, mTLS and secret-manager metadata integrations as evidence sources; do not store private keys or secret values.
+- [ ] Keep credential testing, endpoint discovery, video retrieval, automatic rotation/revocation and network enforcement outside DeviceTrust.
+
+**Dependency:** identity and scoped-authorisation foundations in Milestone 6 are prerequisites for reviewed decisions and remediation attribution. This milestone begins with safe, read-only evidence ingestion; it does not create a secret vault or scanner.
+
+**Exit criteria:** scanner evidence is bounded, provenance-preserving and demonstrably secret-free in storage/logs/responses; ambiguous product relationships remain unresolved; reviewed remediation is attributable and auditable.
 
 ## Parallel product discovery
 
