@@ -50,5 +50,6 @@ def downgrade() -> None:
             "uq_sbom_component_import_bom_ref",
             type_="unique",
         )
-    op.drop_column("sbom_components", "bom_ref")
-    op.drop_column("sbom_imports", "bom_metadata")
+        batch_op.drop_column("bom_ref")
+    with op.batch_alter_table("sbom_imports") as batch_op:
+        batch_op.drop_column("bom_metadata")
