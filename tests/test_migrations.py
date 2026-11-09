@@ -18,6 +18,8 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
 
         command.upgrade(config, "head")
         assert inspect(engine).has_table("audit_chain_state")
+        assert inspect(engine).has_table("principals")
+        assert inspect(engine).has_table("api_credentials")
         finding_columns = {
             column["name"]: column
             for column in inspect(engine).get_columns("sbom_assessment_findings")
@@ -34,10 +36,14 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         command.check(config)
 
         command.downgrade(config, "0002_persistent_sbom")
+        assert not inspect(engine).has_table("api_credentials")
+        assert not inspect(engine).has_table("principals")
         assert not inspect(engine).has_table("audit_chain_state")
 
         command.upgrade(config, "head")
         assert inspect(engine).has_table("audit_chain_state")
+        assert inspect(engine).has_table("principals")
+        assert inspect(engine).has_table("api_credentials")
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
