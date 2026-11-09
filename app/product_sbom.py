@@ -5,8 +5,8 @@ import json
 import os
 from datetime import datetime, timezone
 
-from sqlalchemy import select
 from packaging.version import InvalidVersion, Version
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -104,7 +104,7 @@ def _reprocess_existing_import_references(
             "Existing SBOM import cannot be safely reprocessed: component count changed."
         )
 
-    for ordinal, (row, component) in enumerate(zip(rows, components)):
+    for ordinal, (row, component) in enumerate(zip(rows, components, strict=True)):
         if (
             row.ordinal != ordinal
             or row.name != component["source_name"]
@@ -119,7 +119,7 @@ def _reprocess_existing_import_references(
     previous_parser_version = existing.parser_version
     existing.bom_metadata = bom_metadata
     existing.parser_version = PARSER_VERSION
-    for row, component in zip(rows, components):
+    for row, component in zip(rows, components, strict=True):
         row.bom_ref = component["bom_ref"]
 
     audit.record(
