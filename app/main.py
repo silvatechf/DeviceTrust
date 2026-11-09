@@ -548,6 +548,8 @@ def get_decision_approval_payload(
         raise HTTPException(404, str(error)) from None
     except PermissionError as error:
         raise HTTPException(403, str(error)) from None
+    except decision_evidence.EvidenceManifestIntegrityError:
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     except decision_approvals.ApprovalTrustStoreError:
         raise HTTPException(503, "Registered approval key integrity validation failed") from None
 
@@ -584,6 +586,9 @@ def create_decision_approval(
     except decision_approvals.ApprovalConflict as error:
         db.rollback()
         raise HTTPException(409, str(error)) from None
+    except decision_evidence.EvidenceManifestIntegrityError:
+        db.rollback()
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     except decision_approvals.ApprovalTrustStoreError:
         db.rollback()
         raise HTTPException(503, "Registered approval key integrity validation failed") from None
@@ -603,6 +608,8 @@ def get_decision_approval(
 ):
     try:
         return decision_approvals.get_decision_approval(db, decision_id)
+    except decision_evidence.EvidenceManifestIntegrityError:
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     except LookupError as error:
         raise HTTPException(404, str(error)) from None
 
