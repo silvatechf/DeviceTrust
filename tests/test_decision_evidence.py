@@ -5,7 +5,7 @@ import rfc8785
 from sqlalchemy import update
 
 from app import decision_signatures, identity
-from app.db import EvidenceArtifact, SessionLocal
+from app.db import DecisionEvidenceManifest, EvidenceArtifact, SessionLocal
 
 from .conftest import H
 from .test_decision_signatures import _keypair, _register, _signature_for
@@ -285,3 +285,39 @@ def test_manifest_read_scope_is_separate_from_binding_scope(client, monkeypatch)
         json={"artifact_ids": [artifact_id]},
     )
     assert denied.status_code == 403
+
+
+def test_manifest_payload_tampering_fails_closed(client, monkeypatch):
+    principal_id, token = _operator_with_scopes()
+    artifact_id, _ = _artifact(client)
+    decision_id = _decision(client, monkeypatch, principal_id, token, artifact_id)
+    created = client.post(
+        f"/sbom/decisions/{decision_id}/evidence-manifest",
+        headers={"X-API-Key": token},
+        json={"artifact_ids": [artifact_id]},
+    )
+    assert created.status_code == 201, created.text
+    _private_key, public_pem = _keypair()
+    key_id, _ = _register(principal_id, public_pem)
+
+    with SessionLocal() as db:
+        db.execute(
+            update(DecisionEvidenceManifest)
+            .where(DecisionEvidenceManifest.decision_id == decision_id)
+            .values(manifest_payload={"manifest_version": "tampered"})
+        )
+        db.commit()
+
+    manifest = client.get(
+        f"/sbom/decisions/{decision_id}/evidence-manifest",
+        headers={"X-API-Key": token},
+    )
+    assert manifest.status_code == 200
+    assert manifest.json()["manifest_digest_valid"] is False
+    assert manifest.json()["integrity_valid"] is False
+    signing_payload = client.get(
+        f"/sbom/decisions/{decision_id}/signing-payload",
+        params={"key_id": key_id},
+        headers={"X-API-Key": token},
+    )
+    assert signing_payload.status_code == 503
