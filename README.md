@@ -67,6 +67,10 @@ The persistent SBOM work introduces these authenticated endpoints:
 - `GET /sbom/imports/{import_id}/assessments/{assessment_id}/findings` — list findings for one run.
 - `POST /sbom/assessment-findings/{finding_id}/decisions` — append an attributable human review revision (managed operator with `assessment:review` and an `Idempotency-Key`).
 - `GET /sbom/assessment-findings/{finding_id}/decisions` — retrieve the complete decision history.
+- `GET /sbom/decisions/{decision_id}/signing-payload?key_id=...` — retrieve the exact canonical bytes for an author-controlled Ed25519 signature.
+- `POST /sbom/decisions/{decision_id}/signature` and `GET /sbom/decisions/{decision_id}/signature` — persist and re-verify detached decision signatures (integrated through PR #58).
+- `GET /sbom/decisions/{decision_id}/approval-payload?key_id=...` — retrieve a server-timestamped approval envelope for a distinct operator (current feature branch; pending integration).
+- `POST /sbom/decisions/{decision_id}/approval` and `GET /sbom/decisions/{decision_id}/approval` — persist and inspect independent approval history and policy status (current feature branch; pending integration).
 
 The import digest is calculated from the exact request bytes. A repeated digest for the same release and format returns the existing import. Only fully validated imports are persisted. The API does not store raw SBOM documents or infer a relationship between a product and a device.
 
@@ -82,7 +86,7 @@ The product SBOM persistence API was merged through [PR #22](https://github.com/
 
 - Product-to-device relationship inference.
 - SPDX ingestion or CycloneDX VEX generation.
-- CycloneDX VEX generation, evidence-artifact verification, external audit anchoring and vendor-specific backport analysis. Ed25519 detached decision signatures and offline public-key lifecycle are integrated through PR #58. Independent second-person approval is being implemented separately; neither signatures nor approvals establish legal identity, manufacturer authority or claim truth.
+- CycloneDX VEX generation, evidence-artifact verification, external audit anchoring and vendor-specific backport analysis. Ed25519 detached decision signatures and offline public-key lifecycle are integrated through PR #58. Independent second-person approval is implemented in the current feature branch but remains pending validation and integration into main; neither signatures nor approvals establish legal identity, manufacturer authority or claim truth.
 - Human login, MFA, SSO, tenant isolation and web-based credential administration. Managed API principals and route scopes are implemented in the identity implementation branch; offline CLI administration is required.
 - Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
 - Active LAN discovery, packet capture, device agents or independent firmware/hardware attestation.
