@@ -1167,7 +1167,7 @@ def test_decision_evidence_manifest_persists_postgres(monkeypatch):
             )
             session.commit()
 
-        from tests.test_vulnerability_decisions import _finding
+        from .test_vulnerability_decisions import _finding
 
         finding_id = _finding()
         monkeypatch.setenv("DEVICETRUST_AUTH_MODE", "managed")
