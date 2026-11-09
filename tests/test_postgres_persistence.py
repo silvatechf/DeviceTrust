@@ -220,6 +220,12 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert "intelligence" in assessment_finding_columns
         assert "applicability" in assessment_finding_columns
         assert assessment_finding_columns["applicability"]["nullable"] is False
+        assert "bom_metadata" in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_imports")
+        }
+        assert "bom_ref" in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_components")
+        }
         with target_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
@@ -228,6 +234,21 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
                 text("SELECT COUNT(*) FROM audit_chain_state")
             ) == 1
         command.check(config)
+
+        command.downgrade(config, "0007_sbom_finding_applicability")
+        assert "bom_metadata" not in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_imports")
+        }
+        assert "bom_ref" not in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_components")
+        }
+        command.upgrade(config, "head")
+        assert "bom_metadata" in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_imports")
+        }
+        assert "bom_ref" in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_components")
+        }
 
         command.downgrade(config, "0006_identity_access")
         assert "applicability" not in {
@@ -359,10 +380,16 @@ def test_product_sbom_records_survive_database_engine_disposal():
             spec_version="1.5",
             source_type="manual",
             content_sha256=digest,
-            parser_version="0.3.0",
+            parser_version="0.4.0",
             status="accepted",
             component_count=1,
             validation_summary={"valid": True, "component_count": 1},
+            bom_metadata={
+                "serial_number": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
+                "version": 2,
+                "version_explicit": True,
+                "metadata_component": None,
+            },
         )
         session.add(imported)
         session.flush()
@@ -373,6 +400,7 @@ def test_product_sbom_records_survive_database_engine_disposal():
             name="Example Library",
             version="1.0.0",
             purl="pkg:generic/example-library@1.0.0",
+            bom_ref="example-library-ref",
         )
         session.add(component)
         session.flush()
@@ -407,8 +435,10 @@ def test_product_sbom_records_survive_database_engine_disposal():
             assert persisted_release is not None
             assert persisted_import is not None
             assert persisted_import.content_sha256 == digest
+            assert persisted_import.bom_metadata["version"] == 2
             assert persisted_component is not None
             assert persisted_component.sbom_import_id == import_id
+            assert persisted_component.bom_ref == "example-library-ref"
             assert persisted_finding is not None
             assert persisted_finding.sbom_component_id == component_id
     finally:

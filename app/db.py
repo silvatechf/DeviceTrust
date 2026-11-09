@@ -129,12 +129,14 @@ class SBOMImport(Base):
     status: Mapped[str] = mapped_column(String(16), default="accepted")
     component_count: Mapped[int] = mapped_column(Integer)
     validation_summary: Mapped[dict] = mapped_column(JSON, default=dict)
+    bom_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class SBOMComponent(Base):
     __tablename__ = "sbom_components"
     __table_args__ = (
         UniqueConstraint("sbom_import_id", "ordinal", name="uq_sbom_component_import_ordinal"),
+        UniqueConstraint("sbom_import_id", "bom_ref", name="uq_sbom_component_import_bom_ref"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -143,6 +145,7 @@ class SBOMComponent(Base):
     name: Mapped[str] = mapped_column(String(200))
     version: Mapped[str] = mapped_column(String(100))
     purl: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    bom_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class ProductFinding(Base):

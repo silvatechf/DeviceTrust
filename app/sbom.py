@@ -4,6 +4,7 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import UUID
 
 import httpx
 from packageurl import PackageURL
@@ -25,7 +26,15 @@ OSV_POOL_TIMEOUT_SECONDS = 1.0
 ADVISORIES = Path(__file__).parent / "data" / "advisories.json"
 
 
-def parse_cyclonedx(doc: dict) -> list[dict]:
+def _validate_bom_ref(value: object, label: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip() or len(value) > 255:
+        raise ValueError(f"{label} has an invalid bom-ref.")
+    return value
+
+
+def parse_cyclonedx_document(doc: dict) -> dict:
     if not isinstance(doc, dict) or doc.get("bomFormat") != "CycloneDX":
         raise ValueError("Document must declare bomFormat='CycloneDX'.")
     spec_version = doc.get("specVersion")
@@ -33,6 +42,84 @@ def parse_cyclonedx(doc: dict) -> list[dict]:
         raise ValueError(
             f"Unsupported or missing CycloneDX specVersion; expected {SUPPORTED_CYCLONEDX_SPEC_VERSION}."
         )
+
+    serial_number = doc.get("serialNumber")
+    if serial_number is not None:
+        if not isinstance(serial_number, str) or not serial_number.startswith("urn:uuid:"):
+            raise ValueError("CycloneDX serialNumber must be a URN UUID.")
+        try:
+            UUID(serial_number.removeprefix("urn:uuid:"))
+        except ValueError:
+            raise ValueError("CycloneDX serialNumber must be a URN UUID.") from None
+
+    bom_version_explicit = "version" in doc
+    bom_version = doc.get("version", 1)
+    if (
+        isinstance(bom_version, bool)
+        or not isinstance(bom_version, int)
+        or bom_version < 1
+    ):
+        raise ValueError("CycloneDX BOM version must be a positive integer.")
+
+    metadata = doc.get("metadata", {})
+    if not isinstance(metadata, dict):
+        raise ValueError("CycloneDX metadata must be an object.")
+    metadata_component = metadata.get("component")
+    seen_bom_refs: set[str] = set()
+    if metadata_component is not None:
+        if not isinstance(metadata_component, dict):
+            raise ValueError("CycloneDX metadata component must be an object.")
+        metadata_bom_ref = _validate_bom_ref(
+            metadata_component.get("bom-ref"), "CycloneDX metadata component"
+        )
+        if metadata_bom_ref is not None:
+            seen_bom_refs.add(metadata_bom_ref)
+        metadata_component_data = {
+            "bom_ref": metadata_bom_ref,
+            "type": metadata_component.get("type"),
+            "name": metadata_component.get("name"),
+            "version": metadata_component.get("version"),
+            "purl": metadata_component.get("purl"),
+        }
+        if (
+            not isinstance(metadata_component_data["type"], str)
+            or not metadata_component_data["type"].strip()
+            or not isinstance(metadata_component_data["name"], str)
+            or not metadata_component_data["name"].strip()
+        ):
+            raise ValueError(
+                "CycloneDX metadata component requires a valid type and name."
+            )
+        for field, maximum in (
+            ("type", 64),
+            ("name", MAX_COMPONENT_NAME),
+            ("version", MAX_COMPONENT_VERSION),
+        ):
+            value = metadata_component_data[field]
+            if value is not None and (
+                not isinstance(value, str) or not value.strip() or len(value) > maximum
+            ):
+                raise ValueError(
+                    f"CycloneDX metadata component has an invalid {field}."
+                )
+        metadata_purl = metadata_component_data["purl"]
+        if metadata_purl is not None:
+            if not isinstance(metadata_purl, str) or len(metadata_purl) > MAX_PURL_LENGTH:
+                raise ValueError("CycloneDX metadata component has an invalid purl.")
+            try:
+                parsed_metadata_purl = PackageURL.from_string(metadata_purl)
+            except (TypeError, ValueError):
+                raise ValueError("CycloneDX metadata component has an invalid purl.") from None
+            metadata_version = metadata_component_data["version"]
+            if (
+                parsed_metadata_purl.version
+                and metadata_version is not None
+                and parsed_metadata_purl.version != metadata_version
+            ):
+                raise ValueError("CycloneDX metadata component has a purl/version mismatch.")
+    else:
+        metadata_component_data = None
+
     components = doc.get("components")
     if not isinstance(components, list):
         raise ValueError("CycloneDX document must contain a components array.")
@@ -49,6 +136,12 @@ def parse_cyclonedx(doc: dict) -> list[dict]:
             raise ValueError(f"Component at index {index} has an invalid name.")
         if not isinstance(version, str) or not version.strip() or len(version) > MAX_COMPONENT_VERSION:
             raise ValueError(f"Component at index {index} has an invalid version.")
+
+        bom_ref = _validate_bom_ref(component.get("bom-ref"), f"Component at index {index}")
+        if bom_ref is not None:
+            if bom_ref in seen_bom_refs:
+                raise ValueError(f"Duplicate CycloneDX bom-ref at component index {index}.")
+            seen_bom_refs.add(bom_ref)
 
         purl = component.get("purl")
         if purl is not None:
@@ -67,9 +160,21 @@ def parse_cyclonedx(doc: dict) -> list[dict]:
             "version": version.strip(),
             "source_version": version,
             "purl": purl,
+            "bom_ref": bom_ref,
         })
-    return parsed
 
+    return {
+        "serial_number": serial_number,
+        "version": bom_version,
+        "version_explicit": bom_version_explicit,
+        "metadata_component": metadata_component_data,
+        "components": parsed,
+    }
+
+
+def parse_cyclonedx(doc: dict) -> list[dict]:
+    """Backward-compatible component-only parser for existing callers."""
+    return parse_cyclonedx_document(doc)["components"]
 
 def _lt(a: str, b: str) -> bool:
     try:

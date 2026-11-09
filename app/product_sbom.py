@@ -5,6 +5,7 @@ import json
 import os
 from datetime import datetime, timezone
 
+from packaging.version import InvalidVersion, Version
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -21,7 +22,7 @@ from .db import (
     SessionLocal,
 )
 
-PARSER_VERSION = "0.3.0"
+PARSER_VERSION = "0.4.0"
 
 
 def create_product(
@@ -86,6 +87,68 @@ def create_release(
     return release
 
 
+def _reprocess_existing_import_references(
+    db: Session,
+    actor: str,
+    existing: SBOMImport,
+    components: list[dict],
+    bom_metadata: dict,
+) -> None:
+    rows = db.scalars(
+        select(SBOMComponent)
+        .where(SBOMComponent.sbom_import_id == existing.id)
+        .order_by(SBOMComponent.ordinal)
+    ).all()
+    if len(rows) != len(components):
+        raise ValueError(
+            "Existing SBOM import cannot be safely reprocessed: component count changed."
+        )
+
+    for ordinal, (row, component) in enumerate(zip(rows, components, strict=True)):
+        if (
+            row.ordinal != ordinal
+            or row.name != component["source_name"]
+            or row.version != component["source_version"]
+            or row.purl != component["purl"]
+            or row.bom_ref not in (None, component["bom_ref"])
+        ):
+            raise ValueError(
+                "Existing SBOM import cannot be safely reprocessed: component identity changed."
+            )
+
+    previous_parser_version = existing.parser_version
+    bom_ref_count = sum(
+        component["bom_ref"] is not None for component in components
+    )
+    existing.bom_metadata = bom_metadata
+    existing.parser_version = PARSER_VERSION
+    for row, component in zip(rows, components, strict=True):
+        row.bom_ref = component["bom_ref"]
+
+    audit.record(
+        db,
+        actor,
+        "sbom.product_import_metadata_reprocessed",
+        str(existing.id),
+        {
+            "content_sha256": existing.content_sha256,
+            "previous_parser_version": previous_parser_version,
+            "parser_version": PARSER_VERSION,
+            "component_count": len(components),
+            "bom_ref_count": bom_ref_count,
+            "serial_number_present": bom_metadata["serial_number"] is not None,
+        },
+    )
+    db.flush()
+
+
+def _parser_version_is_older(existing_version: str) -> bool:
+    try:
+        return Version(existing_version) < Version(PARSER_VERSION)
+    except InvalidVersion:
+        raise ValueError("Existing SBOM import has an invalid parser version.") from None
+
+
 async def import_cyclonedx(
     db: Session,
     actor: str,
@@ -94,8 +157,15 @@ async def import_cyclonedx(
     document: dict,
     source_type: str,
     source_reference: str | None,
-) -> tuple[SBOMImport, bool]:
-    components = sbom.parse_cyclonedx(document)
+) -> tuple[SBOMImport, bool, bool]:
+    parsed_document = sbom.parse_cyclonedx_document(document)
+    components = parsed_document["components"]
+    bom_metadata = {
+        "serial_number": parsed_document["serial_number"],
+        "version": parsed_document["version"],
+        "version_explicit": parsed_document["version_explicit"],
+        "metadata_component": parsed_document["metadata_component"],
+    }
     digest = hashlib.sha256(raw_document).hexdigest()
 
     existing_query = select(SBOMImport).where(
@@ -109,8 +179,25 @@ async def import_cyclonedx(
         if lookup_db.get(ProductRelease, release_id) is None:
             raise LookupError("Product release not found")
         existing = lookup_db.scalars(existing_query).first()
+        needs_reference_reprocessing = (
+            existing is not None
+            and _parser_version_is_older(existing.parser_version)
+        )
+        if existing is not None and not needs_reference_reprocessing:
+            return existing, False, False
+
+    if needs_reference_reprocessing:
+        audit.acquire_chain_lock(db)
+        existing = db.scalars(existing_query).first()
         if existing is not None:
-            return existing, False
+            if _parser_version_is_older(existing.parser_version):
+                _reprocess_existing_import_references(
+                    db, actor, existing, components, bom_metadata
+                )
+                db.commit()
+                db.refresh(existing)
+                return existing, False, True
+            return existing, False, False
 
     findings, osv_enrichment = await sbom.scan_with_metadata_async(
         components, include_component_index=True
@@ -127,7 +214,14 @@ async def import_cyclonedx(
     # Recheck after acquiring the serialized writer lock to handle concurrent imports.
     existing = db.scalars(existing_query).first()
     if existing is not None:
-        return existing, False
+        if _parser_version_is_older(existing.parser_version):
+            _reprocess_existing_import_references(
+                db, actor, existing, components, bom_metadata
+            )
+            db.commit()
+            db.refresh(existing)
+            return existing, False, True
+        return existing, False, False
 
     imported = SBOMImport(
         product_release_id=release_id,
@@ -139,6 +233,7 @@ async def import_cyclonedx(
         parser_version=PARSER_VERSION,
         status="accepted",
         component_count=len(components),
+        bom_metadata=bom_metadata,
         validation_summary={
             "valid": True,
             "component_count": len(components),
@@ -157,6 +252,7 @@ async def import_cyclonedx(
                 name=component["source_name"],
                 version=component["source_version"],
                 purl=component["purl"],
+                bom_ref=component["bom_ref"],
             )
             db.add(occurrence)
             db.flush()
@@ -185,7 +281,7 @@ async def import_cyclonedx(
         )
         db.commit()
         db.refresh(imported)
-        return imported, True
+        return imported, True, False
     except IntegrityError:
         db.rollback()
         concurrent = db.scalars(
@@ -196,7 +292,7 @@ async def import_cyclonedx(
             )
         ).first()
         if concurrent is not None:
-            return concurrent, False
+            return concurrent, False, False
         raise
     except Exception:
         db.rollback()
@@ -233,6 +329,7 @@ def _component_snapshot(component: SBOMComponent) -> dict:
         "name": component.name,
         "version": component.version,
         "purl": component.purl,
+        "bom_ref": component.bom_ref,
     }
 
 

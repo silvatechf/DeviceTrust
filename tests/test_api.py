@@ -227,7 +227,6 @@ def test_audit_chain_cannot_detect_deleted_tail_without_checkpoint(tmp_path):
     engine.dispose()
 
 
-
 def test_evidence_listing_is_paginated_and_bounded(client):
     device_id = "PAGINATION-001"
 
@@ -765,3 +764,115 @@ def test_product_sbom_import_rolls_back_all_rows_when_audit_append_fails(client,
             db.query(AuditEntry).filter_by(action="sbom.product_import").count()
             == audit_count_before
         )
+
+
+def test_product_sbom_import_preserves_bom_identity_and_component_refs(client):
+    product = client.post(
+        "/products",
+        json={"manufacturer": "Example Vendor", "product_name": "Sensor X"},
+        headers=H,
+    )
+    release = client.post(
+        f"/products/{product.json()['id']}/releases",
+        json={"version": "1.2.3"},
+        headers=H,
+    )
+    release_id = release.json()["id"]
+    document = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.5",
+        "serialNumber": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
+        "version": 2,
+        "metadata": {
+            "component": {
+                "type": "application",
+                "bom-ref": "product-sensor-x",
+                "name": "Sensor X",
+                "version": "1.2.3",
+                "purl": "pkg:generic/sensor-x@1.2.3",
+            }
+        },
+        "components": [
+            {
+                "type": "library",
+                "bom-ref": "openssl-component",
+                "name": "openssl",
+                "version": "1.1.1",
+                "purl": "pkg:generic/openssl@1.1.1",
+            }
+        ],
+    }
+
+    imported = client.post(
+        f"/product-releases/{release_id}/sbom",
+        json=document,
+        headers=H,
+    )
+
+    assert imported.status_code == 201, imported.text
+    assert imported.json()["metadata_reprocessed"] is False
+    expected_metadata = {
+        "serial_number": document["serialNumber"],
+        "version": 2,
+        "version_explicit": True,
+        "metadata_component": {
+            "bom_ref": "product-sensor-x",
+            "type": "application",
+            "name": "Sensor X",
+            "version": "1.2.3",
+            "purl": "pkg:generic/sensor-x@1.2.3",
+        },
+    }
+    assert imported.json()["bom_metadata"] == expected_metadata
+
+    imports = client.get(f"/product-releases/{release_id}/sbom", headers=H)
+    assert imports.status_code == 200
+    assert imports.json()[0]["bom_metadata"] == expected_metadata
+
+    components = client.get(
+        f"/sbom/imports/{imported.json()['id']}/components",
+        headers=H,
+    )
+    assert components.status_code == 200
+    assert components.json()[0]["bom_ref"] == "openssl-component"
+
+    import_id = imported.json()["id"]
+    with SessionLocal() as db:
+        legacy_import = db.get(SBOMImport, import_id)
+        assert legacy_import is not None
+        legacy_import.parser_version = "0.3.0"
+        legacy_import.bom_metadata = {}
+        legacy_component = db.query(SBOMComponent).filter_by(
+            sbom_import_id=import_id
+        ).one()
+        legacy_component.bom_ref = None
+        db.commit()
+
+    reimported = client.post(
+        f"/product-releases/{release_id}/sbom",
+        json=document,
+        headers=H,
+    )
+
+    assert reimported.status_code == 201, reimported.text
+    assert reimported.json()["id"] == import_id
+    assert reimported.json()["created"] is False
+    assert reimported.json()["metadata_reprocessed"] is True
+    assert reimported.json()["bom_metadata"] == expected_metadata
+
+    imports_after_reprocessing = client.get(
+        f"/product-releases/{release_id}/sbom",
+        headers=H,
+    )
+    assert len(imports_after_reprocessing.json()) == 1
+
+    components_after_reprocessing = client.get(
+        f"/sbom/imports/{import_id}/components",
+        headers=H,
+    )
+    assert components_after_reprocessing.json()[0]["bom_ref"] == "openssl-component"
+
+    with SessionLocal() as db:
+        assert db.query(AuditEntry).filter_by(
+            action="sbom.product_import_metadata_reprocessed"
+        ).count() == 1
