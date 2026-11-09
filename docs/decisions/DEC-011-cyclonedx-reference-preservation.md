@@ -41,6 +41,6 @@ Migration 0008 adds sbom_imports.bom_metadata and nullable sbom_components.bom_r
 
 ## References
 
-- CycloneDX bom-ref uniqueness and vulnerability affects.ref: https://cyclonedx.org/docs/1.7/json/
-- CycloneDX VEX and external BOM linkage: https://cyclonedx.org/guides/sbom/relationships/
-- CycloneDX vulnerability analysis states and justifications: https://cyclonedx.org/docs/1.7/json/
+- CycloneDX BOM-Link syntax and reference requirements: https://cyclonedx.org/capabilities/bomlink/
+- CycloneDX cross-BOM references: https://cyclonedx.org/use-cases/cross-bom-references/
+- CycloneDX vulnerability exploitability and VEX example: https://cyclonedx.org/use-cases/vulnerability-exploitability/
