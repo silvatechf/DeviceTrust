@@ -232,6 +232,7 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
             "envelope_sha256": item.envelope_sha256,
             "verified_at": item.verified_at,
             "signature_valid": False,
+            "trust_valid": False,
             "current_key_status": "missing",
         }
 
