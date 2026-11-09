@@ -399,6 +399,10 @@ def get_decision_signing_payload(
         raise HTTPException(404, str(error)) from None
     except PermissionError as error:
         raise HTTPException(403, str(error)) from None
+    except ValueError:
+        # A malformed or fingerprint-mismatched registry entry is server-side
+        # trust-store corruption, not a client validation error.
+        raise HTTPException(503, "Registered signing key integrity validation failed") from None
 
 
 @app.post("/sbom/decisions/{decision_id}/signature", status_code=201)
