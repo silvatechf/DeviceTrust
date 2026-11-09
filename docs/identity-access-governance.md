@@ -84,7 +84,14 @@ For managed mode, configure DEVICETRUST_AUTH_MODE=managed in the API process and
 
    Keep the private key outside DeviceTrust and register only the PEM public key with the offline CLI. Protect and back up the private key using the organization's approved key-custody process.
 2. Retrieve the exact canonical signing bytes from GET /sbom/decisions/{decision_id}/signing-payload?key_id=... using a managed credential with assessment:sign. Only the decision author can retrieve this payload. The response contains signing_payload_base64.
-3. Sign the decoded signing_payload_base64 bytes locally with the operator private key. DeviceTrust never receives the private key.
+3. Decode and sign the payload locally. Example shell workflow:
+
+       curl --fail --silent --show-error -H "X-API-Key: $DTK" --get --data-urlencode "key_id=$KEY_ID" "$DEVICETRUST_URL/sbom/decisions/$DECISION_ID/signing-payload" -o signing-payload.json
+       python -c "import base64,json; p=json.load(open('signing-payload.json', encoding='utf-8')); open('decision-envelope.bin','wb').write(base64.b64decode(p['signing_payload_base64'], validate=True))"
+       openssl pkeyutl -sign -rawin -inkey operator-ed25519-private.pem -in decision-envelope.bin -out decision-signature.bin
+       SIGNATURE=$(python -c "import base64; print(base64.b64encode(open('decision-signature.bin','rb').read()).decode('ascii'))")
+
+   DeviceTrust never receives the private key.
 4. Submit the Base64 detached signature and key ID to POST /sbom/decisions/{decision_id}/signature. The request body contains only key_id and signature; never submit a private key.
 5. Read GET /sbom/decisions/{decision_id}/signature to re-verify the stored signature against the current decision bytes. signature_valid describes cryptographic validity; trust_valid additionally requires the key to remain active.
 
