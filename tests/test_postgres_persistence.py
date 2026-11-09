@@ -1153,7 +1153,7 @@ def test_decision_evidence_manifest_persists_postgres(monkeypatch):
         artifact_id = artifact.json()["id"]
 
         with Session(application_engine) as session:
-            principal, _credential, token = identity.create_principal(
+            _principal, _credential, token = identity.create_principal(
                 session,
                 name="PostgreSQL decision evidence author",
                 kind="operator",
