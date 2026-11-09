@@ -105,6 +105,12 @@ def register_public_key(
             raise ValueError("public key fingerprint is already registered to another trust binding")
         if existing.revoked_at is not None:
             raise ValueError("revoked public keys cannot be reactivated")
+        if existing.expires_at is not None:
+            existing_expiry = existing.expires_at
+            if existing_expiry.tzinfo is None:
+                existing_expiry = existing_expiry.replace(tzinfo=timezone.utc)
+            if existing_expiry <= now:
+                raise ValueError("expired public keys cannot be reactivated; register a new key")
         return existing
     now = utcnow()
     if expires_at is not None:
