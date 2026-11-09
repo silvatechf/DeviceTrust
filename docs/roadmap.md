@@ -69,14 +69,14 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Preserve feed provenance, freshness and lookup failures; missing intelligence must not mean no risk.
 - [x] Preserve source-aware applicability evidence for OSV package/version matches and synthetic demo candidates, with explicit uncertainty. See [DEC-010](decisions/DEC-010-source-aware-applicability.md) and PR #53.
 - [ ] Expand ecosystem-specific version semantics, vendor backport handling and source/binary package relationships beyond OSV provider matching.
-- [ ] Add human-reviewed affected/not-affected decisions with evidence and rationale.
-- [ ] Implement CycloneDX VEX export only after product/version/component relationships and review controls exist.
+- [x] Add attributable, append-only human-reviewed vulnerability decisions linked to immutable assessment findings; require CycloneDX justification and evidence for not_affected. See [DEC-012](decisions/DEC-012-attributable-vulnerability-review.md).
+- [ ] Implement deterministic CycloneDX VEX export only after product/version/component relationships and review controls exist.
 - [ ] Map internal workflow states explicitly to the selected VEX vocabulary; never equate operational triage states directly with VEX statements.
 - [ ] Consider OpenVEX only after the CycloneDX workflow is stable.
 - [ ] Treat KEV and EPSS as prioritisation signals, not automatic CRA Article 14 triggers.
 - [ ] Support reviewed reporting drafts only; no automatic legal timer or ENISA submission.
 
-**Exit criteria:** every exported VEX statement is product-version scoped, attributable and justified; no unsupported not_affected claim can be emitted.
+**Exit criteria:** every exported VEX statement is product-version scoped, attributable and justified; no unsupported not_affected claim can be emitted. Review records are now implemented, but export, signing and independent approval remain open.
 
 ## Milestone 5 — Developer workflow and ecosystem support (P3)
 
