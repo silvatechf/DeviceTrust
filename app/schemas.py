@@ -186,4 +186,6 @@ class VulnerabilityDecisionIn(BaseModel):
                 raise ValueError("not_affected requires a CycloneDX justification")
             if not self.evidence_references:
                 raise ValueError("not_affected requires at least one evidence reference")
+        if self.state == "resolved_with_pedigree" and not self.evidence_references:
+            raise ValueError("resolved_with_pedigree requires a pedigree evidence reference")
         return self
