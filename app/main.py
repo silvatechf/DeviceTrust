@@ -11,7 +11,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import audit, identity, posture, product_sbom, sbom, vulnerability_decisions
+from . import audit, decision_signatures, identity, posture, product_sbom, sbom, vulnerability_decisions
 from .db import (
     AuditEntry,
     Device,
@@ -32,6 +32,7 @@ from .schemas import (
     SecurityProfile,
     TriageIn,
     VulnerabilityDecisionIn,
+    DecisionSignatureIn,
 )
 
 SEV = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
@@ -378,6 +379,57 @@ def list_vulnerability_decisions(
         return vulnerability_decisions.list_decisions(db, finding_id)
     except LookupError as error:
         raise HTTPException(404, str(error)) from None
+
+
+@app.post("/sbom/decisions/{decision_id}/signature", status_code=201)
+def create_decision_signature(
+    decision_id: int,
+    body: DecisionSignatureIn,
+    response: Response,
+    db: Session = Depends(get_write_db),
+    actor: str = Depends(auth),
+):
+    if not actor.startswith("principal:"):
+        raise HTTPException(403, "Decision signatures require a managed operator principal")
+    principal_id = actor.removeprefix("principal:")
+    try:
+        result = decision_signatures.sign_decision(
+            db,
+            decision_id=decision_id,
+            principal_id=principal_id,
+            key_id=body.key_id,
+            signature_b64=body.signature,
+        )
+        db.commit()
+        response.status_code = 201
+        return result
+    except LookupError as error:
+        db.rollback()
+        raise HTTPException(404, str(error)) from None
+    except PermissionError as error:
+        db.rollback()
+        raise HTTPException(403, str(error)) from None
+    except decision_signatures.SignatureConflict as error:
+        db.rollback()
+        raise HTTPException(409, str(error)) from None
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(422, str(error)) from None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Decision signature conflicts with existing signature history") from None
+
+
+@app.get("/sbom/decisions/{decision_id}/signature")
+def get_decision_signature(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    result = decision_signatures.get_decision_signature(db, decision_id)
+    if result is None:
+        raise HTTPException(404, "Decision signature not found")
+    return result
 
 
 @app.get("/sbom/imports/{import_id}/components")
