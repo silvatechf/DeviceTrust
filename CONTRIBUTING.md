@@ -7,7 +7,10 @@ Thanks for taking an interest in DeviceTrust. The project is an evidence-oriente
 1. Read the [README](README.md), [architecture](docs/architecture.md), [threat model](docs/threat-model.md), [prototype limitations](docs/prototype-limitations.md) and relevant domain documentation.
 2. Open an issue first for substantial product, schema or architecture changes.
 3. Create a focused branch from the current development base. Do not commit directly to `main`.
-4. Keep pull requests small enough to review and explain.
+4. Keep pull requests small enough to review and explain. Prefer one PR per coherent, independently testable change.
+5. Do not push directly to `main`; use a feature or documentation branch and a pull request.
+6. Keep commits meaningful and scoped. Intermediate fix/test/documentation commits are acceptable on the working branch, but avoid one-commit-per-line or repeated cosmetic commits. Run focused checks before pushing so avoidable failures do not accumulate.
+7. Use **Squash and merge** for normal feature and documentation PRs so `main` records one coherent integration commit. Use a merge commit or rebase only when the project history has a documented reason to preserve individual commits.
 
 ## Engineering expectations
 
@@ -44,7 +47,9 @@ pytest -q
 - [ ] Security and privacy implications are described.
 - [ ] Documentation and prototype limitations are updated.
 - [ ] No credentials, local databases, personal data or generated artifacts are included.
-- [ ] CI checks pass.
+- [ ] CI checks pass on the exact PR head; investigate failed checks rather than relying on an earlier run.
+- [ ] The PR has one coherent outcome and a clear squash-merge title/message.
+- [ ] The target branch is up to date and no protected branch was modified directly.
 - [ ] Claims in the PR are supported by code or test evidence.
 
 ## Responsible disclosure

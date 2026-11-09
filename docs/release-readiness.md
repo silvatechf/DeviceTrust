@@ -14,7 +14,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [x] A local synthetic-data demo runbook exists.
 - [ ] Select and add an explicit license, or formally decide to retain all rights.
 - [ ] Manually review the complete Git history for private/customer data and unintended files; review and triage Gitleaks findings without treating a clean scan as proof of complete secret detection.
-- [ ] Verify branch protection/rulesets and required checks on the default branch.
+- [ ] Verify branch protection/rulesets and required checks on the default branch; repository merge-method settings currently allow merge commits, rebase and squash, so use squash for focused feature PRs unless preserving a merge commit is technically justified.
 - [ ] Define any prospective commit-signature policy in repository settings.
 - [ ] Run the candidate from a clean checkout with a disposable database.
 - [x] Add Alembic baseline migration and PostgreSQL migration/persistence CI coverage.
@@ -24,7 +24,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [x] Verify Alembic upgrade/downgrade paths on disposable SQLite and PostgreSQL databases in CI, including the decision-signature and approval schema revisions.
 - [x] Cover product-release SBOM comparison semantics (PURL identity boundaries, ambiguity, unidentified components, release isolation, authentication and read-only behavior) in automated tests; exact PR-head CI and CodeQL evidence is recorded in [PR #33](https://github.com/silvatechf/DeviceTrust/pull/33).
 - [ ] Demonstrate backup/restore and rollback.
-- [ ] Inspect exact-candidate CI results (pre-commit configuration, runtime and development dependency audits, Ruff, Bandit, tests, PostgreSQL and Compose), CodeQL and Gitleaks; record their URLs and manually triage findings.
+- [ ] Inspect exact-candidate CI results (pre-commit configuration, runtime and development dependency audits, Ruff, Bandit, tests, PostgreSQL and Compose), CodeQL and Gitleaks; record their URLs and manually triage findings. For the current main candidate `e03530c`, post-merge CI passed; CodeQL Python and JavaScript passed. Keep a fresh check for every later candidate.
 - [ ] Capture genuine screenshots from the running app using synthetic data only.
 - [ ] Complete the documentation and residual-risk review.
 
@@ -48,7 +48,7 @@ A checkbox must be marked only when the check has actually been performed and ev
 - The browser console receives the configured API token in page memory; there are no server-side browser sessions or backend-for-frontend.
 - Credential and signing-key administration remains offline CLI only.
 - Alembic migrations and explicit upgrade/downgrade paths are implemented; future schema changes still require reviewed migration scripts and coordinated rollback procedures.
-- Ed25519 decision signatures are integrated in main. Independent second-person approval is under validation in a separate feature branch and must not be claimed as part of main until integrated.
+- Ed25519 decision signatures and independent second-person approval are integrated in main through PRs #58 and #62. They establish key control and a technical two-person workflow, not legal identity or organizational independence.
 - Audit-chain appends are serialized for application writers sharing one database, but there is no external checkpoint or immutable retention; a privileged database administrator can still rewrite the chain.
 - The audit-chain state migration is additive. Its downgrade removes the required lock row; the new application then fails closed on writes until the migration is reapplied or the previous application version is restored. Automated downgrade tests use isolated disposable databases only; production rollback still requires coordinated application/database rollback and a preserved backup.
 - CycloneDX support is a bounded subset.
@@ -65,7 +65,7 @@ A checkbox must be marked only when the check has actually been performed and ev
 - Implemented authenticated product-release SBOM persistence for a bounded CycloneDX JSON 1.5 subset, including import provenance metadata, component occurrences, digest-based idempotency and component-scoped synthetic findings.
 - Implemented justified vulnerability triage, JSON/Markdown reports and SHA-256 audit-chain verification.
 - Implemented managed API identity and explicit route-scope enforcement, plus offline Ed25519 public-key lifecycle and detached decision-signature verification.
-- Independent second-person approval is implemented in the current feature branch pending CI/review/integration; do not present it as part of main until merged.
+- Implemented independent second-person approval using a distinct active operator principal, an approval-purpose Ed25519 key and a versioned policy.
 - Integrated linting, static security checks, dependency auditing, JavaScript syntax validation and pytest into CI.
 - Documented trust boundaries, threat scenarios, engineering decisions and residual risks.
 
