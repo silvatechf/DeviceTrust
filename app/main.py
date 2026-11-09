@@ -427,6 +427,9 @@ def create_decision_evidence_manifest(
     except decision_evidence.EvidenceManifestConflict as error:
         db.rollback()
         raise HTTPException(409, str(error)) from None
+    except decision_evidence.EvidenceManifestIntegrityError:
+        db.rollback()
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     except ValueError as error:
         db.rollback()
         raise HTTPException(422, str(error)) from None
