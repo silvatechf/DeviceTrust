@@ -6,6 +6,7 @@ from sqlalchemy import update
 
 from app import decision_signatures, identity
 from app.db import EvidenceArtifact, SessionLocal
+
 from .conftest import H
 from .test_decision_signatures import _keypair, _register, _signature_for
 from .test_vulnerability_decisions import _finding
