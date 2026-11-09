@@ -133,6 +133,37 @@ def revoke_public_key(db: Session, key_id: str) -> SigningKey:
     return item
 
 
+def get_signing_payload(db: Session, *, decision_id: int, principal_id: str, key_id: str) -> dict:
+    decision = db.get(VulnerabilityDecision, decision_id)
+    if decision is None:
+        raise LookupError("Decision not found")
+    if decision.principal_id != principal_id:
+        raise PermissionError("Only the decision author can request its signing payload")
+    key = db.get(SigningKey, key_id)
+    if key is None:
+        raise LookupError("Signing key not found")
+    if key.principal_id != principal_id or key.purpose != "decision-signing":
+        raise PermissionError("Signing key is not bound to this operator and purpose")
+    if key.revoked_at is not None:
+        raise PermissionError("Signing key has been revoked")
+    if key.expires_at is not None:
+        expiry = key.expires_at
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry <= utcnow():
+            raise PermissionError("Signing key has expired")
+    envelope = signing_envelope(decision)
+    return {
+        "decision_id": decision_id,
+        "key_id": key.id,
+        "key_fingerprint": key.fingerprint,
+        "algorithm": key.algorithm,
+        "envelope_version": ENVELOPE_VERSION,
+        "envelope_sha256": hashlib.sha256(envelope).hexdigest(),
+        "signing_payload_base64": base64.b64encode(envelope).decode("ascii"),
+    }
+
+
 def sign_decision(
     db: Session, *, decision_id: int, principal_id: str, key_id: str, signature_b64: str
 ) -> dict:
