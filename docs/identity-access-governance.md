@@ -38,11 +38,11 @@ The route-to-scope policy is explicit in app/identity.py. A protected route with
 - inventory:read, inventory:write
 - evidence:read, evidence:write
 - sbom:read, sbom:write
-- assessment:read, assessment:write, assessment:review, assessment:sign
+- assessment:read, assessment:write, assessment:review, assessment:sign, assessment:approve
 - audit:read
 - credentials:manage (reserved for future API-based credential administration)
 
-Decision-signature submission requires the separate assessment:sign scope and the same active operator principal that authored the decision. The signing key must be registered to that principal and use the decision-signing purpose. Signature reads require assessment:read. Reports require inventory:read, assessment:read and audit:read. Human review routes require the dedicated assessment:review scope and an active operator principal; service principals and legacy shared-key actors are rejected. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
+Decision-signature submission requires the separate assessment:sign scope and the same active operator principal that authored the decision. The signing key must be registered to that principal and use the decision-signing purpose. Independent approval requires assessment:approve, a distinct active operator principal and a separately registered key with the decision-approval purpose. Approval status reads require assessment:read. Signature reads require assessment:read. Reports require inventory:read, assessment:read and audit:read. Human review routes require the dedicated assessment:review scope and an active operator principal; service principals and legacy shared-key actors are rejected. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
 
 ## Offline administration
 
@@ -62,7 +62,8 @@ The command prints the raw token once. Store it in an approved secret manager or
 
 Only active operator principals can create human review decisions; service principals and legacy shared-key requests are rejected. The CLI also supports offline Ed25519 public-key registration and revocation. Supply a PEM public key file only; private keys must never be passed to DeviceTrust:
 
-    python -m app.identity_cli register-signing-key --principal-id PRINCIPAL_UUID --public-key-file operator-ed25519-public.pem --expires-in-days 365
+    python -m app.identity_cli register-signing-key --principal-id PRINCIPAL_UUID --public-key-file operator-ed25519-public.pem --purpose decision-signing --expires-in-days 365
+    python -m app.identity_cli register-signing-key --principal-id APPROVER_UUID --public-key-file approver-ed25519-public.pem --purpose decision-approval --expires-in-days 365
     python -m app.identity_cli revoke-signing-key --key-id SIGNING_KEY_UUID
 
 The CLI also supports:
@@ -99,6 +100,23 @@ The signed envelope uses RFC 8785 JCS, UTF-8 and a domain separator. It binds th
 
 The API token authenticates the request; the detached signature proves possession of the registered private key. Neither is legal identity proof or manufacturer authority.
 
+## Independent second-person approval workflow
+
+The initial approval policy is `devicetrust.approval-policy.v1`: one currently trusted author signature plus at least one approval from a distinct active operator principal. This is a technical two-person control, not an organizational quorum or legal sign-off.
+
+1. Create a separate managed operator principal for the approver. Do not reuse the decision author's principal, even if the approver has a second API credential.
+2. Register a distinct Ed25519 public key to the approver with the `decision-approval` purpose. The key fingerprint is globally unique, so a key already registered for decision signing cannot be reused for approval.
+3. The approver retrieves the exact approval bytes from `GET /sbom/decisions/{decision_id}/approval-payload?key_id=...` with a managed token scoped to `assessment:approve`. The service rejects self-approval, non-current decision revisions, inactive principals, wrong-purpose keys and decisions without a currently trusted author signature.
+4. The response includes the exact RFC 8785 JCS payload, decision digest, policy version and server-issued `approved_at` timestamp. The payload is valid for 30 minutes.
+5. Sign the decoded payload locally with the approver's private key. Submit `key_id`, `approved_at` and the Base64 signature to `POST /sbom/decisions/{decision_id}/approval`. DeviceTrust never receives the private key.
+6. Read `GET /sbom/decisions/{decision_id}/approval` to inspect immutable approval history and current policy status. Each approval separates mathematical `signature_valid`, current key/principal `trust_valid` and `eligible_for_current_revision`.
+
+The approval envelope binds the exact decision digest, finding, revision, approval purpose, approver principal, approval key ID/fingerprint, policy version and timestamp. The approval record and its audit event share one transaction. Identical retries from the same key are idempotent; the same key cannot create a second approval record for the same decision.
+
+A new decision revision makes approvals on the previous revision ineligible for current policy purposes without deleting historical approval records. Revoked/expired keys, disabled principals or a no-longer-trusted author signature also prevent an approval from satisfying the current policy. The signature may remain mathematically verifiable after revocation or disablement, but it is no longer trusted for current approval.
+
+The API token authenticates the approver request; the detached approval signature proves possession of the registered approval key. It does not establish civil identity, manufacturer authority or the truth of the underlying claim.
+
 ## Audit attribution and data handling
 
 Managed requests are attributed to principal:UUID. The actor is derived exclusively from the server-side credential lookup. Existing api-key audit events are retained unchanged. Raw tokens and request authorization values are not written to audit payloads.
@@ -107,7 +125,7 @@ The CLI never prints a token on revocation or disablement. Database access remai
 
 ## Verification
 
-The implementation includes tests for managed token authentication, read/write scope separation, multi-scope reports, legacy-key rejection while managed mode is active, credential revocation, principal disablement, expired credential rejection, keyed token-verifier persistence and scope allow-list validation.
+The implementation includes tests for managed token authentication, read/write scope separation, multi-scope reports, legacy-key rejection while managed mode is active, credential revocation, principal disablement, expired credential rejection, keyed token-verifier persistence, scope allow-list validation, detached decision signatures and independent approval policy enforcement.
 
 CI must pass SQLite migration/tests and PostgreSQL migration/persistence tests before this change is considered validated. These checks do not prove production readiness.
 
@@ -119,5 +137,6 @@ CI must pass SQLite migration/tests and PostgreSQL migration/persistence tests b
 - No human password, MFA, SSO/OIDC, session management, tenant isolation or customer-facing role hierarchy.
 - No last-used tracking; adding per-request writes would create avoidable contention on the current audit/database transaction path.
 - API tokens identify a configured principal, not a legally verified human.
-- Ed25519 signatures prove possession of a registered private key over the canonical decision envelope, not civil identity, manufacturer authority or claim truth. Key revocation changes current trust status but does not erase historical cryptographic verifiability.
+- Ed25519 decision signatures and approval signatures prove possession of registered private keys over canonical envelopes, not civil identity, manufacturer authority or claim truth. Key revocation or principal disablement changes current trust status but does not erase historical cryptographic verifiability.
+- Independent approval is a prototype two-person control. There is no organizational identity proof, approval quorum, legal sign-off or evidence artifact verification yet.
 - Audit hash chaining remains tamper-evident, not immutable; independent external checkpoints are not implemented.
