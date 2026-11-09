@@ -191,6 +191,8 @@ async def import_cyclonedx(
                 _reprocess_existing_import_references(
                     db, actor, existing, components, bom_metadata
                 )
+                db.commit()
+                db.refresh(existing)
             return existing, False
 
     findings, osv_enrichment = await sbom.scan_with_metadata_async(
@@ -212,6 +214,8 @@ async def import_cyclonedx(
             _reprocess_existing_import_references(
                 db, actor, existing, components, bom_metadata
             )
+            db.commit()
+            db.refresh(existing)
         return existing, False
 
     imported = SBOMImport(
