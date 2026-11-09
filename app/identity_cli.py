@@ -1,7 +1,8 @@
 import argparse
 from datetime import timedelta
+from pathlib import Path
 
-from . import audit, identity
+from . import audit, decision_signatures, identity
 from .db import SessionLocal, utcnow
 
 
@@ -27,6 +28,17 @@ def _parser() -> argparse.ArgumentParser:
 
     disable = commands.add_parser("disable-principal", help="Disable a principal and all its credentials.")
     disable.add_argument("--principal-id", required=True)
+
+    register_key = commands.add_parser(
+        "register-signing-key",
+        help="Register an operator Ed25519 public key; private keys are never imported.",
+    )
+    register_key.add_argument("--principal-id", required=True)
+    register_key.add_argument("--public-key-file", required=True)
+    register_key.add_argument("--expires-in-days", type=int, default=365)
+
+    revoke_key = commands.add_parser("revoke-signing-key", help="Revoke an operator signing public key.")
+    revoke_key.add_argument("--key-id", required=True)
     return parser
 
 
@@ -109,6 +121,38 @@ def main() -> None:
             )
             db.commit()
             print(f"Credential revoked: {args.credential_id}")
+            return
+
+        if args.command == "register-signing-key":
+            if not 1 <= args.expires_in_days <= 3650:
+                raise SystemExit("--expires-in-days must be between 1 and 3650")
+            try:
+                public_key_pem = Path(args.public_key_file).read_bytes()
+                key = decision_signatures.register_public_key(
+                    db,
+                    principal_id=args.principal_id,
+                    public_key_pem=public_key_pem,
+                    expires_at=utcnow() + timedelta(days=args.expires_in_days),
+                )
+            except (OSError, LookupError, PermissionError, ValueError) as exc:
+                db.rollback()
+                raise SystemExit(str(exc)) from None
+            db.commit()
+            print(f"Signing key ID: {key.id}")
+            print(f"Principal ID: {key.principal_id}")
+            print(f"Fingerprint (SHA-256): {key.fingerprint}")
+            print(f"Expires at: {key.expires_at.isoformat() if key.expires_at else 'never'}")
+            return
+
+        if args.command == "revoke-signing-key":
+            try:
+                key = decision_signatures.revoke_public_key(db, args.key_id)
+            except LookupError as exc:
+                db.rollback()
+                raise SystemExit(str(exc)) from None
+            db.commit()
+            print(f"Signing key revoked: {key.id}")
+            print(f"Fingerprint (SHA-256): {key.fingerprint}")
             return
 
         if args.command == "disable-principal":
