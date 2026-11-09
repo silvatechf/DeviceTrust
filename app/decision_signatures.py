@@ -335,7 +335,14 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
         principal = db.get(Principal, key.principal_id)
         principal_status = (
             "active"
-            if principal is not None and principal.status == "active" and principal.kind == "operator"
+            if (
+                principal is not None
+                and principal.status == "active"
+                and principal.kind == "operator"
+                and key.principal_id == item.principal_id
+                and item.principal_id == decision.principal_id
+                and key.purpose == "decision-signing"
+            )
             else "disabled_or_invalid"
         )
         signatures.append(
