@@ -25,6 +25,10 @@ class EvidenceManifestConflict(RuntimeError):
     """Raised when a decision already has a different immutable evidence manifest."""
 
 
+class EvidenceManifestIntegrityError(RuntimeError):
+    """Raised when a stored evidence manifest fails integrity validation."""
+
+
 def _utc_iso(value):
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
@@ -156,5 +160,7 @@ def current_manifest_digest(db: Session, decision_id: int) -> str | None:
     if result is None:
         return None
     if not result["integrity_valid"]:
-        raise ValueError("Stored decision evidence manifest integrity validation failed")
+        raise EvidenceManifestIntegrityError(
+            "Stored decision evidence manifest integrity validation failed"
+        )
     return result["manifest_sha256"]
