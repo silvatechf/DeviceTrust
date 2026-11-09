@@ -220,6 +220,12 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert "intelligence" in assessment_finding_columns
         assert "applicability" in assessment_finding_columns
         assert assessment_finding_columns["applicability"]["nullable"] is False
+        assert "bom_metadata" in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_imports")
+        }
+        assert "bom_ref" in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_components")
+        }
         with target_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
@@ -228,6 +234,21 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
                 text("SELECT COUNT(*) FROM audit_chain_state")
             ) == 1
         command.check(config)
+
+        command.downgrade(config, "0007_sbom_finding_applicability")
+        assert "bom_metadata" not in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_imports")
+        }
+        assert "bom_ref" not in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_components")
+        }
+        command.upgrade(config, "head")
+        assert "bom_metadata" in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_imports")
+        }
+        assert "bom_ref" in {
+            column["name"] for column in inspect(target_engine).get_columns("sbom_components")
+        }
 
         command.downgrade(config, "0006_identity_access")
         assert "applicability" not in {
