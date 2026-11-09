@@ -364,7 +364,6 @@ def test_expired_signing_key_cannot_provide_payload_or_sign(client, monkeypatch)
     _, public_pem = _keypair()
     key_id, _ = _register(principal_id, public_pem)
     with SessionLocal() as db:
-        key = db.get(SigningKey, key_id)
         key.expires_at = utcnow() - timedelta(seconds=1)
         db.commit()
     payload = client.get(
