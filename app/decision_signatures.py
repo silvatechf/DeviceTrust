@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import rfc8785
 
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from sqlalchemy import select
@@ -57,7 +57,7 @@ def _registered_public_key(key: SigningKey) -> Ed25519PublicKey:
         raise ValueError("registered signing key algorithm is not supported")
     try:
         public_key = serialization.load_pem_public_key(key.public_key_pem.encode("ascii"))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, UnsupportedAlgorithm):
         raise ValueError("registered public key material is invalid") from None
     if not isinstance(public_key, Ed25519PublicKey):
         raise ValueError("registered signing key is not Ed25519")
@@ -90,7 +90,7 @@ def register_public_key(
         raise PermissionError("Only operator principals can register decision-signing keys")
     try:
         key = serialization.load_pem_public_key(public_key_pem)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, UnsupportedAlgorithm):
         raise ValueError("public key must be a valid PEM-encoded Ed25519 public key") from None
     if not isinstance(key, Ed25519PublicKey):
         raise ValueError("only Ed25519 public keys are supported")
