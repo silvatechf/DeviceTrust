@@ -63,9 +63,9 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Goal:** provide explainable product-version impact assessments, not automatic compliance conclusions.
 
-- [ ] Add CISA KEV enrichment with source, retrieval timestamp and catalog metadata. See proposed [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
-- [ ] Add FIRST EPSS enrichment with score, model/date metadata and retrieval timestamp. See proposed [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
-- [ ] Preserve feed provenance, freshness and lookup failures; missing intelligence must not mean no risk.
+- [x] Add CISA KEV enrichment with source, retrieval timestamp and catalog metadata. See implemented [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
+- [x] Add FIRST EPSS enrichment with score, model/date metadata and retrieval timestamp. See implemented [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
+- [x] Preserve feed provenance, freshness and lookup failures; missing intelligence must not mean no risk.
 - [ ] Match findings against product/component versions with ecosystem-aware semantics and explicit uncertainty.
 - [ ] Add human-reviewed affected/not-affected decisions with evidence and rationale.
 - [ ] Implement CycloneDX VEX export only after product/version/component relationships and review controls exist.
