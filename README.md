@@ -90,8 +90,8 @@ DeviceTrust is a **modular monolith**, not a set of microservices. FastAPI handl
 ```mermaid
 flowchart LR
     CLIENT[API client / local console] --> API[FastAPI]
-    API --> AUTH[Shared API key]
-    AUTH --> ROUTES[Route handlers]
+    API --> AUTH[Legacy key or managed scoped token]
+    AUTH --> ROUTES[Route handlers + scope enforcement]
     ROUTES --> POSTURE[Posture service]
     ROUTES --> EVIDENCE[Evidence + normalizer]
     ROUTES --> SBOM[SBOM import + reassessment]
@@ -142,7 +142,7 @@ Schema changes are managed through Alembic. The application does not create or m
 - Operator console: http://127.0.0.1:8000/
 - Interactive API documentation: http://127.0.0.1:8000/docs
 
-The console receives the shared API key in browser memory. Use it only with a trusted local instance. Do not expose the service or key to the public internet.
+The console keeps the supplied API credential in page memory only. The default local authentication mode is legacy; managed mode accepts individually revocable scoped tokens. Use the console only with a trusted local instance and do not expose this prototype to the public internet.
 
 ### 3. Load synthetic demo data (optional)
 
