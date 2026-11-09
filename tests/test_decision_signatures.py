@@ -194,11 +194,7 @@ def test_signing_scope_is_separate_and_required(client, monkeypatch):
     decision_id = _decision(client, monkeypatch, principal_id, token)
     private_key, public_pem = _keypair()
     key_id, _ = _register(principal_id, public_pem)
-    with SessionLocal() as db:
-        decision = db.get(VulnerabilityDecision, decision_id)
-        signature = base64.b64encode(
-            private_key.sign(decision_signatures.signing_envelope(decision))
-        ).decode("ascii")
+    signature = base64.b64encode(b"x" * 64).decode("ascii")
 
     response = client.post(
         f"/sbom/decisions/{decision_id}/signature",
