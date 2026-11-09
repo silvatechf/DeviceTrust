@@ -18,7 +18,7 @@ Implement trust assurance as four separate, composable controls. They must not b
 
 ### 1. Detached Ed25519 signatures for review decisions
 
-- Use Ed25519 detached signatures over a versioned, domain-separated, deterministic signing envelope.
+- Use Ed25519 detached signatures over a versioned, domain-separated signing envelope. Canonicalize the envelope with RFC 8785 JSON Canonicalization Scheme (JCS), UTF-8 bytes and the fixed `DeviceTrust\\0DecisionSignature\\0v1\\0` domain prefix.
 - The envelope binds at minimum: schema/version identifier, decision ID, exact assessment finding ID, revision, predecessor decision ID, principal ID, decision state, justification, responses, evidence manifest digest and creation timestamp.
 - Canonicalization must be specified and tested byte-for-byte. Do not sign arbitrary API JSON, database serialization, or a representation that can change between runtimes.
 - The server verifies signatures using registered public keys and persists the signature, key ID/fingerprint, algorithm, signing-envelope version and verification result.
@@ -65,7 +65,7 @@ Implement trust assurance as four separate, composable controls. They must not b
 
 ## Rollout sequence
 
-1. **Signature foundation (implemented in PR #57):** canonical domain-separated envelope, Ed25519 verification, operator-bound public-key registry, offline registration/revocation and signature re-verification. The implementation uses `cryptography` and keeps private keys outside DeviceTrust. Independent cross-language test vectors and a formal key-custody runbook remain follow-up work.
+1. **Signature foundation (implemented in PR #57):** canonical domain-separated envelope, Ed25519 verification, operator-bound public-key registry, offline registration/revocation and signature re-verification. The implementation uses `cryptography` and keeps private keys outside DeviceTrust. RFC 8785 canonicalization is used by the implementation; independent cross-language test vectors and a formal key-custody runbook remain follow-up work.
 2. **Decision signing (initial implementation in PR #57):** an author can attach one verified detached signature to an immutable decision revision; historical unsigned records remain explicitly unsigned. Making a signature mandatory for every new decision is not yet enforced.
 3. **Second-person approval:** separate approver identity and signature; export eligibility bound to the exact current revision and policy.
 4. **Evidence verification:** bounded artifact manifest and digest/signature verification with separate trust states.
