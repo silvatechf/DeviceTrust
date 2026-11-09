@@ -381,6 +381,26 @@ def list_vulnerability_decisions(
         raise HTTPException(404, str(error)) from None
 
 
+@app.get("/sbom/decisions/{decision_id}/signing-payload")
+def get_decision_signing_payload(
+    decision_id: int,
+    key_id: str = Query(min_length=36, max_length=36),
+    db: Session = Depends(get_db),
+    actor: str = Depends(auth),
+):
+    if not actor.startswith("principal:"):
+        raise HTTPException(403, "Decision signing requires a managed operator principal")
+    principal_id = actor.removeprefix("principal:")
+    try:
+        return decision_signatures.get_signing_payload(
+            db, decision_id=decision_id, principal_id=principal_id, key_id=key_id
+        )
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from None
+    except PermissionError as error:
+        raise HTTPException(403, str(error)) from None
+
+
 @app.post("/sbom/decisions/{decision_id}/signature", status_code=201)
 def create_decision_signature(
     decision_id: int,
