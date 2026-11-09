@@ -25,7 +25,7 @@ The prototype manages device metadata, posture evidence, SBOM documents, vulnera
 
 | Threat | Current mitigation | Evidence / limitation |
 |---|---|---|
-| Unauthorized API access | Shared API key, constant-time comparison, fail-closed configuration | API tests cover missing/invalid credentials; no identity-scoped authorization or tenant isolation |
+| Unauthorized API access | Legacy shared key or managed principal-bound credentials with expiry, revocation and explicit route scopes | API and identity tests cover authentication and scope boundaries; legacy mode remains default and there is no tenant isolation |
 | Device identifier injection | Strict Pydantic pattern and extra-field rejection | API tests cover traversal-like identifiers and unknown fields |
 | Malformed or oversized SBOM | 2 MiB streaming body cap; component count and field limits; JSON/PURL validation | Input-limit and SBOM validation tests; full CycloneDX schema validation remains absent |
 | Incorrect CVE matching | PURL type/name matching for local demo records; version-specific OSV query | Tests cover ecosystem/package mismatch and fixed versions; local feed is synthetic |
@@ -35,9 +35,11 @@ The prototype manages device metadata, posture evidence, SBOM documents, vulnera
 | Audit database rewriting | SHA-256 hash chain | Tests detect mutation; final-entry deletion and privileged recomputation are not detectable without external checkpoints |
 | Compromised API key | Individually revocable managed credentials and explicit scopes | Legacy mode remains available; no tenant isolation or MFA |
 | Forged or altered review decision | Ed25519 detached signature over a versioned canonical decision envelope; signature re-verification on read | Key possession is not legal identity; author signatures remain optional |
-| Self-approved or collusive review | Separate approval-purpose Ed25519 key, distinct active operator principal, versioned one-author-plus-one-approver policy and exact decision-digest binding | Implemented in the current feature branch pending CI/review/integration; no organizational quorum, legal identity proof or anti-collusion guarantee |
+| Self-approved or collusive review | Separate approval-purpose Ed25519 key, distinct active operator principal, versioned one-author-plus-one-approver policy and exact decision-digest binding | Integrated in main through PR #62; no organizational quorum, legal identity proof or anti-collusion guarantee |
 | Signing-key compromise | Operator-held private keys; public-key registration, expiry and revocation | No hardware-backed key custody, automated compromise response or independent identity proof |
 | Resource exhaustion | SBOM body and component limits | No global request rate limit, concurrency quota or reverse-proxy policy |
+| Evidence artifact substitution or database corruption | Server-computed SHA-256 and byte length; digest rechecked before download; artifact and audit event share a transaction | Tests cover altered BLOB detection and fail-closed download; a privileged database writer can replace both bytes and stored digest without an independent checkpoint |
+| Evidence upload abuse | 5 MiB streaming cap, allow-listed declared media types, observation-scoped attachment and opaque attachment downloads | Tests cover oversized/empty/unsupported uploads and read/write scopes; no malware scanning, content sniffing or rate limit |
 
 ## Abuse cases to test
 
@@ -49,10 +51,14 @@ The prototype manages device metadata, posture evidence, SBOM documents, vulnera
 6. Attempt self-approval using a second credential and a second key bound to the author principal.
 7. Attempt approval without a trusted author signature, with a decision-signing-purpose key, with an expired payload, or after a newer decision revision exists.
 8. Disable or revoke an approver after approval and verify that historical signature validity remains distinct from current trust and policy eligibility.
+9. Upload empty, oversized and unsupported-media artifacts; verify the server rejects them before persistence.
+10. Modify stored artifact bytes without changing the digest; verify integrity detection and fail-closed download.
+11. Verify an evidence:read-only credential cannot upload artifacts and that artifact metadata/content requires evidence:read.
+12. Inject an audit append failure during artifact attachment and verify both artifact and audit writes roll back.
 
 ## Residual risk
 
-Decision signatures improve integrity and key attribution, but the application does not yet require signatures for every decision, verify evidence artifacts or anchor audit checkpoints outside the database. The current feature branch adds a separate second-person approval workflow; until it is integrated into main, the deployed main branch does not enforce that control. Even after integration, the prototype cannot prove organizational independence, prevent collusion or establish legal identity. A privileged database operator can still alter or delete records; signature re-verification detects changes to signed decision content but does not protect the entire database or audit history. Revoked keys remain mathematically verifiable for historical signatures, while their current trust status is reported as revoked.
+Decision signatures and independent second-person approval are integrated in main, but signatures are not mandatory for every decision and the prototype cannot prove organizational independence, prevent collusion or establish legal identity. Evidence artifacts are now stored as bounded database BLOBs with server-computed SHA-256 digests and byte-length checks; verification detects changes to retained bytes and downloads fail closed on mismatch. This does not authenticate the source, validate the claim, scan for malware or bind an artifact to a specific vulnerability-decision revision. A privileged database operator can still replace both the artifact bytes and its stored digest, or alter/delete the audit chain, because no independent checkpoint or external trust anchor exists. Revoked keys remain mathematically verifiable for historical signatures, while their current trust status is reported as revoked.
 
 
 

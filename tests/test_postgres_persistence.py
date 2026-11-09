@@ -16,7 +16,7 @@ from sqlalchemy import create_engine, delete, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app import audit, decision_approvals, decision_signatures, identity, product_sbom, vulnerability_decisions
+from app import audit, decision_approvals, decision_signatures, evidence_artifacts, identity, product_sbom, vulnerability_decisions
 from app.audit import record, verify
 from app.db import (
     APICredential,
@@ -24,6 +24,8 @@ from app.db import (
     AuditEntry,
     DecisionApproval,
     Device,
+    EvidenceArtifact,
+    EvidenceObservation,
     Principal,
     Product,
     ProductFinding,
@@ -1065,3 +1067,52 @@ def test_ed25519_decision_signature_persists_and_reverifies_postgres():
             session.execute(delete(Principal).where(Principal.id == principal_id))
             session.execute(delete(Principal).where(Principal.id == approver_id))
             session.commit()
+
+
+def test_evidence_artifact_blob_and_digest_persist_postgres():
+    payload = b"%PDF-1.7\\nPostgreSQL evidence artifact\\n"
+    digest = hashlib.sha256(payload).hexdigest()
+    observation = EvidenceObservation(
+        device_id=None,
+        source_type="manual",
+        attribute="firmware_note",
+        value="PostgreSQL evidence artifact persistence fixture",
+        observed_at=utcnow(),
+        confidence="low",
+        verification_status="unverified",
+    )
+    with Session(application_engine) as session:
+        session.add(observation)
+        session.flush()
+        observation_id = observation.id
+        artifact, _created = evidence_artifacts.create_artifact(
+            session,
+            observation_id=observation_id,
+            content=payload,
+            media_type="application/pdf",
+            actor="postgres-evidence-integration",
+        )
+        artifact_id = artifact.id
+        session.commit()
+
+    verification_engine = create_engine(os.environ["DATABASE_URL"])
+    try:
+        with Session(verification_engine) as session:
+            stored = session.get(EvidenceArtifact, artifact_id)
+            assert stored is not None
+            assert stored.content == payload
+            assert stored.sha256 == digest
+            assert stored.byte_size == len(payload)
+            assert evidence_artifacts.verify_artifact(stored)["valid"] is True
+    finally:
+        with Session(verification_engine) as session:
+            session.execute(
+                delete(EvidenceArtifact).where(EvidenceArtifact.id == artifact_id)
+            )
+            session.execute(
+                delete(EvidenceObservation).where(
+                    EvidenceObservation.id == observation_id
+                )
+            )
+            session.commit()
+        verification_engine.dispose()

@@ -13,7 +13,7 @@ DeviceTrust is an early-stage engineering prototype. The following boundaries mu
 ## Decision signatures and approval
 
 - Ed25519 detached signatures are supported for exact immutable vulnerability decision revisions. Private keys remain outside DeviceTrust; public keys are registered to operator principals and can be expired or revoked.
-- Independent second-person approval uses a distinct active operator principal and a separately registered approval-purpose key. The initial policy requires a trusted author signature plus one independent approval; implementation in the current feature branch is pending CI/review/integration.
+- Independent second-person approval uses a distinct active operator principal and a separately registered approval-purpose key. The initial policy requires a trusted author signature plus one independent approval; integrated through PR #62.
 - Signatures prove possession of registered keys, not civil identity, manufacturer authority or the truth of a decision.
 - Approval policy cannot prevent collusion or prove organizational independence. No legal sign-off or qualified electronic signature is provided.
 - Signatures and approvals are not yet mandatory for every decision and are not consumed by a VEX exporter.
@@ -26,8 +26,11 @@ DeviceTrust is an early-stage engineering prototype. The following boundaries mu
 - Normalization covers selected attributes only.
 - Stale/conflicting evidence is not resolved.
 - Evidence observations do not currently feed posture calculations.
-- A supplied artifact digest does not prove source authenticity or claim truth.
-- Evidence manifest integrity, artifact signature verification and source authentication are not implemented.
+- Actual evidence artifacts can be attached to observations and are stored as database BLOBs with a server-computed SHA-256 digest and byte length. The API verifies bytes again before download and fails closed on mismatch.
+- Artifact uploads are limited to 5 MiB and an allow-list of declared media types. There is no content sniffing, malware scanning or source authentication.
+- The artifact digest proves consistency with the stored digest only. A privileged database writer can replace both bytes and digest.
+- Artifacts are linked to observations, not to exact vulnerability decision revisions; decision evidence references remain opaque.
+- Artifact storage is a bounded prototype database-BLOB design, not scalable object storage. External signed evidence manifests and independent trust anchors remain unimplemented.
 
 ## Vulnerability intelligence
 
@@ -51,4 +54,4 @@ DeviceTrust is an early-stage engineering prototype. The following boundaries mu
 - No active LAN scanning, packet capture or device agents.
 - No inline IDS/IPS, attack prevention or physical safety control.
 - No CRA conformity assessment, certification or regulatory reporting.
-- No CycloneDX VEX export; VEX remains gated on evidence integrity and external audit assurance.
+- No CycloneDX VEX export; VEX remains gated on exact decision-revision evidence binding, stronger evidence provenance and external audit assurance.

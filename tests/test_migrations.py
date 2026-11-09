@@ -15,6 +15,7 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
     try:
         command.upgrade(config, "0002_persistent_sbom")
         assert not inspect(engine).has_table("audit_chain_state")
+        assert not inspect(engine).has_table("evidence_artifacts")
 
         command.upgrade(config, "head")
         assert inspect(engine).has_table("audit_chain_state")
@@ -24,6 +25,22 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         assert inspect(engine).has_table("signing_keys")
         assert inspect(engine).has_table("signed_decisions")
         assert inspect(engine).has_table("decision_approvals")
+        assert inspect(engine).has_table("evidence_artifacts")
+        artifact_columns = {
+            column["name"]: column
+            for column in inspect(engine).get_columns("evidence_artifacts")
+        }
+        assert {
+            "id", "observation_id", "sha256", "byte_size", "media_type",
+            "content", "uploaded_by", "created_at",
+        }.issubset(artifact_columns)
+        assert artifact_columns["content"]["nullable"] is False
+        artifact_checks = inspect(engine).get_check_constraints("evidence_artifacts")
+        size_check = next(
+            check["sqltext"] for check in artifact_checks
+            if check["name"] == "ck_evidence_artifact_size"
+        )
+        assert "5242880" in size_check
         signing_key_checks = inspect(engine).get_check_constraints("signing_keys")
         purpose_check = next(
             check["sqltext"] for check in signing_key_checks
@@ -80,11 +97,13 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         assert not inspect(engine).has_table("signing_keys")
         assert not inspect(engine).has_table("signed_decisions")
         assert not inspect(engine).has_table("decision_approvals")
+        assert not inspect(engine).has_table("evidence_artifacts")
         command.upgrade(config, "head")
         assert inspect(engine).has_table("vulnerability_decisions")
         assert inspect(engine).has_table("signing_keys")
         assert inspect(engine).has_table("signed_decisions")
         assert inspect(engine).has_table("decision_approvals")
+        assert inspect(engine).has_table("evidence_artifacts")
 
         command.downgrade(config, "0007_sbom_finding_applicability")
         assert not inspect(engine).has_table("vulnerability_decisions")
