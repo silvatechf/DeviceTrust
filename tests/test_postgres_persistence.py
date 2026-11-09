@@ -387,6 +387,7 @@ def test_product_sbom_records_survive_database_engine_disposal():
             bom_metadata={
                 "serial_number": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
                 "version": 2,
+                "version_explicit": True,
                 "metadata_component": None,
             },
         )
