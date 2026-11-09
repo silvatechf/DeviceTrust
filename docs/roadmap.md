@@ -98,7 +98,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 **Architecture and implementation:** [Identity and Access Governance](identity-access-governance.md) documents the implemented managed API credential foundation and its remaining boundaries. Managed mode is opt-in; legacy shared-key mode remains the backwards-compatible default.
 
 - [x] Add operator/service principals and independently revocable API credentials with bounded expiry.
-- [x] Store only SHA-256 verifiers for high-entropy machine tokens; show raw tokens once through the offline CLI.
+- [x] Store only keyed HMAC-SHA256 verifiers for high-entropy machine tokens using an external pepper; show raw tokens once through the offline CLI.
 - [x] Enforce explicit route-level scopes and fail closed when a protected route has no policy.
 - [x] Add offline principal creation, credential issuance/rotation/revocation and principal disablement.
 - [x] Attribute managed API requests to stable principal IDs while preserving historical audit hashes and actor values.
