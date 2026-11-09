@@ -23,6 +23,8 @@ The intended workflow is to connect:
 
 This direction is relevant to product-security workflows under the EU Cyber Resilience Act (CRA), but DeviceTrust currently supports only a small subset of the underlying engineering activities. CRA obligations extend beyond SBOMs and vulnerability triage. Legal applicability and manufacturer responsibilities must be assessed for each product and organisation.
 
+A future product direction is to correlate credential-exposure signals (for example, sanitised secret-scanning findings) and machine-identity evidence with product releases and remediation records. This is **not implemented**: DeviceTrust does not currently scan repositories or firmware for secrets, integrate with Vault/PKI, validate machine identities, rotate credentials or enforce network controls. See [Credential Exposure and Machine Identity scope](docs/credential-exposure-scope.md).
+
 See [Market Positioning](docs/market-positioning.md) for target users, buyer hypotheses, regulatory boundaries, market validation and the claims policy.
 
 ## The current prototype
@@ -71,7 +73,7 @@ The product SBOM persistence API was merged through [PR #22](https://github.com/
 - Product-to-device relationship inference.
 - SPDX ingestion or CycloneDX VEX generation.
 - KEV/EPSS enrichment and contextual product-version assessment.
-- Individual operator accounts, RBAC, tenant isolation or production browser sessions.
+- Individual operator accounts, RBAC, tenant isolation or production browser sessions.\n- Credential-exposure scanning/ingestion, secret-manager integration, machine-identity governance or automated credential lifecycle controls.
 - Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
 - Active LAN discovery, packet capture, device agents or independent firmware/hardware attestation.
 - Immutable/WORM audit storage, external audit checkpoints or independent audit anchoring.
@@ -203,7 +205,7 @@ Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Contributions 
 
 | Document | What it helps explain |
 |---|---|
-| [Market positioning](docs/market-positioning.md) | Target market, CRA context, buyer hypotheses and claims policy |
+| [Market positioning](docs/market-positioning.md) | Target market, CRA context, buyer hypotheses and claims policy |\n| [Credential exposure scope](docs/credential-exposure-scope.md) | Proposed credential-exposure evidence workflow, security invariants and machine-identity boundaries |
 | [Architecture](docs/architecture.md) | Request flow, modules, data flow and trust boundaries |
 | [Engineering decisions](docs/engineering-decisions.md) | Why the current design was chosen and its trade-offs |
 | [Security controls](docs/security-controls.md) | Implemented controls, tests and limitations |
