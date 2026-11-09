@@ -64,7 +64,7 @@ The import digest is calculated from the exact request bytes. A repeated digest 
 
 The comparison reports additions, removals and matched-component changes. Matching excludes only the PURL version; qualifiers and subpath remain identity boundaries. Duplicate identities are marked ambiguous, and components without usable PURLs remain unidentified rather than being matched by name or ordinal. The comparison is read-only and does not re-evaluate vulnerability findings. PURL identity is a conservative heuristic, not proof of artifact or supplier equivalence.
 
-A versioned reassessment workflow is under review in [PR #45](https://github.com/silvatechf/DeviceTrust/pull/45). It introduces separate assessment runs and findings for stored imports, preserves the original SBOM evidence and legacy findings, and exposes authenticated history. Treat this workflow as proposed until the pull request is merged and its checks pass.
+The versioned reassessment workflow was merged through [PR #45](https://github.com/silvatechf/DeviceTrust/pull/45). It adds separate assessment runs and findings for stored imports, preserves the original SBOM evidence and legacy findings, and exposes authenticated history. KEV/EPSS enrichment is a separate pending change in [PR #47](https://github.com/silvatechf/DeviceTrust/pull/47).
 
 The product SBOM persistence API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). Comparison is implemented in the current prototype; see the PR history and test matrix for exact validation evidence. Neither workflow makes DeviceTrust a production-ready service.
 
