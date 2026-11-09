@@ -63,7 +63,7 @@ The persistent SBOM work introduces these authenticated endpoints:
 - `POST /sbom/imports/{import_id}/assessments` — request a new assessment with an `Idempotency-Key`.
 - `GET /sbom/imports/{import_id}/assessments` — list historical assessment runs.
 - `GET /sbom/imports/{import_id}/assessments/{assessment_id}/findings` — list findings for one run.
-- `POST /sbom/assessment-findings/{finding_id}/decisions` — append an attributable human review revision (managed operator with `assessment:review`).
+- `POST /sbom/assessment-findings/{finding_id}/decisions` — append an attributable human review revision (managed operator with `assessment:review` and an `Idempotency-Key`).
 - `GET /sbom/assessment-findings/{finding_id}/decisions` — retrieve the complete decision history.
 
 The import digest is calculated from the exact request bytes. A repeated digest for the same release and format returns the existing import. Only fully validated imports are persisted. The API does not store raw SBOM documents or infer a relationship between a product and a device.
