@@ -15,7 +15,7 @@ A principal represents an accountable operator or machine integration.
 - Credentials have a unique non-secret prefix, a keyed HMAC-SHA256 token verifier, an allow-listed scope set, creation/expiry timestamps and a revocation timestamp.
 - Tokens contain 256 bits of cryptographically generated entropy. The raw token is displayed only by the offline creation command and is never stored.
 - Credentials expire after 90 days by default; the creation service rejects expiries beyond 365 days.
-- Authentication checks credential digest, expiry, revocation and principal status on every request. No positive authentication cache is used.
+- Authentication checks the keyed credential verifier, expiry, revocation and principal status on every request. No positive authentication cache is used.
 
 The HMAC verifier uses a 32-byte hex pepper supplied through DEVICETRUST_CREDENTIAL_PEPPER. Configure the same pepper for the API process and offline CLI, and keep it outside the database. This is a machine-token verifier, not a password hashing strategy. Human passwords are not supported. Managed authentication fails closed with 503 if the pepper is missing or malformed.
 
@@ -74,7 +74,7 @@ The CLI never prints a token on revocation or disablement. Database access remai
 
 ## Verification
 
-The implementation includes tests for managed token authentication, read/write scope separation, multi-scope reports, legacy-key rejection while managed mode is active, credential revocation, principal disablement, expired credential rejection, token digest persistence and scope allow-list validation.
+The implementation includes tests for managed token authentication, read/write scope separation, multi-scope reports, legacy-key rejection while managed mode is active, credential revocation, principal disablement, expired credential rejection, keyed token-verifier persistence and scope allow-list validation.
 
 CI must pass SQLite migration/tests and PostgreSQL migration/persistence tests before this change is considered validated. These checks do not prove production readiness.
 
