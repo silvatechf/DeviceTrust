@@ -23,6 +23,13 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         assert inspect(engine).has_table("vulnerability_decisions")
         assert inspect(engine).has_table("signing_keys")
         assert inspect(engine).has_table("signed_decisions")
+        assert inspect(engine).has_table("decision_approvals")
+        signing_key_checks = inspect(engine).get_check_constraints("signing_keys")
+        purpose_check = next(
+            check["sqltext"] for check in signing_key_checks
+            if check["name"] == "ck_signing_key_purpose"
+        )
+        assert "decision-approval" in purpose_check
         decision_columns = {
             column["name"]: column
             for column in inspect(engine).get_columns("vulnerability_decisions")
@@ -72,10 +79,12 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         assert not inspect(engine).has_table("vulnerability_decisions")
         assert not inspect(engine).has_table("signing_keys")
         assert not inspect(engine).has_table("signed_decisions")
+        assert not inspect(engine).has_table("decision_approvals")
         command.upgrade(config, "head")
         assert inspect(engine).has_table("vulnerability_decisions")
         assert inspect(engine).has_table("signing_keys")
         assert inspect(engine).has_table("signed_decisions")
+        assert inspect(engine).has_table("decision_approvals")
 
         command.downgrade(config, "0007_sbom_finding_applicability")
         assert not inspect(engine).has_table("vulnerability_decisions")
