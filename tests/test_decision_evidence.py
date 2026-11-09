@@ -248,6 +248,12 @@ def test_manifest_artifact_tampering_invalidates_manifest_and_signing_payload(cl
     )
     assert manifest.status_code == 200
     assert manifest.json()["integrity_valid"] is False
+    retry = client.post(
+        f"/sbom/decisions/{decision_id}/evidence-manifest",
+        headers={"X-API-Key": token},
+        json={"artifact_ids": [artifact_id]},
+    )
+    assert retry.status_code == 503
     payload = client.get(
         f"/sbom/decisions/{decision_id}/signing-payload",
         params={"key_id": key_id},
