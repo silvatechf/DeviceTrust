@@ -21,8 +21,12 @@ def acquire_chain_lock(db: Session) -> None:
         return
 
     dialect = db.get_bind().dialect.name
-    if dialect == "sqlite":
+    if dialect == "sqlite" and transaction is None:
+        # Acquire the writer reservation before the first read whenever possible.
         db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    # If a caller has already read in this transaction, SQLite cannot accept a
+    # second BEGIN IMMEDIATE. The singleton UPDATE below then acquires the write
+    # lock in the existing transaction; a lock-upgrade failure aborts the write.
     elif dialect == "postgresql":
         db.execute(text("SET LOCAL lock_timeout = '10s'"))
 
