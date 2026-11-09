@@ -192,7 +192,14 @@ def approve_decision(
     if approved_at > now + FUTURE_CLOCK_SKEW or approved_at < now - APPROVAL_WINDOW:
         raise ValueError("approval payload has expired; request a new approval payload")
 
-    decision_digest = hashlib.sha256(decision_signatures.signing_envelope(decision)).hexdigest()
+    decision_digest = hashlib.sha256(
+        decision_signatures.signing_envelope(
+            decision,
+            evidence_manifest_sha256=decision_evidence.current_manifest_digest(
+                db, decision.id
+            ),
+        )
+    ).hexdigest()
     envelope = approval_envelope(
         decision,
         decision_digest=decision_digest,
@@ -293,7 +300,19 @@ def get_decision_approval(db: Session, decision_id: int) -> dict:
     decision = db.get(VulnerabilityDecision, decision_id)
     if decision is None:
         raise LookupError("Decision not found")
-    current_digest = hashlib.sha256(decision_signatures.signing_envelope(decision)).hexdigest()
+    manifest_digest = decision_evidence.current_manifest_digest(db, decision.id)
+    current_digest = hashlib.sha256(
+        decision_signatures.signing_envelope(
+            decision, evidence_manifest_sha256=manifest_digest
+        )
+    ).hexdigest()
+    legacy_digest = hashlib.sha256(
+        decision_signatures.legacy_signing_envelope(decision)
+    ).hexdigest()
+    current_decision_digests = {current_digest}
+    if manifest_digest is None:
+        # Preserve historical v1 approvals when no evidence manifest was bound.
+        current_decision_digests.add(legacy_digest)
     current_revision = _current_revision(db, decision)
     author_signature_trusted = _trusted_author_signature(db, decision_id)
     items = db.scalars(
@@ -337,7 +356,7 @@ def get_decision_approval(db: Session, decision_id: int) -> dict:
             signature_valid = (
                 item.envelope_version == ENVELOPE_VERSION
                 and item.envelope_sha256 == hashlib.sha256(envelope).hexdigest()
-                and item.decision_envelope_sha256 == current_digest
+                and item.decision_envelope_sha256 in current_decision_digests
             )
             if signature_valid:
                 decision_signatures._registered_public_key(key).verify(
