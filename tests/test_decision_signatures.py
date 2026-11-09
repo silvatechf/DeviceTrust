@@ -79,7 +79,8 @@ def test_signing_envelope_is_domain_separated_and_deterministic(client, monkeypa
         second = decision_signatures.signing_envelope(decision)
     assert first == second
     assert first.startswith(decision_signatures.DOMAIN_SEPARATOR)
-    assert b'"envelope_version":"devicetrust.decision-signature.v1"' in first
+    assert b'"envelope_version":"devicetrust.decision-signature.v2"' in first
+    assert b'"evidence_manifest_sha256":null' in first
 
 def test_ed25519_signature_is_verified_and_persisted(client, monkeypatch):
     principal_id, token = _operator()
