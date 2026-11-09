@@ -1,4 +1,5 @@
 import base64
+import hashlib
 from datetime import timedelta
 
 import pytest
@@ -130,6 +131,15 @@ def test_independent_approval_requires_author_signature_and_separate_operator_ke
     assert response.status_code == 201, response.text
     assert response.json()["approver_principal_id"] == approver_id
     assert response.json()["policy_version"] == decision_approvals.POLICY_VERSION
+    approval_envelope = base64.b64decode(
+        response.json()["approval_payload_base64"], validate=True
+    )
+    assert hashlib.sha256(approval_envelope).hexdigest() == response.json()["envelope_sha256"]
+    verifier = serialization.load_pem_public_key(response.json()["public_key_pem"].encode("ascii"))
+    verifier.verify(
+        base64.b64decode(response.json()["signature"], validate=True),
+        approval_envelope,
+    )
 
     retry = client.post(
         f"/sbom/decisions/{decision_id}/approval",
