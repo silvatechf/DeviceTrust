@@ -147,13 +147,13 @@ The console keeps the supplied API credential in page memory only. The default l
 
 #### Optional managed API credentials
 
-After applying migrations, create an operator credential through the offline CLI and set `DEVICETRUST_AUTH_MODE=managed` in the API process:
+After applying migrations, generate a 32-byte random verifier pepper (`python -c "import secrets; print(secrets.token_hex(32))"`), store it as `DEVICETRUST_CREDENTIAL_PEPPER` for both the API and CLI, create an operator credential through the offline CLI, and set `DEVICETRUST_AUTH_MODE=managed` in the API process:
 
 ```bash
 python -m app.identity_cli create-principal --name "Local operator" --kind operator --scope inventory:read --scope inventory:write --scope evidence:read --scope evidence:write --scope sbom:read --scope sbom:write --scope assessment:read --scope assessment:write --scope audit:read
 ```
 
-The token is displayed once and is accepted through the existing `X-API-Key` header. Additional credentials can be issued for an existing principal before revoking an older token. Managed mode ignores `DEVICETRUST_API_KEY`; it never falls back to the shared key. See [Identity and Access Governance](docs/identity-access-governance.md) for rotation, revocation, disablement and the complete scope list.
+The token is displayed once and is accepted through the existing `X-API-Key` header. The pepper must be kept outside the database and shared by all API instances. Additional credentials can be issued for an existing principal before revoking an older token. Managed mode ignores `DEVICETRUST_API_KEY`; it never falls back to the shared key. See [Identity and Access Governance](docs/identity-access-governance.md) for rotation, revocation, disablement and the complete scope list.
 
 ### 3. Load synthetic demo data (optional)
 
