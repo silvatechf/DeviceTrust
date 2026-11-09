@@ -358,7 +358,18 @@ def test_only_ed25519_public_keys_can_be_registered():
             decision_signatures.register_public_key(db, principal_id=principal_id, public_key_pem=pem)
         db.rollback()
 
-def test_corrupted_registered_key_fails_closed_when_requesting_signing_payload(client, monkeypatch):
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("fingerprint", "0" * 64),
+        ("fingerprint", "é" * 64),
+        ("fingerprint", "g" * 64),
+        ("public_key_pem", "not a PEM public key"),
+    ],
+)
+def test_corrupted_registered_key_fails_closed_when_requesting_signing_payload(
+    client, monkeypatch, field, value
+):
     principal_id, token = _operator()
     decision_id = _decision(client, monkeypatch, principal_id, token)
     _, public_pem = _keypair()
@@ -366,7 +377,7 @@ def test_corrupted_registered_key_fails_closed_when_requesting_signing_payload(c
 
     with SessionLocal() as db:
         key = db.get(SigningKey, key_id)
-        key.fingerprint = "0" * 64
+        setattr(key, field, value)
         db.commit()
 
     response = client.get(
