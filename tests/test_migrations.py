@@ -25,7 +25,18 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
             column["name"]: column
             for column in inspect(engine).get_columns("vulnerability_decisions")
         }
-        assert {"assessment_finding_id", "principal_id", "revision", "supersedes_id", "state", "justification", "detail", "evidence_references", "responses", "created_at"}.issubset(decision_columns)
+        assert {
+            "assessment_finding_id",
+            "principal_id",
+            "revision",
+            "supersedes_id",
+            "state",
+            "justification",
+            "detail",
+            "evidence_references",
+            "responses",
+            "created_at",
+        }.issubset(decision_columns)
         finding_columns = {
             column["name"]: column
             for column in inspect(engine).get_columns("sbom_assessment_findings")
