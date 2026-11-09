@@ -42,7 +42,7 @@ def _credential_digest(raw_token: str) -> str:
     return hmac.new(
         bytes.fromhex(pepper),
         raw_token.encode("ascii"),
-        hashlib.sha256,
+        hashlib.sha256,  # lgtm[py/weak-sensitive-data-hashing] - 256-bit CSPRNG API tokens are not human passwords; HMAC plus an external pepper resists offline guessing.
     ).hexdigest()
 
 
