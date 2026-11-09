@@ -154,7 +154,7 @@ async def import_cyclonedx(
     document: dict,
     source_type: str,
     source_reference: str | None,
-) -> tuple[SBOMImport, bool]:
+) -> tuple[SBOMImport, bool, bool]:
     parsed_document = sbom.parse_cyclonedx_document(document)
     components = parsed_document["components"]
     bom_metadata = {
@@ -181,7 +181,7 @@ async def import_cyclonedx(
             and _parser_version_is_older(existing.parser_version)
         )
         if existing is not None and not needs_reference_reprocessing:
-            return existing, False
+            return existing, False, False
 
     if needs_reference_reprocessing:
         audit.acquire_chain_lock(db)
@@ -193,7 +193,8 @@ async def import_cyclonedx(
                 )
                 db.commit()
                 db.refresh(existing)
-            return existing, False
+                return existing, False, True
+            return existing, False, False
 
     findings, osv_enrichment = await sbom.scan_with_metadata_async(
         components, include_component_index=True
@@ -216,7 +217,8 @@ async def import_cyclonedx(
             )
             db.commit()
             db.refresh(existing)
-        return existing, False
+            return existing, False, True
+        return existing, False, False
 
     imported = SBOMImport(
         product_release_id=release_id,
@@ -276,7 +278,7 @@ async def import_cyclonedx(
         )
         db.commit()
         db.refresh(imported)
-        return imported, True
+        return imported, True, False
     except IntegrityError:
         db.rollback()
         concurrent = db.scalars(
@@ -287,7 +289,7 @@ async def import_cyclonedx(
             )
         ).first()
         if concurrent is not None:
-            return concurrent, False
+            return concurrent, False, False
         raise
     except Exception:
         db.rollback()
