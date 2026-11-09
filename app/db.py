@@ -234,6 +234,45 @@ class Principal(Base):
     disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class VulnerabilityDecision(Base):
+    __tablename__ = "vulnerability_decisions"
+    __table_args__ = (
+        UniqueConstraint(
+            "assessment_finding_id",
+            "revision",
+            name="uq_vulnerability_decision_finding_revision",
+        ),
+        UniqueConstraint(
+            "supersedes_id",
+            name="uq_vulnerability_decision_supersedes",
+        ),
+        CheckConstraint("revision >= 1", name="ck_vulnerability_decision_revision"),
+        CheckConstraint(
+            "state IN ('resolved', 'resolved_with_pedigree', 'exploitable', "
+            "'in_triage', 'false_positive', 'not_affected')",
+            name="ck_vulnerability_decision_state",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    assessment_finding_id: Mapped[int] = mapped_column(
+        ForeignKey("sbom_assessment_findings.id"), nullable=False, index=True
+    )
+    principal_id: Mapped[str] = mapped_column(
+        ForeignKey("principals.id"), nullable=False, index=True
+    )
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    supersedes_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vulnerability_decisions.id"), nullable=True
+    )
+    state: Mapped[str] = mapped_column(String(32), nullable=False)
+    justification: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    detail: Mapped[str] = mapped_column(String(4000), nullable=False)
+    evidence_references: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    responses: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class APICredential(Base):
     __tablename__ = "api_credentials"
     __table_args__ = (
