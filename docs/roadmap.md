@@ -90,7 +90,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Exit criteria:** CLI and API produce consistent assessments; pipeline results distinguish policy findings from assessment/runtime errors and incomplete intelligence.
 
-## Milestone 6 — Identity, governance and audit assurance (P4)
+## Milestone 6 — Identity, governance and audit assurance (P2 prerequisite)
 
 **Goal:** prepare for attributable multi-user and controlled customer evaluation.
 
@@ -104,6 +104,23 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Prepare reviewed CRA reporting data only where a manufacturer has established the applicable reporting condition and authorised the action.
 
 **Exit criteria:** no shared credential for multi-user operation; decisions are attributable; audit checkpoints have an independent trust boundary; tenant isolation and operational recovery are tested.
+
+## Milestone 7 — Credential exposure evidence (P3, proposed)
+
+**Goal:** correlate externally detected credential-exposure signals with product releases and retain safe, attributable remediation evidence.
+
+- [ ] Select one supported secret-scanning report contract (initial candidate: sanitised Gitleaks CI output) and pin/version its parser contract.
+- [ ] Define a bounded ingestion schema for tool/rule, source, artifact digest, sanitised location, observation time and coverage metadata.
+- [ ] Prove that raw API keys, passwords, JWT material, database URLs, RTSP/ONVIF credentials and private keys never enter persistence, API responses, logs or audit events.
+- [ ] Associate findings only with explicitly declared product/release/artifact references; retain ambiguous or missing relationships as unassigned.
+- [ ] Preserve immutable scan observations, provenance, idempotency and explicit incomplete/unverified states.
+- [ ] Add attributable review and remediation evidence only after individual identity, scoped authorisation and audit attribution are available.
+- [ ] Evaluate PKI, mTLS and secret-manager metadata integrations as evidence sources; do not store private keys or secret values.
+- [ ] Keep credential testing, endpoint discovery, video retrieval, automatic rotation/revocation and network enforcement outside DeviceTrust.
+
+**Dependency:** identity and scoped-authorisation foundations in Milestone 6 are prerequisites for reviewed decisions and remediation attribution. This milestone begins with safe, read-only evidence ingestion; it does not create a secret vault or scanner.
+
+**Exit criteria:** scanner evidence is bounded, provenance-preserving and demonstrably secret-free in storage/logs/responses; ambiguous product relationships remain unresolved; reviewed remediation is attributable and auditable.
 
 ## Parallel product discovery
 
