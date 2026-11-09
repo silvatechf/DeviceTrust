@@ -7,10 +7,10 @@ import hmac
 from datetime import timezone
 from uuid import uuid4
 
+import rfc8785
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-import rfc8785
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
