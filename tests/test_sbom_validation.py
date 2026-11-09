@@ -108,6 +108,7 @@ def test_parser_preserves_bom_and_component_references():
 
     assert parsed["serial_number"] == document["serialNumber"]
     assert parsed["version"] == 2
+    assert parsed["version_explicit"] is True
     assert parsed["metadata_component"] == {
         "bom_ref": "product-sensor-x",
         "type": "application",
@@ -177,6 +178,7 @@ def test_parser_keeps_bom_metadata_optional_for_legacy_documents():
     parsed = parse_cyclonedx_document(_document([_component()]))
 
     assert parsed["serial_number"] is None
-    assert parsed["version"] is None
+    assert parsed["version"] == 1
+    assert parsed["version_explicit"] is False
     assert parsed["metadata_component"] is None
     assert parsed["components"][0]["bom_ref"] is None
