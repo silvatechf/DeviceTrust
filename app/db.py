@@ -411,3 +411,29 @@ class DecisionApproval(Base):
     signature_b64: Mapped[str] = mapped_column(String(128), nullable=False)
     approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+class DecisionEvidenceManifest(Base):
+    __tablename__ = "decision_evidence_manifests"
+    __table_args__ = (
+        UniqueConstraint(
+            "decision_id",
+            name="uq_decision_evidence_manifest_decision",
+        ),
+        CheckConstraint(
+            "manifest_version = 'devicetrust.decision-evidence-manifest.v1'",
+            name="ck_decision_evidence_manifest_version",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    decision_id: Mapped[int] = mapped_column(
+        ForeignKey("vulnerability_decisions.id"), nullable=False, index=True
+    )
+    manifest_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    manifest_payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    artifact_ids: Mapped[list] = mapped_column(JSON, nullable=False)
+    created_by: Mapped[str] = mapped_column(
+        ForeignKey("principals.id"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
