@@ -1119,7 +1119,7 @@ def test_evidence_artifact_blob_and_digest_persist_postgres():
         verification_engine.dispose()
 
 
-def test_decision_evidence_manifest_persists_with_signature_digest_postgres(monkeypatch):
+def test_decision_evidence_manifest_persists_postgres(monkeypatch):
     api_key = os.getenv("DEVICETRUST_API_KEY", "test-key")
     monkeypatch.setenv("DEVICETRUST_AUTH_MODE", "legacy")
     with TestClient(app) as client:
