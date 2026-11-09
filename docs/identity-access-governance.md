@@ -58,7 +58,7 @@ Create a principal and credential. Repeat --scope for each allowed scope:
 
 The command prints the raw token once. Store it in an approved secret manager or local secret store; do not commit it or place it in shell history. To issue a separate reviewer credential to an existing operator, grant the review scope explicitly:
 
-    python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope assessment:read --scope assessment:review
+    python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope assessment:read --scope assessment:review --scope assessment:sign
 
 Only active operator principals can create human review decisions; service principals and legacy shared-key requests are rejected. The CLI also supports offline Ed25519 public-key registration and revocation. Supply a PEM public key file only; private keys must never be passed to DeviceTrust:
 
@@ -74,6 +74,18 @@ The CLI also supports:
 Principal creation, credential issuance/revocation and principal disablement append audit events in the same database transaction as the identity change. The actor for offline administration is the fixed value offline-admin; it does not prove the OS user's identity.
 
 For managed mode, configure DEVICETRUST_AUTH_MODE=managed in the API process and submit the generated token using X-API-Key. The console keeps the token in page memory only.
+
+## Detached decision-signature workflow
+
+1. Generate an Ed25519 key pair on the operator-controlled workstation. Keep the private key outside DeviceTrust and register only the PEM public key with the offline CLI.
+2. Retrieve the exact canonical signing bytes from GET /sbom/decisions/{decision_id}/signing-payload?key_id=... using a managed credential with assessment:sign. Only the decision author can retrieve this payload.
+3. Sign the decoded signing_payload_base64 bytes locally with the operator private key. DeviceTrust never receives the private key.
+4. Submit the Base64 detached signature and key ID to POST /sbom/decisions/{decision_id}/signature.
+5. Read GET /sbom/decisions/{decision_id}/signature to re-verify the stored signature against the current decision bytes. signature_valid describes cryptographic validity; trust_valid additionally requires the key to remain active.
+
+The signed envelope uses RFC 8785 JCS, UTF-8 and a domain separator. It binds the exact decision revision, reviewer principal, finding, state, rationale, evidence references, responses and timestamp. The signature endpoint is idempotent for an identical signature; a different signature for an already signed decision is rejected. A new decision revision is a separate unsigned record and must be signed separately.
+
+The API token authenticates the request; the detached signature proves possession of the registered private key. Neither is legal identity proof or manufacturer authority.
 
 ## Audit attribution and data handling
 
