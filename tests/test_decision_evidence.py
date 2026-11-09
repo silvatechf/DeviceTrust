@@ -119,6 +119,7 @@ def test_manifest_binds_verified_artifact_to_exact_decision_and_signature(client
     assert verified.json()["signature_valid"] is True
     assert verified.json()["trust_valid"] is True
 
+    approval_private, approval_public = _keypair()
     with SessionLocal() as db:
         approver, _credential, approver_token = identity.create_principal(
             db,
@@ -127,19 +128,6 @@ def test_manifest_binds_verified_artifact_to_exact_decision_and_signature(client
             scopes={"assessment:approve", "assessment:read"},
         )
         approver_id = approver.id
-        approval_key = decision_signatures.register_public_key(
-            db,
-            principal_id=approver_id,
-            public_key_pem=_keypair()[1],
-            purpose="decision-approval",
-        )
-        approval_key_id = approval_key.id
-        db.commit()
-    approval_private, _ = _keypair()
-    # Register the public half corresponding to the private key used below.
-    approval_private, approval_public = _keypair()
-    with SessionLocal() as db:
-        decision_signatures.revoke_public_key(db, approval_key_id)
         approval_key = decision_signatures.register_public_key(
             db,
             principal_id=approver_id,
