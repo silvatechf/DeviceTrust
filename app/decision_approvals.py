@@ -214,7 +214,7 @@ def approve_decision(
             and existing.envelope_sha256 == envelope_digest
             and _utc_iso(existing.approved_at) == _utc_iso(approved_at)
         ):
-            return _approval_dict(existing, key), False
+            return _approval_dict(existing, key, decision=decision, envelope=envelope), False
         raise ApprovalConflict("decision already has an immutable approval from this key")
 
     item = DecisionApproval(
@@ -247,11 +247,17 @@ def approve_decision(
             "approval_envelope_sha256": envelope_digest,
         },
     )
-    return _approval_dict(item, key), True
+    return _approval_dict(item, key, decision=decision, envelope=envelope), True
 
 
-def _approval_dict(item: DecisionApproval, key: SigningKey) -> dict:
-    return {
+def _approval_dict(
+    item: DecisionApproval,
+    key: SigningKey,
+    *,
+    decision: VulnerabilityDecision | None = None,
+    envelope: bytes | None = None,
+) -> dict:
+    result = {
         "id": item.id,
         "decision_id": item.decision_id,
         "approver_principal_id": item.principal_id,
@@ -267,6 +273,13 @@ def _approval_dict(item: DecisionApproval, key: SigningKey) -> dict:
         "approved_at": _utc_iso(item.approved_at),
         "recorded_at": _utc_iso(item.recorded_at),
     }
+    if decision is not None:
+        result["assessment_finding_id"] = decision.assessment_finding_id
+        result["revision"] = decision.revision
+        result["approval_purpose"] = "independent-second-person-review"
+    if envelope is not None:
+        result["approval_payload_base64"] = base64.b64encode(envelope).decode("ascii")
+    return result
 
 
 def get_decision_approval(db: Session, decision_id: int) -> dict:
@@ -303,6 +316,7 @@ def get_decision_approval(db: Session, decision_id: int) -> dict:
             continue
 
         signature_valid = False
+        envelope = None
         try:
             envelope = approval_envelope(
                 decision,
@@ -360,7 +374,7 @@ def get_decision_approval(db: Session, decision_id: int) -> dict:
             eligible_approvers.add(item.principal_id)
         approvals.append(
             {
-                **_approval_dict(item, key),
+                **_approval_dict(item, key, decision=decision, envelope=envelope),
                 "signature_valid": signature_valid,
                 "trust_valid": trust_valid,
                 "eligible_for_current_revision": eligible,
