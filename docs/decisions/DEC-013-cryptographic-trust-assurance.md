@@ -66,7 +66,7 @@ Implement trust assurance as four separate, composable controls. They must not b
 ## Rollout sequence
 
 1. **Signature foundation (implemented in PR #57):** canonical domain-separated envelope, Ed25519 verification, operator-bound public-key registry, offline registration/revocation and signature re-verification. The implementation uses `cryptography` and keeps private keys outside DeviceTrust. RFC 8785 canonicalization is used by the implementation; independent cross-language test vectors and a formal key-custody runbook remain follow-up work.
-2. **Decision signing (initial implementation in PR #57):** an author can attach one verified detached signature to an immutable decision revision; historical unsigned records remain explicitly unsigned. Making a signature mandatory for every new decision is not yet enforced.
+2. **Decision signing (initial implementation in PR #57):** an author can attach verified detached signatures from distinct registered keys to an immutable decision revision; historical unsigned records remain explicitly unsigned. Making a signature mandatory for every new decision is not yet enforced.
 3. **Second-person approval:** separate approver identity and signature; export eligibility bound to the exact current revision and policy.
 4. **Evidence verification:** bounded artifact manifest and digest/signature verification with separate trust states.
 5. **Audit anchoring:** signed checkpoint format, independent verifier, then one explicitly supported external immutable-storage integration.
