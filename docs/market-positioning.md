@@ -24,6 +24,18 @@ The core problem to validate is:
 
 DeviceTrust should focus on that traceability problem rather than attempting to become a general-purpose vulnerability scanner, OT monitoring suite or compliance automation platform.
 
+## Use case hypothesis: credential exposure across connected products
+
+A compromised shared API key, service token, database credential or camera/streaming credential can create a fleet-wide exposure when identity scope is broad and product/deployment boundaries are weak. The relevant product-security question is not only whether a secret-like string exists, but which product release or artefact it relates to, what evidence supports the finding, who owns the credential, and whether rotation or revocation has been evidenced.
+
+A future DeviceTrust workflow could correlate **external credential-scanning signals and machine-identity evidence** with declared product releases, artefact digests and accountable remediation records. Potential inputs include sanitised repository/CI secret-scanning reports, firmware-analysis results, PKI/certificate inventory and metadata from an existing secret manager.
+
+This is a complementary product-security evidence workflow, not a replacement for Gitleaks, firmware-analysis tools, HashiCorp Vault, PKI, identity providers or OT security controls. DeviceTrust should not store secret values, private keys or credential-bearing URLs; it should not attempt logins, enumerate cameras, retrieve video streams, rotate credentials or enforce network segmentation.
+
+The first implementation should ingest a bounded, sanitised report from one selected scanner and preserve provenance, artifact context, coverage and uncertainty. Human review and remediation attribution depend on individual operator identity and scoped authorisation, which are not currently implemented. See [Credential Exposure and Machine Identity scope](credential-exposure-scope.md).
+
+**Current capability boundary:** credential-exposure detection, secret-manager integration, machine identity governance, mTLS enforcement and automatic rotation/revocation are not implemented. This use case is a roadmap hypothesis, not a current product claim.
+
 ## Regulatory context — EU Cyber Resilience Act
 
 Regulation (EU) 2024/2847 establishes cybersecurity requirements for products with digital elements. It is relevant context for the product direction, but it is not a shortcut to a compliance claim.
