@@ -812,6 +812,7 @@ def test_product_sbom_import_preserves_bom_identity_and_component_refs(client):
     )
 
     assert imported.status_code == 201, imported.text
+    assert imported.json()["metadata_reprocessed"] is False
     expected_metadata = {
         "serial_number": document["serialNumber"],
         "version": 2,
@@ -858,6 +859,7 @@ def test_product_sbom_import_preserves_bom_identity_and_component_refs(client):
     assert reimported.status_code == 201, reimported.text
     assert reimported.json()["id"] == import_id
     assert reimported.json()["created"] is False
+    assert reimported.json()["metadata_reprocessed"] is True
     assert reimported.json()["bom_metadata"] == expected_metadata
 
     imports_after_reprocessing = client.get(
