@@ -16,6 +16,7 @@ MAX_PURL_LENGTH = 512
 SUPPORTED_CYCLONEDX_SPEC_VERSION = "1.5"
 MAX_OSV_QUERIES_PER_IMPORT = 50
 OSV_QUERY_CONTRACT_VERSION = "2"
+OSV_QUERY_URL = "https://api.osv.dev/v1/query"
 OSV_ENRICHMENT_DEADLINE_SECONDS = 10.0
 OSV_CONNECT_TIMEOUT_SECONDS = 2.0
 OSV_READ_TIMEOUT_SECONDS = 3.0
@@ -174,9 +175,10 @@ def scan_osv_with_status(
                 if remaining <= 0:
                     deadline_exhausted = True
                     break
+                query_checked_at = datetime.now(timezone.utc).isoformat()
                 try:
                     response = client.post(
-                        "https://api.osv.dev/v1/query",
+                        OSV_QUERY_URL,
                         json={"package": {"purl": purl}, "version": version},
                         timeout=_osv_timeout(remaining),
                     )
@@ -216,6 +218,13 @@ def scan_osv_with_status(
                             "severity": severity.lower(),
                             "fixed_in": None,
                             "source": "osv",
+                            "osv_query": {
+                                "endpoint": OSV_QUERY_URL,
+                                "package_url": purl,
+                                "component_purl": components[component_index]["purl"],
+                                "version": version,
+                                "checked_at": query_checked_at,
+                            },
                         }
                         if include_component_index:
                             finding["component_index"] = component_index
@@ -290,9 +299,10 @@ async def scan_osv_with_status_async(
                         deadline_exhausted = True
                         break
                     queried += 1
+                    query_checked_at = datetime.now(timezone.utc).isoformat()
                     try:
                         response = await client.post(
-                            "https://api.osv.dev/v1/query",
+                            OSV_QUERY_URL,
                             json={"package": {"purl": purl}, "version": version},
                             timeout=_osv_timeout(remaining),
                         )
@@ -329,6 +339,13 @@ async def scan_osv_with_status_async(
                                 "severity": severity.lower(),
                                 "fixed_in": None,
                                 "source": "osv",
+                                "osv_query": {
+                                    "endpoint": OSV_QUERY_URL,
+                                    "package_url": purl,
+                                    "component_purl": components[component_index]["purl"],
+                                    "version": version,
+                                    "checked_at": query_checked_at,
+                                },
                             }
                             if include_component_index:
                                 finding["component_index"] = component_index
