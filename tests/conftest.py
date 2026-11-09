@@ -7,6 +7,7 @@ os.environ.setdefault(
     f"sqlite:///{Path(tempfile.mkdtemp()) / 'test.db'}",
 )
 os.environ.setdefault("DEVICETRUST_API_KEY", "test-key")
+os.environ.setdefault("DEVICETRUST_CREDENTIAL_PEPPER", "a" * 64)
 os.environ["DEVICETRUST_AUTH_MODE"] = "legacy"
 
 import pytest  # noqa: E402
