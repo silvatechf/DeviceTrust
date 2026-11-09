@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 from typing import Literal
+from urllib.parse import parse_qsl, urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -143,6 +144,29 @@ class VulnerabilityDecisionIn(BaseModel):
             item = value.strip()
             if not item or len(item) > 500 or any(ord(char) < 32 for char in item):
                 raise ValueError("evidence references must be non-empty bounded identifiers")
+            try:
+                parsed = urlsplit(item)
+            except ValueError:
+                raise ValueError("evidence reference is malformed") from None
+            sensitive_query_keys = {
+                "access_token",
+                "api_key",
+                "key",
+                "password",
+                "secret",
+                "sig",
+                "signature",
+                "token",
+            }
+            if parsed.scheme in {"http", "https"} and (
+                parsed.username is not None
+                or parsed.password is not None
+                or any(
+                    key.lower() in sensitive_query_keys
+                    for key, _ in parse_qsl(parsed.query, keep_blank_values=True)
+                )
+            ):
+                raise ValueError("evidence references must not contain credentials or tokens")
             if item in normalized:
                 raise ValueError("evidence references must be unique")
             normalized.append(item)
