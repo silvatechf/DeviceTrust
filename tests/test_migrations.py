@@ -28,6 +28,16 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         assert finding_columns["intelligence"]["nullable"] is False
         assert "applicability" in finding_columns
         assert finding_columns["applicability"]["nullable"] is False
+        import_columns = {
+            column["name"]: column
+            for column in inspect(engine).get_columns("sbom_imports")
+        }
+        component_columns = {
+            column["name"]: column
+            for column in inspect(engine).get_columns("sbom_components")
+        }
+        assert import_columns["bom_metadata"]["nullable"] is False
+        assert component_columns["bom_ref"]["nullable"] is True
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
@@ -36,6 +46,21 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
                 text("SELECT COUNT(*) FROM audit_chain_state")
             ) == 1
         command.check(config)
+
+        command.downgrade(config, "0007_sbom_finding_applicability")
+        assert "bom_metadata" not in {
+            column["name"] for column in inspect(engine).get_columns("sbom_imports")
+        }
+        assert "bom_ref" not in {
+            column["name"] for column in inspect(engine).get_columns("sbom_components")
+        }
+        command.upgrade(config, "head")
+        assert "bom_metadata" in {
+            column["name"] for column in inspect(engine).get_columns("sbom_imports")
+        }
+        assert "bom_ref" in {
+            column["name"] for column in inspect(engine).get_columns("sbom_components")
+        }
 
         command.downgrade(config, "0006_identity_access")
         assert "applicability" not in {
