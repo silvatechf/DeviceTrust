@@ -25,12 +25,12 @@ from .db import (
 )
 from .evidence_normalization import NORMALIZER_VERSION, normalize_observation
 from .schemas import (
+    DecisionSignatureIn,
     DeviceIn,
     EvidenceObservationIn,
     ProductIn,
     ProductReleaseIn,
     SecurityProfile,
-    DecisionSignatureIn,
     TriageIn,
     VulnerabilityDecisionIn,
 )
