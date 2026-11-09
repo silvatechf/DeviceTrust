@@ -46,7 +46,7 @@ Implemented prototype workflows:
 13. Preserve source-aware applicability signals for versioned findings (merged in main via PR #55).
 14. Preserve original CycloneDX BOM and component references for future VEX linkage (merged in main via PR #55).
 15. Record attributable, append-only vulnerability review decisions against immutable assessment findings (integrated through PR #56).
-16. Register operator-controlled Ed25519 public keys and verify detached signatures bound to exact immutable decision revisions (implemented in the trust-assurance work; second-person approval and VEX export remain future work).
+16. Register operator-controlled Ed25519 public keys and verify append-only detached signatures bound to exact immutable decision revisions, including key-rotation history (implemented in the trust-assurance work; second-person approval and VEX export remain future work).
 
 Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. The merged implementation is covered by successful post-merge CI and CodeQL runs for the current main commit. PostgreSQL integration and API-flow tests are included in the automated test suite, while a clean local Compose walkthrough remains part of the release gate.
 
