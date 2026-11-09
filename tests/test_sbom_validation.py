@@ -182,3 +182,32 @@ def test_parser_keeps_bom_metadata_optional_for_legacy_documents():
     assert parsed["version_explicit"] is False
     assert parsed["metadata_component"] is None
     assert parsed["components"][0]["bom_ref"] is None
+
+
+def test_parser_rejects_metadata_component_without_required_identity():
+    document = _document([])
+    document["metadata"] = {
+        "component": {
+            "type": "application",
+            "bom-ref": "product-ref",
+        }
+    }
+
+    with pytest.raises(ValueError, match="requires a valid type and name"):
+        parse_cyclonedx_document(document)
+
+
+def test_parser_rejects_metadata_component_purl_version_mismatch():
+    document = _document([])
+    document["metadata"] = {
+        "component": {
+            "type": "application",
+            "bom-ref": "product-ref",
+            "name": "Sensor X",
+            "version": "1.2.3",
+            "purl": "pkg:generic/sensor-x@9.9.9",
+        }
+    }
+
+    with pytest.raises(ValueError, match="purl/version mismatch"):
+        parse_cyclonedx_document(document)
