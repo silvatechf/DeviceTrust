@@ -92,6 +92,8 @@ def auth(request: Request, x_api_key: str = Header(default="", alias="X-API-Key"
     try:
         with SessionLocal() as db:
             principal = identity.authenticate(db, x_api_key)
+    except identity.IdentityConfigurationError:
+        raise HTTPException(503, "Managed authentication configuration is unavailable") from None
     except SQLAlchemyError:
         raise HTTPException(503, "Managed authentication is unavailable") from None
 
