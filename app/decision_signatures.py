@@ -15,11 +15,13 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import audit
+from . import audit, decision_evidence
 from .db import Principal, SignedDecision, SigningKey, VulnerabilityDecision, utcnow
 
-ENVELOPE_VERSION = "devicetrust.decision-signature.v1"
-DOMAIN_SEPARATOR = b"DeviceTrust\x00DecisionSignature\x00v1\x00"
+LEGACY_ENVELOPE_VERSION = "devicetrust.decision-signature.v1"
+LEGACY_DOMAIN_SEPARATOR = b"DeviceTrust\x00DecisionSignature\x00v1\x00"
+ENVELOPE_VERSION = "devicetrust.decision-signature.v2"
+DOMAIN_SEPARATOR = b"DeviceTrust\x00DecisionSignature\x00v2\x00"
 
 
 class SignatureConflict(RuntimeError):
