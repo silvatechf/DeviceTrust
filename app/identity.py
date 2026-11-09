@@ -117,6 +117,7 @@ def create_principal(
         expires_at=expires_at,
     )
     db.add(principal)
+    db.flush([principal])
     db.add(credential)
     db.flush()
     return principal, credential, raw_token
