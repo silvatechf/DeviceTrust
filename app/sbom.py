@@ -253,6 +253,7 @@ async def scan_osv_with_status_async(
     deadline = loop.time() + OSV_ENRICHMENT_DEADLINE_SECONDS
     unique_queries: dict[tuple[str, str], list[int]] = {}
     skipped_no_purl = 0
+    skipped_invalid_purl = 0
     hits = []
     queried = 0
     failed = False
@@ -266,7 +267,12 @@ async def scan_osv_with_status_async(
                 if not purl:
                     skipped_no_purl += 1
                     continue
-                unique_queries.setdefault((purl, component["version"]), []).append(index)
+                try:
+                    query_purl = _osv_query_purl(purl)
+                except (TypeError, ValueError):
+                    skipped_invalid_purl += 1
+                    continue
+                unique_queries.setdefault((query_purl, component["version"]), []).append(index)
 
             async with httpx.AsyncClient() as client:
                 for (purl, version), indexes in unique_queries.items():
@@ -327,7 +333,10 @@ async def scan_osv_with_status_async(
         failed = True
 
     deduplicated = sum(len(indexes) - 1 for indexes in unique_queries.values())
-    incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0
+    incomplete = (
+        failed or budget_exhausted or deadline_exhausted
+        or skipped_no_purl > 0 or skipped_invalid_purl > 0
+    )
     return hits, {
         "status": "incomplete" if incomplete else "complete",
         "source": "osv",
@@ -335,6 +344,7 @@ async def scan_osv_with_status_async(
         "query_candidates": len(unique_queries),
         "deduplicated_occurrences": deduplicated,
         "skipped_without_purl": skipped_no_purl,
+        "skipped_invalid_purl": skipped_invalid_purl,
         "query_limit": MAX_OSV_QUERIES_PER_IMPORT,
         "deadline_seconds": OSV_ENRICHMENT_DEADLINE_SECONDS,
         "budget_exhausted": budget_exhausted,
