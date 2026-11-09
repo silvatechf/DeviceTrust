@@ -81,3 +81,23 @@ def test_unsupported_finding_source_is_not_promoted_to_affected():
     )
 
     assert result["status"] == "unknown"
+
+
+def test_osv_query_purl_must_match_component_identity():
+    result = applicability.assess_finding(
+        {
+            "source": "osv",
+            "vuln_id": "CVE-2026-1234",
+            "osv_query": {
+                "endpoint": applicability.OSV_QUERY_URL,
+                "package_url": "pkg:generic/other-package",
+                "component_purl": "pkg:generic/example@1.0.0",
+                "version": "1.0.0",
+                "checked_at": "2026-11-09T10:00:00+00:00",
+            },
+        },
+        {"version": "1.0.0", "purl": "pkg:generic/example@1.0.0"},
+    )
+
+    assert result["status"] == "unknown"
+    assert result["basis"] == "invalid_osv_query_evidence"
