@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ManagementInterface(BaseModel):
@@ -88,3 +88,78 @@ class SBOMImportIn(BaseModel):
     product_release_id: int = Field(gt=0)
     source_type: Literal["manual", "pipeline"] = "manual"
     source_reference: str | None = Field(default=None, max_length=500)
+
+
+
+class VulnerabilityDecisionIn(BaseModel):
+    """A human-reviewed decision for one immutable assessment finding."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    state: Literal[
+        "resolved",
+        "resolved_with_pedigree",
+        "exploitable",
+        "in_triage",
+        "false_positive",
+        "not_affected",
+    ]
+    justification: Literal[
+        "code_not_present",
+        "code_not_reachable",
+        "requires_configuration",
+        "requires_dependency",
+        "requires_environment",
+        "protected_by_compiler",
+        "protected_at_runtime",
+        "protected_at_perimeter",
+        "protected_by_mitigating_control",
+    ] | None = None
+    detail: str = Field(min_length=20, max_length=4000)
+    evidence_references: list[str] = Field(default_factory=list, max_length=10)
+    responses: list[
+        Literal[
+            "can_not_fix",
+            "will_not_fix",
+            "update",
+            "rollback",
+            "workaround_available",
+        ]
+    ] = Field(default_factory=list, max_length=5)
+
+    @field_validator("detail")
+    @classmethod
+    def detail_must_be_meaningful(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 20:
+            raise ValueError("detail must contain at least 20 non-whitespace characters")
+        return normalized
+
+    @field_validator("evidence_references")
+    @classmethod
+    def evidence_references_must_be_bounded(cls, values: list[str]) -> list[str]:
+        normalized = []
+        for value in values:
+            item = value.strip()
+            if not item or len(item) > 500 or any(ord(char) < 32 for char in item):
+                raise ValueError("evidence references must be non-empty bounded identifiers")
+            if item in normalized:
+                raise ValueError("evidence references must be unique")
+            normalized.append(item)
+        return normalized
+
+    @field_validator("responses")
+    @classmethod
+    def responses_must_be_unique(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("responses must be unique")
+        return values
+
+    @model_validator(mode="after")
+    def not_affected_requires_justification_and_evidence(self):
+        if self.state == "not_affected":
+            if self.justification is None:
+                raise ValueError("not_affected requires a CycloneDX justification")
+            if not self.evidence_references:
+                raise ValueError("not_affected requires at least one evidence reference")
+        return self
