@@ -26,9 +26,10 @@ Preserve the minimum source identity needed for future, reviewable VEX linkage:
 
 Migration 0008 adds sbom_imports.bom_metadata and nullable sbom_components.bom_ref.
 
-- Existing imports receive an empty BOM metadata object and NULL component references.
-- Existing raw SBOM documents are not available to backfill those values.
-- New imports preserve supplied identity fields without changing the original content digest or assessment snapshots.
+- Existing imports receive an empty BOM metadata object and NULL component references during migration.
+- The raw SBOM is not retained, so there is no automatic backfill. Re-uploading the identical bytes triggers an audited metadata-only reprocessing when the stored parser version is older and the parsed component occurrences still match.
+- Metadata-only reprocessing updates the parser version, BOM metadata and component references in one audit transaction; it does not rerun vulnerability scans or modify existing assessment snapshots.
+- If component count/order/name/version/PURL no longer matches, reprocessing fails closed instead of rewriting component identity.
 - The import and component APIs expose the preserved fields.
 
 ## Consequences and limitations
