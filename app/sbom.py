@@ -78,6 +78,18 @@ def parse_cyclonedx_document(doc: dict) -> dict:
             "version": metadata_component.get("version"),
             "purl": metadata_component.get("purl"),
         }
+        for field, maximum in (
+            ("type", 64),
+            ("name", MAX_COMPONENT_NAME),
+            ("version", MAX_COMPONENT_VERSION),
+        ):
+            value = metadata_component_data[field]
+            if value is not None and (
+                not isinstance(value, str) or not value.strip() or len(value) > maximum
+            ):
+                raise ValueError(
+                    f"CycloneDX metadata component has an invalid {field}."
+                )
         metadata_purl = metadata_component_data["purl"]
         if metadata_purl is not None:
             if not isinstance(metadata_purl, str) or len(metadata_purl) > MAX_PURL_LENGTH:
@@ -87,7 +99,11 @@ def parse_cyclonedx_document(doc: dict) -> dict:
             except (TypeError, ValueError):
                 raise ValueError("CycloneDX metadata component has an invalid purl.") from None
             metadata_version = metadata_component_data["version"]
-            if parsed_metadata_purl.version and parsed_metadata_purl.version != metadata_version:
+            if (
+                parsed_metadata_purl.version
+                and metadata_version is not None
+                and parsed_metadata_purl.version != metadata_version
+            ):
                 raise ValueError("CycloneDX metadata component has a purl/version mismatch.")
     else:
         metadata_component_data = None
