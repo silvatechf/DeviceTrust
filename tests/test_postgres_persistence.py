@@ -380,10 +380,15 @@ def test_product_sbom_records_survive_database_engine_disposal():
             spec_version="1.5",
             source_type="manual",
             content_sha256=digest,
-            parser_version="0.3.0",
+            parser_version="0.4.0",
             status="accepted",
             component_count=1,
             validation_summary={"valid": True, "component_count": 1},
+            bom_metadata={
+                "serial_number": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
+                "version": 2,
+                "metadata_component": None,
+            },
         )
         session.add(imported)
         session.flush()
@@ -394,6 +399,7 @@ def test_product_sbom_records_survive_database_engine_disposal():
             name="Example Library",
             version="1.0.0",
             purl="pkg:generic/example-library@1.0.0",
+            bom_ref="example-library-ref",
         )
         session.add(component)
         session.flush()
@@ -428,8 +434,10 @@ def test_product_sbom_records_survive_database_engine_disposal():
             assert persisted_release is not None
             assert persisted_import is not None
             assert persisted_import.content_sha256 == digest
+            assert persisted_import.bom_metadata["version"] == 2
             assert persisted_component is not None
             assert persisted_component.sbom_import_id == import_id
+            assert persisted_component.bom_ref == "example-library-ref"
             assert persisted_finding is not None
             assert persisted_finding.sbom_component_id == component_id
     finally:
