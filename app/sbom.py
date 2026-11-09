@@ -78,6 +78,15 @@ def parse_cyclonedx_document(doc: dict) -> dict:
             "version": metadata_component.get("version"),
             "purl": metadata_component.get("purl"),
         }
+        if (
+            not isinstance(metadata_component_data["type"], str)
+            or not metadata_component_data["type"].strip()
+            or not isinstance(metadata_component_data["name"], str)
+            or not metadata_component_data["name"].strip()
+        ):
+            raise ValueError(
+                "CycloneDX metadata component requires a valid type and name."
+            )
         for field, maximum in (
             ("type", 64),
             ("name", MAX_COMPONENT_NAME),
