@@ -1,9 +1,11 @@
 import base64
+from datetime import timedelta
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app import decision_approvals, decision_signatures, identity
-from app.db import DecisionApproval, SessionLocal
+from app.db import DecisionApproval, SessionLocal, SigningKey, utcnow
 
 from .test_vulnerability_decisions import _finding
 
@@ -300,3 +302,81 @@ def test_approval_requires_assessment_approve_scope(client, monkeypatch):
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "Insufficient API credential scope"
+
+
+def test_expired_approval_payload_is_rejected(client, monkeypatch):
+    author_id, author_token = _operator("Expired approval author")
+    approver_id, approver_token = _operator("Expired approval reviewer")
+    _finding_id, decision_id = _decision(client, monkeypatch, author_id, author_token)
+    _sign_author(client, author_token, decision_id, author_id)
+    _private_key, public_pem = _keypair()
+    key_id = _register(approver_id, public_pem, "decision-approval")
+    expired_at = (utcnow() - timedelta(minutes=31)).isoformat()
+    response = client.post(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers={"X-API-Key": approver_token},
+        json={
+            "key_id": key_id,
+            "approved_at": expired_at,
+            "signature": base64.b64encode(b"x" * 64).decode("ascii"),
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "approval payload has expired; request a new approval payload"
+    )
+
+
+def test_revoked_author_key_makes_approval_ineligible(client, monkeypatch):
+    author_id, author_token = _operator("Revoked author key")
+    approver_id, approver_token = _operator("Revocation policy approver")
+    _finding_id, decision_id = _decision(client, monkeypatch, author_id, author_token)
+    author_key_id = _sign_author(client, author_token, decision_id, author_id)
+    submission = _approval_submission(
+        client, decision_id, approver_id, approver_token
+    )
+    approved = client.post(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers={"X-API-Key": approver_token},
+        json=submission,
+    )
+    assert approved.status_code == 201, approved.text
+
+    with SessionLocal() as db:
+        decision_signatures.revoke_public_key(db, author_key_id)
+        db.commit()
+
+    status = client.get(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers={"X-API-Key": author_token},
+    )
+    result = status.json()
+    assert result["author_signature_trusted"] is False
+    assert result["approvals"][0]["signature_valid"] is True
+    assert result["approvals"][0]["trust_valid"] is True
+    assert result["approvals"][0]["eligible_for_current_revision"] is False
+    assert result["approval_policy_satisfied"] is False
+
+
+def test_corrupted_approval_key_registry_fails_closed(client, monkeypatch):
+    author_id, author_token = _operator("Corrupt approval registry author")
+    approver_id, approver_token = _operator("Corrupt approval registry reviewer")
+    _finding_id, decision_id = _decision(client, monkeypatch, author_id, author_token)
+    _sign_author(client, author_token, decision_id, author_id)
+    _private_key, public_pem = _keypair()
+    key_id = _register(approver_id, public_pem, "decision-approval")
+
+    with SessionLocal() as db:
+        key = db.get(SigningKey, key_id)
+        key.public_key_pem = "not a PEM public key"
+        db.commit()
+
+    response = client.get(
+        f"/sbom/decisions/{decision_id}/approval-payload",
+        params={"key_id": key_id},
+        headers={"X-API-Key": approver_token},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Registered approval key integrity validation failed"
+    )
