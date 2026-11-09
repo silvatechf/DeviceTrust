@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
 
 from app import decision_signatures, identity
-from app.db import SessionLocal, SignedDecision, SigningKey, VulnerabilityDecision, utcnow
+from app.db import AuditChainState, AuditEntry, SessionLocal, SignedDecision, SigningKey, VulnerabilityDecision, utcnow
 
 from .test_vulnerability_decisions import _finding
 
@@ -227,6 +227,33 @@ def test_signing_scope_is_separate_and_required(client, monkeypatch):
     assert response.status_code == 403
     assert response.json()["detail"] == "Insufficient API credential scope"
 
+
+def test_signature_and_audit_event_roll_back_together(client, monkeypatch):
+    principal_id, token = _operator()
+    decision_id = _decision(client, monkeypatch, principal_id, token)
+    private_key, public_pem = _keypair()
+    key_id, _ = _register(principal_id, public_pem)
+    signature = _signature_for(client, token, decision_id, key_id, private_key)
+    with SessionLocal() as db:
+        signed_before = db.query(SignedDecision).count()
+        audit_before = db.query(AuditEntry).count()
+        chain_version_before = db.get(AuditChainState, 1).version
+    original_record = decision_signatures.audit.record
+    def fail_after_audit_append(db, actor, action, entity, payload):
+        original_record(db, actor, action, entity, payload)
+        raise RuntimeError("injected signature audit failure")
+    monkeypatch.setattr(decision_signatures.audit, "record", fail_after_audit_append)
+    with pytest.raises(RuntimeError, match="injected signature audit failure"):
+        client.post(
+            f"/sbom/decisions/{decision_id}/signature",
+            headers={"X-API-Key": token},
+            json={"key_id": key_id, "signature": signature},
+        )
+    monkeypatch.setattr(decision_signatures.audit, "record", original_record)
+    with SessionLocal() as db:
+        assert db.query(SignedDecision).count() == signed_before
+        assert db.query(AuditEntry).count() == audit_before
+        assert db.get(AuditChainState, 1).version == chain_version_before
 
 def test_service_principal_cannot_register_decision_signing_key():
     with SessionLocal() as db:
