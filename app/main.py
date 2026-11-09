@@ -27,7 +27,6 @@ from . import (
 from .db import (
     AuditEntry,
     Device,
-    DecisionEvidenceManifest,
     EvidenceArtifact,
     EvidenceObservation,
     ProductFinding,
