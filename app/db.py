@@ -347,6 +347,7 @@ class SignedDecision(Base):
     signature_b64: Mapped[str] = mapped_column(String(128), nullable=False)
     verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+
 class DecisionApproval(Base):
     __tablename__ = "decision_approvals"
     __table_args__ = (
