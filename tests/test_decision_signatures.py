@@ -364,6 +364,7 @@ def test_expired_signing_key_cannot_provide_payload_or_sign(client, monkeypatch)
     _, public_pem = _keypair()
     key_id, _ = _register(principal_id, public_pem)
     with SessionLocal() as db:
+        key = db.get(SigningKey, key_id)
         key.expires_at = utcnow() - timedelta(seconds=1)
         db.commit()
     payload = client.get(
@@ -427,7 +428,6 @@ def test_historical_v1_signature_remains_verifiable_after_envelope_v2(client, mo
 
     with SessionLocal() as db:
         decision = db.get(VulnerabilityDecision, decision_id)
-        key = db.get(SigningKey, key_id)
         envelope = decision_signatures.legacy_signing_envelope(decision)
         signature = base64.b64encode(private_key.sign(envelope)).decode("ascii")
         db.add(
