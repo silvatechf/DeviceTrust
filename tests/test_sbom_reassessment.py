@@ -292,7 +292,7 @@ def test_reassessment_persists_osv_provider_reported_applicability(client, monke
 
     created = client.post(
         f"/sbom/imports/{import_id}/assessments",
-        headers={**H, "Idempotency-Key": "osv-applicability-001"},
+        headers={**H, "Idempotency-Key": "osv-1"},
     )
     assert created.status_code == 201, created.text
 
