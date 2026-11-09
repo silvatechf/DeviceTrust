@@ -16,7 +16,7 @@ from sqlalchemy import create_engine, delete, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app import audit, identity, product_sbom, vulnerability_decisions
+from app import audit, decision_signatures, identity, product_sbom, vulnerability_decisions
 from app.audit import record, verify
 from app.db import (
     APICredential,
@@ -31,6 +31,8 @@ from app.db import (
     SBOMAssessmentFinding,
     SBOMComponent,
     SBOMImport,
+    SignedDecision,
+    SigningKey,
     VulnerabilityDecision,
 )
 from app.db import engine as application_engine
@@ -829,5 +831,157 @@ def test_review_decisions_persist_and_link_revisions_postgres():
             session.execute(delete(SBOMImport).where(SBOMImport.id == import_id))
             session.execute(delete(ProductRelease).where(ProductRelease.id == release_id))
             session.execute(delete(Product).where(Product.id == product_id))
+            session.execute(delete(Principal).where(Principal.id == principal_id))
+            session.commit()
+
+
+def test_ed25519_decision_signature_persists_and_reverifies_postgres():
+    import base64
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    suffix = uuid4().hex
+    principal_id = str(uuid4())
+    product_id = release_id = import_id = component_id = assessment_id = finding_id = decision_id = None
+    key_id = None
+    private_key = Ed25519PrivateKey.generate()
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+    with Session(application_engine) as session:
+        principal = Principal(
+            id=principal_id,
+            name=f"PostgreSQL signing operator {suffix[:8]}",
+            kind="operator",
+            status="active",
+        )
+        product = Product(
+            manufacturer="PostgreSQL Signing Integration",
+            product_name=f"Signed Decision {suffix[:8]}",
+        )
+        session.add_all([principal, product])
+        session.flush()
+        product_id = product.id
+        release = ProductRelease(product_id=product.id, version="2.0.0")
+        session.add(release)
+        session.flush()
+        release_id = release.id
+        imported = SBOMImport(
+            product_release_id=release.id,
+            format="CycloneDX",
+            spec_version="1.5",
+            source_type="manual",
+            content_sha256=hashlib.sha256(f"signing-{suffix}".encode()).hexdigest(),
+            parser_version="0.4.0",
+            status="accepted",
+            component_count=1,
+            validation_summary={"valid": True},
+            bom_metadata={"serial_number": f"urn:uuid:{suffix}", "version": 1, "version_explicit": True, "metadata_component": None},
+        )
+        session.add(imported)
+        session.flush()
+        import_id = imported.id
+        component = SBOMComponent(
+            sbom_import_id=imported.id,
+            ordinal=0,
+            name="libsigning",
+            version="2.0.0",
+            purl="pkg:generic/libsigning@2.0.0",
+            bom_ref=f"component-{suffix[:8]}",
+        )
+        session.add(component)
+        session.flush()
+        component_id = component.id
+        assessment = SBOMAssessment(
+            sbom_import_id=imported.id,
+            request_key_hash=hashlib.sha256(f"request-signing-{suffix}".encode()).hexdigest(),
+            source_fingerprint=hashlib.sha256(f"source-signing-{suffix}".encode()).hexdigest(),
+            status="complete",
+            component_count=1,
+            finding_count=1,
+            enrichment_metadata={},
+        )
+        session.add(assessment)
+        session.flush()
+        assessment_id = assessment.id
+        finding = SBOMAssessmentFinding(
+            assessment_id=assessment.id,
+            sbom_component_id=component.id,
+            vuln_id="CVE-2026-98765",
+            severity="high",
+            fixed_in="2.0.1",
+            source="osv",
+            intelligence={},
+            applicability={"status": "osv_reported_affected"},
+        )
+        session.add(finding)
+        session.flush()
+        finding_id = finding.id
+        decision, created = vulnerability_decisions.create_decision(
+            session,
+            finding_id=finding_id,
+            principal_id=principal_id,
+            state="in_triage",
+            justification=None,
+            detail="PostgreSQL integration decision awaiting vendor review.",
+            evidence_references=[],
+            responses=[],
+            idempotency_key=f"pg-signing-{suffix}",
+        )
+        decision_id = decision["id"]
+        session.commit()
+    try:
+        with Session(application_engine) as session:
+            key = decision_signatures.register_public_key(
+                session, principal_id=principal_id, public_key_pem=public_pem
+            )
+            key_id = key.id
+            session.commit()
+
+        with Session(application_engine) as session:
+            decision_row = session.get(VulnerabilityDecision, decision_id)
+            signature = base64.b64encode(
+                private_key.sign(decision_signatures.signing_envelope(decision_row))
+            ).decode("ascii")
+            result = decision_signatures.sign_decision(
+                session,
+                decision_id=decision_id,
+                principal_id=principal_id,
+                key_id=key_id,
+                signature_b64=signature,
+            )
+            session.commit()
+            assert result["key_id"] == key_id
+
+        with Session(application_engine) as session:
+            verified = decision_signatures.get_decision_signature(session, decision_id)
+            assert verified is not None
+            assert verified["signature_valid"] is True
+            assert verified["trust_valid"] is True
+            assert session.scalar(
+                select(SignedDecision).where(SignedDecision.decision_id == decision_id)
+            ) is not None
+    finally:
+        with Session(application_engine) as session:
+            if decision_id is not None:
+                session.execute(delete(SignedDecision).where(SignedDecision.decision_id == decision_id))
+                session.execute(delete(VulnerabilityDecision).where(VulnerabilityDecision.id == decision_id))
+            if key_id is not None:
+                session.execute(delete(SigningKey).where(SigningKey.id == key_id))
+            if finding_id is not None:
+                session.execute(delete(SBOMAssessmentFinding).where(SBOMAssessmentFinding.id == finding_id))
+            if assessment_id is not None:
+                session.execute(delete(SBOMAssessment).where(SBOMAssessment.id == assessment_id))
+            if component_id is not None:
+                session.execute(delete(SBOMComponent).where(SBOMComponent.id == component_id))
+            if import_id is not None:
+                session.execute(delete(SBOMImport).where(SBOMImport.id == import_id))
+            if release_id is not None:
+                session.execute(delete(ProductRelease).where(ProductRelease.id == release_id))
+            if product_id is not None:
+                session.execute(delete(Product).where(Product.id == product_id))
             session.execute(delete(Principal).where(Principal.id == principal_id))
             session.commit()
