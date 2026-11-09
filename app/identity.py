@@ -3,7 +3,7 @@ import hmac
 import re
 import secrets
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import timedelta, timezone
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -91,8 +91,12 @@ def create_principal(
     if not normalized_scopes or not set(normalized_scopes).issubset(ALLOWED_SCOPES):
         raise ValueError("At least one valid, allow-listed scope is required")
     now = utcnow()
-    if expires_at is not None and expires_at <= now:
-        raise ValueError("Credential expiry must be in the future")
+    if expires_at is None:
+        expires_at = now + timedelta(days=90)
+    elif expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= now or expires_at > now + timedelta(days=365):
+        raise ValueError("Credential expiry must be within the next 365 days")
 
     principal = Principal(
         id=str(uuid4()),
@@ -139,8 +143,12 @@ def authenticate(db: Session, raw_token: str) -> AuthenticatedPrincipal | None:
     if principal is None or principal.status != "active" or credential.revoked_at is not None:
         return None
     now = utcnow()
-    if credential.expires_at is not None and credential.expires_at <= now:
-        return None
+    if credential.expires_at is not None:
+        expires_at = credential.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= now:
+            return None
 
     scopes = frozenset(credential.scopes or [])
     if not scopes.issubset(ALLOWED_SCOPES):
