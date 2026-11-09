@@ -139,6 +139,8 @@ def test_reassessment_persists_versioned_findings_and_is_idempotent(
     assert findings.json()[0]["vuln_id"] == "CVE-2099-0001"
     assert findings.json()[0]["intelligence"]["kev"]["status"] == "listed"
     assert findings.json()[0]["intelligence"]["epss"]["score"] == 0.9
+    assert findings.json()[0]["applicability"]["status"] == "synthetic_candidate"
+    assert findings.json()[0]["applicability"]["fixed_in"] == "3.0.1"
 
     # A deliberate new request identity appends another historical run.
     second = client.post(
