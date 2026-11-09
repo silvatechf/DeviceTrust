@@ -20,8 +20,8 @@ Implement trust assurance as four separate, composable controls. They must not b
 
 - Use Ed25519 detached signatures over a versioned, domain-separated signing envelope. Canonicalize the envelope with RFC 8785 JSON Canonicalization Scheme (JCS), UTF-8 bytes and the fixed `DeviceTrust\\0DecisionSignature\\0v1\\0` domain prefix.
 - The envelope binds at minimum: schema/version identifier, decision ID, exact assessment finding ID, revision, predecessor decision ID, principal ID, decision state, justification, responses, evidence manifest digest and creation timestamp.
-- Canonicalization must be specified and tested byte-for-byte. Do not sign arbitrary API JSON, database serialization, or a representation that can change between runtimes.
-- The server verifies signatures using registered public keys and persists the signature, key ID/fingerprint, algorithm, signing-envelope version and verification result.
+- Canonicalization uses RFC 8785 JCS and is tested for deterministic output. Do not sign arbitrary API JSON, database serialization, or a representation that can change between runtimes.
+- The server exposes the exact canonical signing bytes to the decision author, verifies submitted signatures using registered public keys and persists the signature, key ID/fingerprint, algorithm, signing-envelope version and envelope digest.
 - Private keys are generated and retained by the operator or their approved key-management system. DeviceTrust must never store private keys or expose a server-side signing endpoint.
 - Public keys are registered to an active managed operator principal through an offline administrative workflow. Key rotation, expiry, revocation and historical verification must be explicit.
 - A managed API token authenticates a request; it is not proof that the holder controls the signing key. Both checks are required.
