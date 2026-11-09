@@ -48,7 +48,11 @@ def upgrade() -> None:
         sa.Column("envelope_sha256", sa.String(length=64), nullable=False),
         sa.Column("signature_b64", sa.String(length=128), nullable=False),
         sa.Column("verified_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint("decision_id", name="uq_signed_decision_decision"),
+        sa.UniqueConstraint(
+            "decision_id",
+            "signing_key_id",
+            name="uq_signed_decision_decision_key",
+        ),
     )
     op.create_index("ix_signed_decisions_decision_id", "signed_decisions", ["decision_id"])
     op.create_index("ix_signed_decisions_signing_key_id", "signed_decisions", ["signing_key_id"])
