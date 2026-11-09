@@ -37,13 +37,21 @@ def _utc_iso(value):
     )
 
 
-def _manifest_payload(decision: VulnerabilityDecision, artifacts: list[EvidenceArtifact]) -> dict:
+def _manifest_payload(
+    decision: VulnerabilityDecision,
+    artifacts: list[EvidenceArtifact],
+    *,
+    created_by: str,
+    created_at,
+) -> dict:
     return {
         "manifest_version": MANIFEST_VERSION,
         "decision_id": decision.id,
         "assessment_finding_id": decision.assessment_finding_id,
         "decision_revision": decision.revision,
         "decision_created_at": _utc_iso(decision.created_at),
+        "manifest_created_by": created_by,
+        "manifest_created_at": _utc_iso(created_at),
         "artifacts": [
             {
                 "artifact_id": item.id,
@@ -102,7 +110,13 @@ def create_manifest(
         if not evidence_artifacts.verify_artifact(artifact)["valid"]:
             raise ValueError("Evidence artifact integrity verification failed")
 
-    payload = _manifest_payload(decision, artifacts)
+    recorded_at = utcnow()
+    payload = _manifest_payload(
+        decision,
+        artifacts,
+        created_by=principal_id,
+        created_at=recorded_at,
+    )
     canonical = rfc8785.dumps(payload)
     digest = hashlib.sha256(canonical).hexdigest()
     item = DecisionEvidenceManifest(
@@ -112,7 +126,7 @@ def create_manifest(
         manifest_sha256=digest,
         artifact_ids=sorted(artifact_ids),
         created_by=principal_id,
-        created_at=utcnow(),
+        created_at=recorded_at,
     )
     db.add(item)
     db.flush()
@@ -168,7 +182,10 @@ def get_manifest(db: Session, decision_id: int) -> dict | None:
     )
     if artifact_integrity_valid:
         current_payload = _manifest_payload(
-            decision, [artifact_map[artifact_id] for artifact_id in item.artifact_ids]
+            decision,
+            [artifact_map[artifact_id] for artifact_id in item.artifact_ids],
+            created_by=item.created_by,
+            created_at=item.created_at,
         )
         artifact_integrity_valid = rfc8785.dumps(current_payload) == canonical
     return {
