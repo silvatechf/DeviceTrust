@@ -252,6 +252,18 @@ class VulnerabilityDecision(Base):
             "'in_triage', 'false_positive', 'not_affected')",
             name="ck_vulnerability_decision_state",
         ),
+        CheckConstraint(
+            "justification IS NULL OR justification IN "
+            "('code_not_present', 'code_not_reachable', 'requires_configuration', "
+            "'requires_dependency', 'requires_environment', 'protected_by_compiler', "
+            "'protected_at_runtime', 'protected_at_perimeter', "
+            "'protected_by_mitigating_control')",
+            name="ck_vulnerability_decision_justification",
+        ),
+        CheckConstraint(
+            "state <> 'not_affected' OR justification IS NOT NULL",
+            name="ck_vulnerability_decision_not_affected_justification",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
