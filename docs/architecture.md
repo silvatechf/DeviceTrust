@@ -26,6 +26,8 @@ For normal typed endpoints, Pydantic validates request models. The SBOM route re
 | Module | Responsibility |
 |---|---|
 | `app/main.py` | FastAPI app, routes, authentication dependency, request orchestration and response serialization |
+| `app/identity.py` | Principal/credential verification, route-scope policy and credential lifecycle operations |
+| `app/identity_cli.py` | Offline principal creation, credential revocation and principal disablement |
 | `app/schemas.py` | Pydantic request contracts and field constraints |
 | `app/db.py` | SQLAlchemy models, engine/session setup and database access |
 | `app/posture.py` | Rules that assess the declared device security profile |
@@ -47,7 +49,7 @@ The posture service evaluates declared fields such as authentication, encryption
 ```mermaid
 flowchart TD
     SOURCE[External or manual source] --> POST[POST /evidence]
-    POST --> AUTH[Shared API key]
+    POST --> AUTH[Authentication mode and route scope check]
     AUTH --> VALID[Schema, allowlist and bounds]
     VALID --> DEVICE{Device ID supplied?}
     DEVICE -->|Known ID| CHECK[Check device exists]
