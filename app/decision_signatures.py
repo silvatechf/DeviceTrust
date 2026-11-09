@@ -7,16 +7,15 @@ import hmac
 from datetime import timezone
 from uuid import uuid4
 
-import rfc8785
-
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+import rfc8785
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import audit
-from .db import Principal, SigningKey, SignedDecision, VulnerabilityDecision, utcnow
+from .db import Principal, SignedDecision, SigningKey, VulnerabilityDecision, utcnow
 
 ENVELOPE_VERSION = "devicetrust.decision-signature.v1"
 DOMAIN_SEPARATOR = b"DeviceTrust\x00DecisionSignature\x00v1\x00"
