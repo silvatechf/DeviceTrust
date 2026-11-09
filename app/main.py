@@ -11,7 +11,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import audit, decision_signatures, identity, posture, product_sbom, sbom, vulnerability_decisions
+from . import audit, decision_approvals, decision_signatures, identity, posture, product_sbom, sbom, vulnerability_decisions
 from .db import (
     AuditEntry,
     Device,
@@ -25,6 +25,7 @@ from .db import (
 )
 from .evidence_normalization import NORMALIZER_VERSION, normalize_observation
 from .schemas import (
+    DecisionApprovalIn,
     DecisionSignatureIn,
     DeviceIn,
     EvidenceObservationIn,
@@ -454,6 +455,83 @@ def get_decision_signature(
     if result is None:
         raise HTTPException(404, "Decision signature not found")
     return result
+
+
+@app.get("/sbom/decisions/{decision_id}/approval-payload")
+def get_decision_approval_payload(
+    decision_id: int,
+    key_id: str = Query(min_length=36, max_length=36),
+    db: Session = Depends(get_db),
+    actor: str = Depends(auth),
+):
+    if not actor.startswith("principal:"):
+        raise HTTPException(403, "Independent approval requires a managed operator principal")
+    principal_id = actor.removeprefix("principal:")
+    try:
+        return decision_approvals.get_approval_payload(
+            db, decision_id=decision_id, principal_id=principal_id, key_id=key_id
+        )
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from None
+    except PermissionError as error:
+        raise HTTPException(403, str(error)) from None
+    except decision_approvals.ApprovalTrustStoreError:
+        raise HTTPException(503, "Registered approval key integrity validation failed") from None
+
+
+@app.post("/sbom/decisions/{decision_id}/approval", status_code=201)
+def create_decision_approval(
+    decision_id: int,
+    body: DecisionApprovalIn,
+    response: Response,
+    db: Session = Depends(get_write_db),
+    actor: str = Depends(auth),
+):
+    if not actor.startswith("principal:"):
+        raise HTTPException(403, "Independent approval requires a managed operator principal")
+    principal_id = actor.removeprefix("principal:")
+    try:
+        result, created = decision_approvals.approve_decision(
+            db,
+            decision_id=decision_id,
+            principal_id=principal_id,
+            key_id=body.key_id,
+            approved_at=body.approved_at,
+            signature_b64=body.signature,
+        )
+        db.commit()
+        response.status_code = 201 if created else 200
+        return result
+    except LookupError as error:
+        db.rollback()
+        raise HTTPException(404, str(error)) from None
+    except PermissionError as error:
+        db.rollback()
+        raise HTTPException(403, str(error)) from None
+    except decision_approvals.ApprovalConflict as error:
+        db.rollback()
+        raise HTTPException(409, str(error)) from None
+    except decision_approvals.ApprovalTrustStoreError:
+        db.rollback()
+        raise HTTPException(503, "Registered approval key integrity validation failed") from None
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(422, str(error)) from None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Decision approval conflicts with existing approval history") from None
+
+
+@app.get("/sbom/decisions/{decision_id}/approval")
+def get_decision_approval(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    try:
+        return decision_approvals.get_decision_approval(db, decision_id)
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from None
 
 
 @app.get("/sbom/imports/{import_id}/components")

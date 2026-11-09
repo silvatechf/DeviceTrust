@@ -21,7 +21,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [ ] Verify PostgreSQL startup, persistence and restart behavior in a clean local Compose deployment.
 - [ ] Verify console flows and API error paths in a real browser at desktop/mobile sizes.
 - [x] Test concurrent complete API/domain writes and transaction failure behavior on SQLite and PostgreSQL.
-- [x] Verify migration 0003 upgrade/downgrade on disposable SQLite and PostgreSQL databases in CI.
+- [x] Verify Alembic upgrade/downgrade paths on disposable SQLite and PostgreSQL databases in CI, including the decision-signature and approval schema revisions.
 - [x] Cover product-release SBOM comparison semantics (PURL identity boundaries, ambiguity, unidentified components, release isolation, authentication and read-only behavior) in automated tests; exact PR-head CI and CodeQL evidence is recorded in [PR #33](https://github.com/silvatechf/DeviceTrust/pull/33).
 - [ ] Demonstrate backup/restore and rollback.
 - [ ] Inspect exact-candidate CI results (pre-commit configuration, runtime and development dependency audits, Ruff, Bandit, tests, PostgreSQL and Compose), CodeQL and Gitleaks; record their URLs and manually triage findings.
@@ -44,10 +44,11 @@ A checkbox must be marked only when the check has actually been performed and ev
 
 ## Production blockers
 
-- Shared API key; no individual identity, RBAC, scopes, revocation workflow or tenant isolation.
-- Browser console receives the shared key in page memory.
-- No server-side browser sessions or backend-for-frontend.
-- Alembic baseline and explicit migration workflow are implemented; future schema changes still require reviewed migration scripts.
+- Managed API authentication provides principal-bound credentials, expiry, revocation and route scopes; legacy shared-key mode remains the default. There is no human login, MFA/SSO, tenant isolation or customer-facing role hierarchy.
+- The browser console receives the configured API token in page memory; there are no server-side browser sessions or backend-for-frontend.
+- Credential and signing-key administration remains offline CLI only.
+- Alembic migrations and explicit upgrade/downgrade paths are implemented; future schema changes still require reviewed migration scripts and coordinated rollback procedures.
+- Ed25519 decision signatures are integrated in main. Independent second-person approval is under validation in a separate feature branch and must not be claimed as part of main until integrated.
 - Audit-chain appends are serialized for application writers sharing one database, but there is no external checkpoint or immutable retention; a privileged database administrator can still rewrite the chain.
 - The audit-chain state migration is additive. Its downgrade removes the required lock row; the new application then fails closed on writes until the migration is reapplied or the previous application version is restored. Automated downgrade tests use isolated disposable databases only; production rollback still requires coordinated application/database rollback and a preserved backup.
 - CycloneDX support is a bounded subset.
@@ -63,6 +64,8 @@ A checkbox must be marked only when the check has actually been performed and ev
 - Implemented bounded CycloneDX JSON parsing and PURL-based matching against synthetic demo advisories, with optional best-effort OSV lookup.
 - Implemented authenticated product-release SBOM persistence for a bounded CycloneDX JSON 1.5 subset, including import provenance metadata, component occurrences, digest-based idempotency and component-scoped synthetic findings.
 - Implemented justified vulnerability triage, JSON/Markdown reports and SHA-256 audit-chain verification.
+- Implemented managed API identity and explicit route-scope enforcement, plus offline Ed25519 public-key lifecycle and detached decision-signature verification.
+- Independent second-person approval is implemented in the current feature branch pending CI/review/integration; do not present it as part of main until merged.
 - Integrated linting, static security checks, dependency auditing, JavaScript syntax validation and pytest into CI.
 - Documented trust boundaries, threat scenarios, engineering decisions and residual risks.
 

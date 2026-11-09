@@ -197,3 +197,19 @@ class DecisionSignatureIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     key_id: str = Field(min_length=36, max_length=36)
     signature: str = Field(pattern=r"^[A-Za-z0-9+/]{86}==$")
+
+
+class DecisionApprovalIn(BaseModel):
+    """An independent approval signature over a server-issued, timestamped envelope."""
+
+    model_config = ConfigDict(extra="forbid")
+    key_id: str = Field(min_length=36, max_length=36)
+    approved_at: datetime
+    signature: str = Field(pattern=r"^[A-Za-z0-9+/]{86}==$")
+
+    @field_validator("approved_at")
+    @classmethod
+    def approved_at_must_be_timezone_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("approved_at must include a timezone")
+        return value.astimezone(timezone.utc)

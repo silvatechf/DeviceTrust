@@ -34,7 +34,8 @@ The prototype manages device metadata, posture evidence, SBOM documents, vulnera
 | Concurrent audit writers | Singleton state-row lock; SQLite IMMEDIATE transaction and PostgreSQL row lock | Concurrent application writers cannot append from the same head; lock-row update and audit append share the domain transaction |
 | Audit database rewriting | SHA-256 hash chain | Tests detect mutation; final-entry deletion and privileged recomputation are not detectable without external checkpoints |
 | Compromised API key | Individually revocable managed credentials and explicit scopes | Legacy mode remains available; no tenant isolation or MFA |
-| Forged or altered review decision | Ed25519 detached signature over a versioned canonical decision envelope; signature re-verification on read | Key possession is not legal identity; signature is optional in this prototype; no second-person approval yet |
+| Forged or altered review decision | Ed25519 detached signature over a versioned canonical decision envelope; signature re-verification on read | Key possession is not legal identity; author signatures remain optional |
+| Self-approved or collusive review | Separate approval-purpose Ed25519 key, distinct active operator principal, versioned one-author-plus-one-approver policy and exact decision-digest binding | Implemented in the current feature branch pending CI/review/integration; no organizational quorum, legal identity proof or anti-collusion guarantee |
 | Signing-key compromise | Operator-held private keys; public-key registration, expiry and revocation | No hardware-backed key custody, automated compromise response or independent identity proof |
 | Resource exhaustion | SBOM body and component limits | No global request rate limit, concurrency quota or reverse-proxy policy |
 
@@ -45,10 +46,13 @@ The prototype manages device metadata, posture evidence, SBOM documents, vulnera
 3. Submit non-object SBOM components, invalid PURLs, PURL/version mismatches and package-name collisions across ecosystems.
 4. Verify that unknown exposure remains unverified and an exposed management interface is high risk.
 5. Mutate retained audit entries and document the final-suffix deletion limitation.
+6. Attempt self-approval using a second credential and a second key bound to the author principal.
+7. Attempt approval without a trusted author signature, with a decision-signing-purpose key, with an expired payload, or after a newer decision revision exists.
+8. Disable or revoke an approver after approval and verify that historical signature validity remains distinct from current trust and policy eligibility.
 
 ## Residual risk
 
-Decision signatures improve integrity and key attribution, but the application does not yet require signatures for every decision, enforce second-person approval, verify evidence artifacts or anchor audit checkpoints outside the database. A privileged database operator can still alter or delete records; signature re-verification detects changes to signed decision content but does not protect the entire database or audit history. Revoked keys remain mathematically verifiable for historical signatures, while their current trust status is reported as revoked.
+Decision signatures improve integrity and key attribution, but the application does not yet require signatures for every decision, verify evidence artifacts or anchor audit checkpoints outside the database. The current feature branch adds a separate second-person approval workflow; until it is integrated into main, the deployed main branch does not enforce that control. Even after integration, the prototype cannot prove organizational independence, prevent collusion or establish legal identity. A privileged database operator can still alter or delete records; signature re-verification detects changes to signed decision content but does not protect the entire database or audit history. Revoked keys remain mathematically verifiable for historical signatures, while their current trust status is reported as revoked.
 
 
 

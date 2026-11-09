@@ -1,6 +1,6 @@
 # DEC-013: Cryptographic trust, independent approval and audit anchoring
 
-- Status: Partially implemented in PR #58; Ed25519 key registry and detached decision-signature verification implemented, approval/evidence/anchoring pending
+- Status: Ed25519 decision signatures integrated into main through PR #58; independent approval implemented in the current feature branch pending CI/review/integration; evidence verification and external anchoring remain pending
 - Date: 2026-11-09
 - Scope: Attributable vulnerability decisions, evidence provenance and audit integrity
 
@@ -30,8 +30,10 @@ Implement trust assurance as four separate, composable controls. They must not b
 ### 2. Independent second-person approval
 
 - A decision requiring approval remains pending until a distinct active operator principal approves the exact decision digest.
-- The author cannot approve their own decision. The approver must authenticate with a managed principal and provide a valid signature from a separately registered key.
-- Approval signs a domain-separated envelope containing the decision digest, approval purpose, approver principal, timestamp and policy version.
+- The author cannot approve their own decision, including through a second credential. The approver must authenticate with a managed principal and provide a valid signature from a separately registered Ed25519 key whose purpose is decision-approval.
+- Approval signs a domain-separated RFC 8785 envelope containing the decision digest, decision/finding/revision identity, approval purpose, approver principal, key ID/fingerprint, timestamp and policy version.
+- The initial `devicetrust.approval-policy.v1` requires one currently trusted author signature plus at least one distinct active operator approval. The implementation issues a server-timestamped payload with a 30-minute acceptance window and persists approval plus audit event in one transaction.
+- Mathematical signature validity, current key/principal trust and eligibility for the current decision revision are reported separately. Revocation, principal disablement, loss of the author signature's trust or a newer decision revision prevents current policy satisfaction.
 - Any new decision revision invalidates approval of the superseded revision for current export purposes; historical signatures and approvals remain immutable and verifiable.
 - Approval policy is explicit and versioned. The initial policy is one author signature plus one distinct approver signature; it is not described as organizational quorum or legal sign-off.
 - VEX export must require the current revision to meet the configured approval policy. There is no implicit approval and no fallback to the author.
@@ -67,7 +69,7 @@ Implement trust assurance as four separate, composable controls. They must not b
 
 1. **Signature foundation (implemented in PR #58):** canonical domain-separated envelope, Ed25519 verification, operator-bound public-key registry, offline registration/revocation and signature re-verification. The implementation uses `cryptography` and keeps private keys outside DeviceTrust. RFC 8785 canonicalization is used by the implementation; independent cross-language test vectors and a formal key-custody runbook remain follow-up work.
 2. **Decision signing (initial implementation in PR #58):** an author can attach one verified detached signature to an immutable decision revision; historical unsigned records remain explicitly unsigned. Making a signature mandatory for every new decision is not yet enforced.
-3. **Second-person approval:** separate approver identity and signature; export eligibility bound to the exact current revision and policy.
+3. **Second-person approval (implemented in the current feature branch; pending validation and integration):** separate approver identity and purpose-specific key; domain-separated approval envelope; exact decision digest/revision binding; versioned one-author-plus-one-independent-approver policy; immutable history and dynamic trust/eligibility evaluation.
 4. **Evidence verification:** bounded artifact manifest and digest/signature verification with separate trust states.
 5. **Audit anchoring:** signed checkpoint format, independent verifier, then one explicitly supported external immutable-storage integration.
 6. **VEX export:** only after the signature, approval, evidence and BOM-reference preconditions are enforced and tested.
@@ -81,6 +83,8 @@ Each stage is a separate implementation change with migration, threat-model upda
 - Canonicalization has published test vectors and produces identical bytes across supported runtimes.
 - An author cannot approve their own decision, including through a second credential belonging to the same principal.
 - Approval is invalid for current export eligibility after a new decision revision is appended.
+- The author cannot approve their own decision using another credential or key; approval requires a distinct active operator and a key registered for decision-approval purpose.
+- Approval requires a currently trusted author signature and an approval payload within its bounded validity window.
 - Evidence digest mismatch, missing manifest fields and untrusted signing keys fail closed.
 - External checkpoint verification detects chain rewrite, truncation and rollback when an independently retained checkpoint is supplied.
 - SQLite and PostgreSQL migration, transaction, concurrency and rollback behavior are tested.

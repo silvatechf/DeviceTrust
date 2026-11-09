@@ -148,6 +148,35 @@ def test_tampered_decision_fails_signature_reverification(client, monkeypatch):
     assert verified.json()["trust_valid"] is False
 
 
+def test_unsupported_stored_signature_envelope_version_fails_verification(client, monkeypatch):
+    principal_id, token = _operator()
+    decision_id = _decision(client, monkeypatch, principal_id, token)
+    private_key, public_pem = _keypair()
+    key_id, _ = _register(principal_id, public_pem)
+    signature = _signature_for(client, token, decision_id, key_id, private_key)
+    signed = client.post(
+        f"/sbom/decisions/{decision_id}/signature",
+        headers={"X-API-Key": token},
+        json={"key_id": key_id, "signature": signature},
+    )
+    assert signed.status_code == 201
+
+    with SessionLocal() as db:
+        record = db.scalar(
+            select(SignedDecision).where(SignedDecision.decision_id == decision_id)
+        )
+        record.envelope_version = "devicetrust.decision-signature.unsupported"
+        db.commit()
+
+    verified = client.get(
+        f"/sbom/decisions/{decision_id}/signature",
+        headers={"X-API-Key": token},
+    )
+    assert verified.status_code == 200
+    assert verified.json()["signature_valid"] is False
+    assert verified.json()["trust_valid"] is False
+
+
 def test_revoked_key_remains_verifiable_but_is_not_trusted_for_new_signatures(client, monkeypatch):
     principal_id, token = _operator()
     decision_id = _decision(client, monkeypatch, principal_id, token)

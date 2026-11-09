@@ -85,13 +85,20 @@ def _decode_signature(value: str) -> bytes:
 
 
 def register_public_key(
-    db: Session, *, principal_id: str, public_key_pem: bytes, expires_at=None
+    db: Session,
+    *,
+    principal_id: str,
+    public_key_pem: bytes,
+    purpose: str = "decision-signing",
+    expires_at=None,
 ) -> SigningKey:
+    if purpose not in {"decision-signing", "decision-approval"}:
+        raise ValueError("unsupported signing key purpose")
     principal = db.get(Principal, principal_id)
     if principal is None or principal.status != "active":
         raise LookupError("Active principal not found")
     if principal.kind != "operator":
-        raise PermissionError("Only operator principals can register decision-signing keys")
+        raise PermissionError("Only operator principals can register trust-assurance keys")
     try:
         key = serialization.load_pem_public_key(public_key_pem)
     except (ValueError, TypeError, UnsupportedAlgorithm):
@@ -106,7 +113,7 @@ def register_public_key(
     now = utcnow()
     existing = db.scalar(select(SigningKey).where(SigningKey.fingerprint == fingerprint))
     if existing is not None:
-        if existing.principal_id != principal_id or existing.purpose != "decision-signing":
+        if existing.principal_id != principal_id or existing.purpose != purpose:
             raise ValueError("public key fingerprint is already registered to another trust binding")
         if existing.revoked_at is not None:
             raise ValueError("revoked public keys cannot be reactivated")
@@ -125,7 +132,7 @@ def register_public_key(
     item = SigningKey(
         id=str(uuid4()),
         principal_id=principal_id,
-        purpose="decision-signing",
+        purpose=purpose,
         algorithm="Ed25519",
         public_key_pem=public_key_pem.decode("ascii"),
         fingerprint=fingerprint,
@@ -320,7 +327,10 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
             )
             continue
 
-        signature_valid = current_digest == item.envelope_sha256
+        signature_valid = (
+            item.envelope_version == ENVELOPE_VERSION
+            and current_digest == item.envelope_sha256
+        )
         if signature_valid:
             try:
                 signature = _decode_signature(item.signature_b64)
