@@ -3,7 +3,7 @@
 import base64
 import binascii
 import hashlib
-import json
+import rfc8785
 from datetime import timezone
 from uuid import uuid4
 
@@ -46,9 +46,7 @@ def signing_envelope(decision: VulnerabilityDecision) -> bytes:
         "responses": list(decision.responses or []),
         "created_at": _utc_iso(decision.created_at),
     }
-    canonical = json.dumps(
-        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
-    ).encode("utf-8")
+    canonical = rfc8785.dumps(payload)
     return DOMAIN_SEPARATOR + canonical
 
 
