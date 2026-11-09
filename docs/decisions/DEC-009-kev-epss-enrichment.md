@@ -1,6 +1,6 @@
 # DEC-009: Versioned KEV and EPSS enrichment
 
-- Status: Proposed
+- Status: Implemented in PR #47; pending merge
 - Date: 2026-11-08
 - Scope: Product SBOM assessment enrichment
 
