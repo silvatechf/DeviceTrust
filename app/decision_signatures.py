@@ -99,6 +99,7 @@ def register_public_key(
         format=serialization.PublicFormat.Raw,
     )
     fingerprint = hashlib.sha256(raw).hexdigest()
+    now = utcnow()
     existing = db.scalar(select(SigningKey).where(SigningKey.fingerprint == fingerprint))
     if existing is not None:
         if existing.principal_id != principal_id or existing.purpose != "decision-signing":
@@ -112,7 +113,6 @@ def register_public_key(
             if existing_expiry <= now:
                 raise ValueError("expired public keys cannot be reactivated; register a new key")
         return existing
-    now = utcnow()
     if expires_at is not None:
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
