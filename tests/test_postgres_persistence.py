@@ -217,6 +217,9 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert inspect(target_engine).has_table("principals")
         assert inspect(target_engine).has_table("api_credentials")
         assert inspect(target_engine).has_table("vulnerability_decisions")
+        assert inspect(target_engine).has_table("signing_keys")
+        assert inspect(target_engine).has_table("signed_decisions")
+        assert inspect(target_engine).has_table("decision_approvals")
         decision_columns = {
             column["name"]
             for column in inspect(target_engine).get_columns("vulnerability_decisions")
@@ -248,8 +251,14 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
 
         command.downgrade(config, "0008_sbom_reference_preservation")
         assert not inspect(target_engine).has_table("vulnerability_decisions")
+        assert not inspect(target_engine).has_table("signing_keys")
+        assert not inspect(target_engine).has_table("signed_decisions")
+        assert not inspect(target_engine).has_table("decision_approvals")
         command.upgrade(config, "head")
         assert inspect(target_engine).has_table("vulnerability_decisions")
+        assert inspect(target_engine).has_table("signing_keys")
+        assert inspect(target_engine).has_table("signed_decisions")
+        assert inspect(target_engine).has_table("decision_approvals")
 
         command.downgrade(config, "0007_sbom_finding_applicability")
         assert not inspect(target_engine).has_table("vulnerability_decisions")
