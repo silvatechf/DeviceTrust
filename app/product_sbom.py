@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import audit, intelligence, sbom
+from . import applicability, audit, intelligence, sbom
 from .db import (
     Product,
     ProductFinding,
@@ -422,6 +422,7 @@ def list_assessment_findings(
             "fixed_in": row.fixed_in,
             "source": row.source,
             "intelligence": row.intelligence,
+            "applicability": row.applicability,
         }
         for row in rows
     ]
@@ -605,6 +606,9 @@ async def reassess_import(
                     fixed_in=finding.get("fixed_in"),
                     source=finding["source"],
                     intelligence=finding.get("intelligence", {}),
+                    applicability=applicability.assess_finding(
+                        finding, components[index]
+                    ),
                 )
             )
         audit.record(

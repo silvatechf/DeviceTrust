@@ -18,12 +18,16 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
 
         command.upgrade(config, "head")
         assert inspect(engine).has_table("audit_chain_state")
+        assert inspect(engine).has_table("principals")
+        assert inspect(engine).has_table("api_credentials")
         finding_columns = {
             column["name"]: column
             for column in inspect(engine).get_columns("sbom_assessment_findings")
         }
         assert "intelligence" in finding_columns
         assert finding_columns["intelligence"]["nullable"] is False
+        assert "applicability" in finding_columns
+        assert finding_columns["applicability"]["nullable"] is False
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
@@ -33,11 +37,26 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
             ) == 1
         command.check(config)
 
+        command.downgrade(config, "0006_identity_access")
+        assert "applicability" not in {
+            column["name"]
+            for column in inspect(engine).get_columns("sbom_assessment_findings")
+        }
+        command.upgrade(config, "head")
+        assert "applicability" in {
+            column["name"]
+            for column in inspect(engine).get_columns("sbom_assessment_findings")
+        }
+
         command.downgrade(config, "0002_persistent_sbom")
+        assert not inspect(engine).has_table("api_credentials")
+        assert not inspect(engine).has_table("principals")
         assert not inspect(engine).has_table("audit_chain_state")
 
         command.upgrade(config, "head")
         assert inspect(engine).has_table("audit_chain_state")
+        assert inspect(engine).has_table("principals")
+        assert inspect(engine).has_table("api_credentials")
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")

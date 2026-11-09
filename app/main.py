@@ -8,10 +8,10 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import or_, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import audit, posture, product_sbom, sbom
+from . import audit, identity, posture, product_sbom, sbom
 from .db import (
     AuditEntry,
     Device,
@@ -70,13 +70,38 @@ def get_db():
         yield db
 
 
-def auth(x_api_key: str = Header(default="")) -> str:
-    expected = os.getenv("DEVICETRUST_API_KEY")
-    if not expected:
-        raise HTTPException(503, "API key not configured")
-    if not hmac.compare_digest(x_api_key.encode(), expected.encode()):
-        raise HTTPException(401, "Invalid API key")
-    return "api-key"
+def auth(request: Request, x_api_key: str = Header(default="", alias="X-API-Key")) -> str:
+    mode = os.getenv("DEVICETRUST_AUTH_MODE", "legacy").strip().lower()
+    required = identity.required_scopes(request.method, request.url.path)
+    if required is None:
+        raise HTTPException(403, "No authorization policy is defined for this route")
+
+    if mode == "legacy":
+        expected = os.getenv("DEVICETRUST_API_KEY")
+        if not expected:
+            raise HTTPException(503, "Legacy API key is not configured")
+        if not hmac.compare_digest(x_api_key.encode(), expected.encode()):
+            raise HTTPException(401, "Invalid API credential")
+        return "api-key"
+
+    if mode != "managed":
+        raise HTTPException(503, "Unsupported authentication mode")
+    if not x_api_key:
+        raise HTTPException(401, "Missing API credential")
+
+    try:
+        with SessionLocal() as db:
+            principal = identity.authenticate(db, x_api_key)
+    except identity.IdentityConfigurationError:
+        raise HTTPException(503, "Managed authentication configuration is unavailable") from None
+    except SQLAlchemyError:
+        raise HTTPException(503, "Managed authentication is unavailable") from None
+
+    if principal is None:
+        raise HTTPException(401, "Invalid API credential")
+    if not required.issubset(principal.scopes):
+        raise HTTPException(403, "Insufficient API credential scope")
+    return f"principal:{principal.principal_id}"
 
 
 def get_write_db(_: str = Depends(auth)):

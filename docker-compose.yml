@@ -19,7 +19,9 @@
       - "127.0.0.1:8000:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
-      DEVICETRUST_API_KEY: ${DEVICETRUST_API_KEY:?Set DEVICETRUST_API_KEY in the environment}
+      DEVICETRUST_AUTH_MODE: ${DEVICETRUST_AUTH_MODE:-legacy}
+      DEVICETRUST_API_KEY: ${DEVICETRUST_API_KEY:-}
+      DEVICETRUST_CREDENTIAL_PEPPER: ${DEVICETRUST_CREDENTIAL_PEPPER:-}
     depends_on:
       db:
         condition: service_healthy

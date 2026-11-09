@@ -16,6 +16,7 @@ MAX_PURL_LENGTH = 512
 SUPPORTED_CYCLONEDX_SPEC_VERSION = "1.5"
 MAX_OSV_QUERIES_PER_IMPORT = 50
 OSV_QUERY_CONTRACT_VERSION = "2"
+OSV_QUERY_URL = "https://api.osv.dev/v1/query"
 OSV_ENRICHMENT_DEADLINE_SECONDS = 10.0
 OSV_CONNECT_TIMEOUT_SECONDS = 2.0
 OSV_READ_TIMEOUT_SECONDS = 3.0
@@ -110,7 +111,7 @@ def scan_local(
     return hits
 
 
-def _osv_query_purl(purl: str) -> str:
+def normalize_osv_query_purl(purl: str) -> str:
     """Return an unversioned PURL for OSV's separate top-level version field."""
     parsed = PackageURL.from_string(purl)
     return PackageURL(
@@ -152,7 +153,7 @@ def scan_osv_with_status(
             skipped_no_purl += 1
             continue
         try:
-            query_purl = _osv_query_purl(purl)
+            query_purl = normalize_osv_query_purl(purl)
         except (TypeError, ValueError):
             skipped_invalid_purl += 1
             continue
@@ -176,12 +177,13 @@ def scan_osv_with_status(
                     break
                 try:
                     response = client.post(
-                        "https://api.osv.dev/v1/query",
+                        OSV_QUERY_URL,
                         json={"package": {"purl": purl}, "version": version},
                         timeout=_osv_timeout(remaining),
                     )
                     response.raise_for_status()
                     payload = response.json()
+                    query_checked_at = datetime.now(timezone.utc).isoformat()
                 except (httpx.HTTPError, ValueError, TypeError):
                     failed = True
                     queried += 1
@@ -216,6 +218,13 @@ def scan_osv_with_status(
                             "severity": severity.lower(),
                             "fixed_in": None,
                             "source": "osv",
+                            "osv_query": {
+                                "endpoint": OSV_QUERY_URL,
+                                "package_url": purl,
+                                "component_purl": components[component_index]["purl"],
+                                "version": version,
+                                "checked_at": query_checked_at,
+                            },
                         }
                         if include_component_index:
                             finding["component_index"] = component_index
@@ -272,7 +281,7 @@ async def scan_osv_with_status_async(
                     skipped_no_purl += 1
                     continue
                 try:
-                    query_purl = _osv_query_purl(purl)
+                    query_purl = normalize_osv_query_purl(purl)
                 except (TypeError, ValueError):
                     skipped_invalid_purl += 1
                     continue
@@ -292,12 +301,13 @@ async def scan_osv_with_status_async(
                     queried += 1
                     try:
                         response = await client.post(
-                            "https://api.osv.dev/v1/query",
+                            OSV_QUERY_URL,
                             json={"package": {"purl": purl}, "version": version},
                             timeout=_osv_timeout(remaining),
                         )
                         response.raise_for_status()
                         payload = response.json()
+                        query_checked_at = datetime.now(timezone.utc).isoformat()
                     except (httpx.HTTPError, ValueError, TypeError):
                         failed = True
                         continue
@@ -329,6 +339,13 @@ async def scan_osv_with_status_async(
                                 "severity": severity.lower(),
                                 "fixed_in": None,
                                 "source": "osv",
+                                "osv_query": {
+                                    "endpoint": OSV_QUERY_URL,
+                                    "package_url": purl,
+                                    "component_purl": components[component_index]["purl"],
+                                    "version": version,
+                                    "checked_at": query_checked_at,
+                                },
                             }
                             if include_component_index:
                                 finding["component_index"] = component_index
