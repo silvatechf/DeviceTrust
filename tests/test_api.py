@@ -227,7 +227,6 @@ def test_audit_chain_cannot_detect_deleted_tail_without_checkpoint(tmp_path):
     engine.dispose()
 
 
-
 def test_evidence_listing_is_paginated_and_bounded(client):
     device_id = "PAGINATION-001"
 
@@ -765,7 +764,6 @@ def test_product_sbom_import_rolls_back_all_rows_when_audit_append_fails(client,
             db.query(AuditEntry).filter_by(action="sbom.product_import").count()
             == audit_count_before
         )
-
 
 
 def test_product_sbom_import_preserves_bom_identity_and_component_refs(client):
