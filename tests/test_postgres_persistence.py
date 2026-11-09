@@ -35,6 +35,7 @@ from app.db import (
     SignedDecision,
     SigningKey,
     VulnerabilityDecision,
+    utcnow,
 )
 from app.db import engine as application_engine
 from app.main import app
@@ -833,7 +834,6 @@ def test_review_decisions_persist_and_link_revisions_postgres():
             session.execute(delete(ProductRelease).where(ProductRelease.id == release_id))
             session.execute(delete(Product).where(Product.id == product_id))
             session.execute(delete(Principal).where(Principal.id == principal_id))
-            session.execute(delete(Principal).where(Principal.id == approver_id))
             session.commit()
 
 
@@ -1054,4 +1054,5 @@ def test_ed25519_decision_signature_persists_and_reverifies_postgres():
             if product_id is not None:
                 session.execute(delete(Product).where(Product.id == product_id))
             session.execute(delete(Principal).where(Principal.id == principal_id))
+            session.execute(delete(Principal).where(Principal.id == approver_id))
             session.commit()
