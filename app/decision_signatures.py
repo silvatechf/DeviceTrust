@@ -98,7 +98,7 @@ def register_public_key(
     if principal is None or principal.status != "active":
         raise LookupError("Active principal not found")
     if principal.kind != "operator":
-        raise PermissionError("Only operator principals can register decision-signing keys")
+        raise PermissionError("Only operator principals can register trust-assurance keys")
     try:
         key = serialization.load_pem_public_key(public_key_pem)
     except (ValueError, TypeError, UnsupportedAlgorithm):
