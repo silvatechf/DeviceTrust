@@ -149,7 +149,7 @@ The console keeps the supplied API credential in page memory only. The default l
 After applying migrations, create an operator credential through the offline CLI and set `DEVICETRUST_AUTH_MODE=managed` in the API process:
 
 ```bash
-python -m app.identity_cli create-principal --name "Local operator" --kind operator --scope inventory:read --scope inventory:write --scope audit:read
+python -m app.identity_cli create-principal --name "Local operator" --kind operator --scope inventory:read --scope inventory:write --scope evidence:read --scope evidence:write --scope sbom:read --scope sbom:write --scope assessment:read --scope assessment:write --scope audit:read
 ```
 
 The token is displayed once and is accepted through the existing `X-API-Key` header. Managed mode ignores `DEVICETRUST_API_KEY`; it never falls back to the shared key. See [Identity and Access Governance](docs/identity-access-governance.md) for revocation, disablement and the complete scope list.
