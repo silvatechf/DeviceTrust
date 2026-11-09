@@ -47,6 +47,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Persist accepted CycloneDX JSON 1.5 SBOM imports with format, spec version, source, timestamp, SHA-256 digest and parser version.
 - [x] Persist component occurrences and link them to a specific product release and SBOM import.
 - [x] Preserve source component name/version values and supported PURLs without inventing identifiers.
+- [x] Preserve CycloneDX serialNumber, BOM version, metadata.component identity and supplied top-level component bom-ref values for future VEX linkage. See [DEC-011](decisions/DEC-011-cyclonedx-reference-preservation.md).
 - [x] Add duplicate detection and idempotent re-import behavior for the same release, format and content digest.
 - [x] Link synthetic vulnerability findings to exact component occurrences.
 - [x] Compare accepted SBOM imports and explain additions, removals and matched-component changes using PURL identity that excludes only the version segment while preserving qualifiers and subpath; report ambiguous and unidentified occurrences without speculative matching.
