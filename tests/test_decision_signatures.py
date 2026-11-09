@@ -112,9 +112,9 @@ def test_ed25519_signature_is_verified_and_persisted(client, monkeypatch):
     assert verified.status_code == 200
     assert verified.json()["signature_valid"] is True
     assert verified.json()["trust_valid"] is True
-    assert verified.json()["signature"] == signature
-    assert verified.json()["public_key_pem"].startswith("-----BEGIN PUBLIC KEY-----")
-    assert verified.json()["current_key_status"] == "active"
+    assert verified.json()["signatures"][0]["signature"] == signature
+    assert verified.json()["signatures"][0]["public_key_pem"].startswith("-----BEGIN PUBLIC KEY-----")
+    assert verified.json()["signatures"][0]["current_key_status"] == "active"
 
     with SessionLocal() as db:
         rows = db.scalars(select(SignedDecision).where(SignedDecision.decision_id == decision_id)).all()
@@ -170,7 +170,7 @@ def test_revoked_key_remains_verifiable_but_is_not_trusted_for_new_signatures(cl
     verified = client.get(f"/sbom/decisions/{decision_id}/signature", headers={"X-API-Key": token})
     assert verified.json()["signature_valid"] is True
     assert verified.json()["trust_valid"] is False
-    assert verified.json()["current_key_status"] == "revoked"
+    assert verified.json()["signatures"][0]["current_key_status"] == "revoked"
     payload = client.get(
         f"/sbom/decisions/{decision_id}/signing-payload",
         params={"key_id": key_id},
@@ -178,6 +178,39 @@ def test_revoked_key_remains_verifiable_but_is_not_trusted_for_new_signatures(cl
     )
     assert payload.status_code == 403
 
+
+def test_decision_can_be_resigned_after_key_rotation_without_losing_history(client, monkeypatch):
+    principal_id, token = _operator()
+    decision_id = _decision(client, monkeypatch, principal_id, token)
+    first_private, first_public = _keypair()
+    first_key_id, _ = _register(principal_id, first_public)
+    first_signature = _signature_for(client, token, decision_id, first_key_id, first_private)
+    first_response = client.post(
+        f"/sbom/decisions/{decision_id}/signature",
+        headers={"X-API-Key": token},
+        json={"key_id": first_key_id, "signature": first_signature},
+    )
+    assert first_response.status_code == 201
+    with SessionLocal() as db:
+        decision_signatures.revoke_public_key(db, first_key_id)
+        db.commit()
+    second_private, second_public = _keypair()
+    second_key_id, _ = _register(principal_id, second_public)
+    second_signature = _signature_for(client, token, decision_id, second_key_id, second_private)
+    second_response = client.post(
+        f"/sbom/decisions/{decision_id}/signature",
+        headers={"X-API-Key": token},
+        json={"key_id": second_key_id, "signature": second_signature},
+    )
+    assert second_response.status_code == 201
+    verified = client.get(f"/sbom/decisions/{decision_id}/signature", headers={"X-API-Key": token})
+    result = verified.json()
+    assert len(result["signatures"]) == 2
+    assert result["signatures"][0]["current_key_status"] == "revoked"
+    assert result["signatures"][0]["trust_valid"] is False
+    assert result["signatures"][1]["current_key_status"] == "active"
+    assert result["signatures"][1]["trust_valid"] is True
+    assert result["trust_valid"] is True
 
 def test_signature_rejects_wrong_key_payload_and_cross_principal_key(client, monkeypatch):
     principal_id, token = _operator()
