@@ -160,9 +160,11 @@ def sign_decision(
     envelope = signing_envelope(decision)
     envelope_digest = hashlib.sha256(envelope).hexdigest()
     public_key = serialization.load_pem_public_key(key.public_key_pem.encode("ascii"))
+    if not isinstance(public_key, Ed25519PublicKey):
+        raise ValueError("registered signing key is not Ed25519")
     try:
         public_key.verify(signature, envelope)
-    except InvalidSignature:
+    except (InvalidSignature, TypeError):
         raise ValueError("detached signature does not match the decision envelope") from None
 
     existing = db.scalar(select(SignedDecision).where(SignedDecision.decision_id == decision_id))
@@ -243,8 +245,10 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
         try:
             signature = _decode_signature(item.signature_b64)
             public_key = serialization.load_pem_public_key(key.public_key_pem.encode("ascii"))
+            if not isinstance(public_key, Ed25519PublicKey):
+                raise ValueError("registered signing key is not Ed25519")
             public_key.verify(signature, current_envelope)
-        except (ValueError, InvalidSignature):
+        except (ValueError, InvalidSignature, TypeError):
             signature_valid = False
 
     key_status = "revoked" if key.revoked_at else "active"
