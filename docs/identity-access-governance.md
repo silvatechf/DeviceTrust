@@ -60,6 +60,10 @@ The command prints the raw token once. Store it in an approved secret manager or
 
     python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope assessment:read --scope assessment:review --scope assessment:sign
 
+For a distinct approver principal, issue a separate credential with approval/read scopes only:
+
+    python -m app.identity_cli issue-credential --principal-id APPROVER_UUID --scope assessment:read --scope assessment:approve
+
 Only active operator principals can create human review decisions; service principals and legacy shared-key requests are rejected. The CLI also supports offline Ed25519 public-key registration and revocation. Supply a PEM public key file only; private keys must never be passed to DeviceTrust:
 
     python -m app.identity_cli register-signing-key --principal-id PRINCIPAL_UUID --public-key-file operator-ed25519-public.pem --purpose decision-signing --expires-in-days 365
