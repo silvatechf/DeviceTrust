@@ -29,7 +29,7 @@ DeviceTrust is an early-stage engineering prototype. The following boundaries mu
 - Actual evidence artifacts can be attached to observations and are stored as database BLOBs with a server-computed SHA-256 digest and byte length. The API verifies bytes again before download and fails closed on mismatch.
 - Artifact uploads are limited to 5 MiB and an allow-list of declared media types. There is no content sniffing, malware scanning or source authentication.
 - The artifact digest proves consistency with the stored digest only. A privileged database writer can replace both bytes and digest.
-- Artifacts are linked to observations, not to exact vulnerability decision revisions; decision evidence references remain opaque.
+- An immutable evidence manifest can bind selected artifact IDs already present in the decision's original evidence references to the exact decision revision; the manifest digest is included in signature/approval envelope v2. This establishes byte-to-revision linkage, not source authentication or claim truth.
 - Artifact storage is a bounded prototype database-BLOB design, not scalable object storage. External signed evidence manifests and independent trust anchors remain unimplemented.
 
 ## Vulnerability intelligence
