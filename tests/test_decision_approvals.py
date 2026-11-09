@@ -295,6 +295,38 @@ def test_disabled_approver_signature_remains_verifiable_but_not_trusted(
     assert result["approval_policy_satisfied"] is False
 
 
+def test_tampered_approval_record_fails_cryptographic_verification(client, monkeypatch):
+    author_id, author_token = _operator("Tampered approval author")
+    approver_id, approver_token = _operator("Tampered approval reviewer")
+    _finding_id, decision_id = _decision(client, monkeypatch, author_id, author_token)
+    _sign_author(client, author_token, decision_id, author_id)
+    submission = _approval_submission(
+        client, decision_id, approver_id, approver_token
+    )
+    approved = client.post(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers={"X-API-Key": approver_token},
+        json=submission,
+    )
+    assert approved.status_code == 201, approved.text
+
+    with SessionLocal() as db:
+        item = db.scalar(
+            db.query(DecisionApproval).filter_by(decision_id=decision_id).statement
+        )
+        item.envelope_sha256 = "0" * 64
+        db.commit()
+
+    status = client.get(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers={"X-API-Key": author_token},
+    )
+    assert status.status_code == 200
+    assert status.json()["approvals"][0]["signature_valid"] is False
+    assert status.json()["approvals"][0]["trust_valid"] is False
+    assert status.json()["approval_policy_satisfied"] is False
+
+
 def test_approval_requires_assessment_approve_scope(client, monkeypatch):
     author_id, author_token = _operator("Scoped author")
     approver_id, approver_token = _operator(
