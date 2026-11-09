@@ -65,7 +65,39 @@ jobs:
           tar -xzf "$archive" -C /tmp gitleaks
           /tmp/gitleaks version
       - name: Scan all reachable Git history
-        run: /tmp/gitleaks git --log-opts="--all --full-history" --redact=100 --no-banner --log-level=warn --exit-code=1 .
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="${RUNNER_TEMP}/gitleaks-report.json"
+          set +e
+          /tmp/gitleaks git --log-opts="--all --full-history" --redact=100 --report-format=json --report-path="$report" --no-banner --log-level=warn --exit-code=1 .
+          scan_status=$?
+          set -e
+          if [[ "$scan_status" -ne 0 ]]; then
+            python - "$report" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report_path = Path(sys.argv[1])
+          if not report_path.exists():
+              print("Gitleaks failed without a readable redacted report.")
+              raise SystemExit(0)
+          findings = json.loads(report_path.read_text(encoding="utf-8"))
+          print(f"Gitleaks detected {len(findings)} finding(s). Secret values are intentionally omitted.")
+          for finding in findings:
+              print(
+                  "rule={rule} file={file} commit={commit} line={line} description={description}".format(
+                      rule=finding.get("RuleID", "unknown"),
+                      file=finding.get("File", "unknown"),
+                      commit=finding.get("Commit", "unknown"),
+                      line=finding.get("StartLine", "unknown"),
+                      description=finding.get("Description", "unknown"),
+                  )
+              )
+          PY
+          fi
+          exit "$scan_status"
 
   postgres-integration:
     runs-on: ubuntu-latest
