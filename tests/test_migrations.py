@@ -26,6 +26,8 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         }
         assert "intelligence" in finding_columns
         assert finding_columns["intelligence"]["nullable"] is False
+        assert "applicability" in finding_columns
+        assert finding_columns["applicability"]["nullable"] is False
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
