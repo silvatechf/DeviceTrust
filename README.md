@@ -45,9 +45,10 @@ Implemented prototype workflows:
 12. Authenticate API clients through legacy shared-key mode or individually revocable, expiring, scoped managed tokens (merged in main via PR #55).
 13. Preserve source-aware applicability signals for versioned findings (merged in main via PR #55).
 14. Preserve original CycloneDX BOM and component references for future VEX linkage (merged in main via PR #55).
-15. Record attributable, append-only vulnerability review decisions against immutable assessment findings (implemented in the current reviewed-decision PR; VEX export remains future work).
+15. Record attributable, append-only vulnerability review decisions against immutable assessment findings (integrated through PR #56).
+16. Register operator-controlled Ed25519 public keys and verify append-only detached signatures bound to exact immutable decision revisions, including key-rotation history (implemented in the trust-assurance work; second-person approval and VEX export remain future work).
 
-Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. The corresponding pull-request head passed CI and CodeQL before merge; no post-merge workflow run is currently recorded for the merge commit. PostgreSQL integration and API-flow tests are included in the automated test suite, while a clean local Compose walkthrough remains part of the release gate.
+Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. The merged implementation is covered by successful post-merge CI and CodeQL runs for the current main commit. PostgreSQL integration and API-flow tests are included in the automated test suite, while a clean local Compose walkthrough remains part of the release gate.
 
 ### Product-scoped SBOM API
 
@@ -80,7 +81,7 @@ The product SBOM persistence API was merged through [PR #22](https://github.com/
 
 - Product-to-device relationship inference.
 - SPDX ingestion or CycloneDX VEX generation.
-- CycloneDX VEX generation, digital signatures, second-person approval and vendor-specific backport analysis. Attributable human review records are implemented in the reviewed-decision branch; they are not yet exported as VEX statements.
+- CycloneDX VEX generation, second-person approval, evidence-artifact verification, external audit anchoring and vendor-specific backport analysis. Ed25519 detached decision signatures and offline public-key lifecycle are implemented in PR #57 (pending review); signatures remain optional and do not establish legal identity or manufacturer authority.
 - Human login, MFA, SSO, tenant isolation and web-based credential administration. Managed API principals and route scopes are implemented in the identity implementation branch; offline CLI administration is required.
 - Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
 - Active LAN discovery, packet capture, device agents or independent firmware/hardware attestation.
