@@ -169,8 +169,14 @@ def test_signature_rejects_wrong_key_payload_and_cross_principal_key(client, mon
     _, public_pem = _keypair()
     key_id, _ = _register(other_principal_id, public_pem)
 
-    signature = base64.b64encode(b"x" * 64).decode("ascii")
+    payload = client.get(
+        f"/sbom/decisions/{decision_id}/signing-payload",
+        params={"key_id": key_id},
+        headers={"X-API-Key": token},
+    )
+    assert payload.status_code == 403
 
+    signature = base64.b64encode(b"x" * 64).decode("ascii")
     response = client.post(
         f"/sbom/decisions/{decision_id}/signature",
         headers={"X-API-Key": token},
