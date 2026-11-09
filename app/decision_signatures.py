@@ -152,7 +152,7 @@ def revoke_public_key(db: Session, key_id: str) -> SigningKey:
     return item
 
 
-def get_signing_payload(db: Session, *, decision_id: int, principal_id: str, key_id: str) -> dict:
+def get_signing_payload(db: Session, *, decision_id: int, principal_id: str, key_id: str) -> tuple[dict, bool]:
     decision = db.get(VulnerabilityDecision, decision_id)
     if decision is None:
         raise LookupError("Decision not found")
@@ -227,7 +227,7 @@ def sign_decision(
             and existing.signature_b64 == signature_b64
             and existing.envelope_sha256 == envelope_digest
         ):
-            return _signature_dict(existing, key)
+            return _signature_dict(existing, key), False
         raise SignatureConflict("decision already has a different immutable signature")
 
     item = SignedDecision(
@@ -255,7 +255,7 @@ def sign_decision(
             "envelope_sha256": envelope_digest,
         },
     )
-    return _signature_dict(item, key)
+    return _signature_dict(item, key), True
 
 
 def _signature_dict(item: SignedDecision, key: SigningKey) -> dict:
