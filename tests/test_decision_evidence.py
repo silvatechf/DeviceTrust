@@ -1,18 +1,13 @@
+import base64
 import hashlib
 
+import rfc8785
 from sqlalchemy import update
 
-from app import decision_evidence, decision_signatures, evidence_artifacts, identity
-from app.db import (
-    DecisionEvidenceManifest,
-    EvidenceArtifact,
-    EvidenceObservation,
-    SessionLocal,
-    SignedDecision,
-    utcnow,
-)
+from app import identity
+from app.db import EvidenceArtifact, SessionLocal
 from .conftest import H
-from .test_decision_signatures import _keypair, _register, _signature_for, _operator
+from .test_decision_signatures import _keypair, _register, _signature_for
 from .test_vulnerability_decisions import _finding
 
 
@@ -95,7 +90,7 @@ def test_manifest_binds_verified_artifact_to_exact_decision_and_signature(client
     assert result["manifest"]["artifacts"][0]["artifact_id"] == artifact_id
     assert result["manifest"]["artifacts"][0]["sha256"] == artifact_digest
     assert result["manifest_sha256"] == hashlib.sha256(
-        __import__("rfc8785").dumps(result["manifest"])
+        rfc8785.dumps(result["manifest"])
     ).hexdigest()
 
     private_key, public_pem = _keypair()
@@ -106,9 +101,6 @@ def test_manifest_binds_verified_artifact_to_exact_decision_and_signature(client
         headers={"X-API-Key": token},
     )
     assert payload.status_code == 200, payload.text
-    import base64
-    import json
-
     envelope = base64.b64decode(payload.json()["signing_payload_base64"], validate=True)
     assert b'"evidence_manifest_sha256":"' + result["manifest_sha256"].encode() + b'"' in envelope
     signed = client.post(
@@ -116,7 +108,7 @@ def test_manifest_binds_verified_artifact_to_exact_decision_and_signature(client
         headers={"X-API-Key": token},
         json={
             "key_id": key_id,
-            "signature": __import__("base64").b64encode(private_key.sign(envelope)).decode(),
+            "signature": base64.b64encode(private_key.sign(envelope)).decode(),
         },
     )
     assert signed.status_code == 201, signed.text
@@ -217,10 +209,16 @@ def test_manifest_artifact_tampering_invalidates_manifest_and_signing_payload(cl
     assert payload.status_code == 503
 
 
-def test_manifest_read_scope_is_separate_from_binding_scope(client):
+def test_manifest_read_scope_is_separate_from_binding_scope(client, monkeypatch):
     principal_id, token = _operator_with_scopes()
     artifact_id, _ = _artifact(client)
-    decision_id = _decision(client, __import__("pytest").MonkeyPatch(), principal_id, token, artifact_id)
+    decision_id = _decision(client, monkeypatch, principal_id, token, artifact_id)
+    created = client.post(
+        f"/sbom/decisions/{decision_id}/evidence-manifest",
+        headers={"X-API-Key": token},
+        json={"artifact_ids": [artifact_id]},
+    )
+    assert created.status_code == 201, created.text
     with SessionLocal() as db:
         _reader, _credential, read_token = identity.create_principal(
             db,
@@ -233,4 +231,10 @@ def test_manifest_read_scope_is_separate_from_binding_scope(client):
         f"/sbom/decisions/{decision_id}/evidence-manifest",
         headers={"X-API-Key": read_token},
     )
-    assert response.status_code == 404
+    assert response.status_code == 200
+    denied = client.post(
+        f"/sbom/decisions/{decision_id}/evidence-manifest",
+        headers={"X-API-Key": read_token},
+        json={"artifact_ids": [artifact_id]},
+    )
+    assert denied.status_code == 403
