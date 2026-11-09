@@ -173,3 +173,43 @@ def disable_principal(db: Session, principal_id: str) -> None:
         principal.status = "disabled"
         principal.disabled_at = utcnow()
         db.flush()
+
+
+def issue_credential(
+    db: Session,
+    *,
+    principal_id: str,
+    scopes: set[str] | frozenset[str],
+    expires_at=None,
+) -> tuple[APICredential, str]:
+    principal = db.get(Principal, principal_id)
+    if principal is None:
+        raise LookupError("Principal not found")
+    if principal.status != "active":
+        raise ValueError("Cannot issue credentials to a disabled principal")
+
+    normalized_scopes = sorted(set(scopes))
+    if not normalized_scopes or not set(normalized_scopes).issubset(ALLOWED_SCOPES):
+        raise ValueError("At least one valid, allow-listed scope is required")
+    now = utcnow()
+    if expires_at is None:
+        expires_at = now + timedelta(days=90)
+    elif expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= now or expires_at > now + timedelta(days=365):
+        raise ValueError("Credential expiry must be within the next 365 days")
+
+    prefix = secrets.token_hex(6)
+    raw_token = f"dtk_{prefix}_{secrets.token_urlsafe(32)}"
+    credential = APICredential(
+        id=str(uuid4()),
+        principal_id=principal.id,
+        prefix=prefix,
+        token_digest=hashlib.sha256(raw_token.encode("ascii")).hexdigest(),
+        scopes=normalized_scopes,
+        created_at=now,
+        expires_at=expires_at,
+    )
+    db.add(credential)
+    db.flush()
+    return credential, raw_token
