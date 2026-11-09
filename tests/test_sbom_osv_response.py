@@ -80,6 +80,8 @@ def test_osv_deduplicates_queries_and_maps_findings_to_each_occurrence(monkeypat
     findings, status = sbom.scan_osv_with_status(components, include_component_index=True)
 
     assert len(client.calls) == 2
+    assert all("@" not in call[1]["package"]["purl"] for call in client.calls)
+    assert [call[1]["version"] for call in client.calls] == ["3.0.0", "3.0.1"]
     assert [item["component_index"] for item in findings] == [0, 1, 2]
     assert status["status"] == "complete"
     assert status["queried"] == 2
@@ -269,3 +271,37 @@ def test_async_osv_deadline_includes_query_preparation(monkeypatch):
     assert status["status"] == "incomplete"
     assert status["deadline_exhausted"] is True
     assert status["queried"] == 0
+
+
+def test_osv_query_uses_unversioned_purl_and_preserves_qualifiers(monkeypatch):
+    client = _FakeClient()
+    monkeypatch.setattr(sbom.httpx, "Client", lambda: client)
+
+    _, status = sbom.scan_osv_with_status([
+        _component(
+            version="1.2.3",
+            purl="pkg:npm/%40scope/package@1.2.3?repository_url=https%3A%2F%2Fregistry.npmjs.org",
+        )
+    ])
+
+    assert status["status"] == "complete"
+    assert client.calls[0][1] == {
+        "package": {
+            "purl": "pkg:npm/%40scope/package?repository_url=https%3A%2F%2Fregistry.npmjs.org"
+        },
+        "version": "1.2.3",
+    }
+
+
+def test_osv_skips_invalid_purl_and_marks_coverage_incomplete(monkeypatch):
+    client = _FakeClient()
+    monkeypatch.setattr(sbom.httpx, "Client", lambda: client)
+
+    findings, status = sbom.scan_osv_with_status([
+        _component(purl="not-a-purl")
+    ])
+
+    assert findings == []
+    assert client.calls == []
+    assert status["status"] == "incomplete"
+    assert status["skipped_invalid_purl"] == 1
