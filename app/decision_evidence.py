@@ -102,7 +102,12 @@ def create_manifest(
         )
     )
     if existing is not None:
-        if set(existing.artifact_ids or []) == set(artifact_ids):
+        existing_status = get_manifest(db, decision_id)
+        if existing_status is None or not existing_status["integrity_valid"]:
+            raise EvidenceManifestIntegrityError(
+                "Stored decision evidence manifest integrity validation failed"
+            )
+        if set(existing.artifact_ids) == set(artifact_ids):
             return existing, False
         raise EvidenceManifestConflict(
             "Decision already has an immutable evidence manifest"
