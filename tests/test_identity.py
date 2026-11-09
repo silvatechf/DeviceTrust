@@ -145,3 +145,42 @@ def test_every_authenticated_route_has_an_explicit_scope_policy():
             )
 
     assert protected_routes
+
+
+def test_existing_principal_can_receive_replacement_credential():
+    principal_id, old_credential_id, old_token = _issue({"inventory:read"})
+    with SessionLocal() as db:
+        new_credential, new_token = identity.issue_credential(
+            db,
+            principal_id=principal_id,
+            scopes={"inventory:read", "audit:read"},
+        )
+        new_credential_id = new_credential.id
+        db.commit()
+
+    with SessionLocal() as db:
+        assert identity.authenticate(db, old_token) is not None
+        assert identity.authenticate(db, new_token) is not None
+        identity.revoke_credential(db, old_credential_id)
+        db.commit()
+
+    with SessionLocal() as db:
+        assert identity.authenticate(db, old_token) is None
+        assert identity.authenticate(db, new_token) is not None
+        identity.revoke_credential(db, new_credential_id)
+        db.commit()
+
+
+def test_disabled_principal_cannot_receive_a_new_credential():
+    principal_id, _, _ = _issue({"inventory:read"})
+    with SessionLocal() as db:
+        identity.disable_principal(db, principal_id)
+        db.commit()
+
+    with SessionLocal() as db:
+        with pytest.raises(ValueError, match="disabled principal"):
+            identity.issue_credential(
+                db,
+                principal_id=principal_id,
+                scopes={"inventory:read"},
+            )
