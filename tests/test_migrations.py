@@ -37,11 +37,18 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
             ) == 1
         command.check(config)
 
-        command.downgrade(config, "0002_persistent_sbom")
+        command.downgrade(config, "0006_identity_access")
         assert "applicability" not in {
             column["name"]
             for column in inspect(engine).get_columns("sbom_assessment_findings")
         }
+        command.upgrade(config, "head")
+        assert "applicability" in {
+            column["name"]
+            for column in inspect(engine).get_columns("sbom_assessment_findings")
+        }
+
+        command.downgrade(config, "0002_persistent_sbom")
         assert not inspect(engine).has_table("api_credentials")
         assert not inspect(engine).has_table("principals")
         assert not inspect(engine).has_table("audit_chain_state")
