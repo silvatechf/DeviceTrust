@@ -93,7 +93,7 @@ For managed mode, configure DEVICETRUST_AUTH_MODE=managed in the API process and
 
    DeviceTrust never receives the private key.
 4. Submit the Base64 detached signature and key ID to POST /sbom/decisions/{decision_id}/signature. The request body contains only key_id and signature; never submit a private key.
-5. Read GET /sbom/decisions/{decision_id}/signature to re-verify the stored signature against the current decision bytes. The response exposes the append-only signature history and each public key for independent verification. The top-level signature_valid and trust_valid fields summarize whether any recorded signature is cryptographically valid and currently trusted; each item also reports its key and principal status.
+5. Read GET /sbom/decisions/{decision_id}/signature to re-verify the stored signature against the current decision bytes. The response exposes the append-only signature history, each public key and the current canonical signing payload for independent verification. The top-level signature_valid and trust_valid fields summarize whether any recorded signature is cryptographically valid and currently trusted; each item also reports its key and principal status.
 
 The signed envelope uses RFC 8785 JCS, UTF-8 and a domain separator. It binds the exact decision revision, reviewer principal, finding, state, rationale, evidence references, responses and timestamp. The signature endpoint is idempotent for an identical signature from the same key. Each key can sign a decision once; a rotated key can add another immutable signature without deleting historical signatures. A new decision revision is a separate unsigned record and must be signed separately.
 
