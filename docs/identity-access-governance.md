@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented prototype capability in the identity implementation branch. Managed authentication is opt-in through DEVICETRUST_AUTH_MODE=managed; the backwards-compatible default remains legacy. This is not a production identity provider or a multi-tenant access system.
+Implemented prototype capability in PR #50; pending merge. Managed authentication is opt-in through DEVICETRUST_AUTH_MODE=managed; the backwards-compatible default remains legacy. This is not a production identity provider or a multi-tenant access system.
 
 ## Principal and credential model
 
