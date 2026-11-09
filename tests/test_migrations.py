@@ -29,6 +29,8 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
             "assessment_finding_id",
             "principal_id",
             "revision",
+            "request_key_hash",
+            "request_fingerprint",
             "supersedes_id",
             "state",
             "justification",
