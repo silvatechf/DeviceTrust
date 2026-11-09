@@ -139,13 +139,27 @@ def get_manifest(db: Session, decision_id: int) -> dict | None:
     )
     if item is None:
         return None
-    canonical = rfc8785.dumps(item.manifest_payload)
-    actual_digest = hashlib.sha256(canonical).hexdigest()
-    digest_valid = hmac.compare_digest(actual_digest, item.manifest_sha256)
-    decision = db.get(VulnerabilityDecision, decision_id)
-    artifacts = db.scalars(
-        select(EvidenceArtifact).where(EvidenceArtifact.id.in_(item.artifact_ids or []))
-    ).all()
+    try:
+        if (
+            item.manifest_version != MANIFEST_VERSION
+            or not isinstance(item.artifact_ids, list)
+            or not isinstance(item.manifest_sha256, str)
+            or len(item.manifest_sha256) != 64
+        ):
+            raise ValueError("Stored evidence manifest metadata is invalid")
+        canonical = rfc8785.dumps(item.manifest_payload)
+        actual_digest = hashlib.sha256(canonical).hexdigest()
+        digest_valid = hmac.compare_digest(actual_digest, item.manifest_sha256)
+        decision = db.get(VulnerabilityDecision, decision_id)
+        artifacts = db.scalars(
+            select(EvidenceArtifact).where(
+                EvidenceArtifact.id.in_(item.artifact_ids)
+            )
+        ).all()
+    except (TypeError, ValueError, OverflowError):
+        raise EvidenceManifestIntegrityError(
+            "Stored decision evidence manifest integrity validation failed"
+        ) from None
     artifact_map = {artifact.id: artifact for artifact in artifacts}
     artifact_integrity_valid = (
         decision is not None
