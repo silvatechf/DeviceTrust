@@ -765,3 +765,73 @@ def test_product_sbom_import_rolls_back_all_rows_when_audit_append_fails(client,
             db.query(AuditEntry).filter_by(action="sbom.product_import").count()
             == audit_count_before
         )
+
+
+
+def test_product_sbom_import_preserves_bom_identity_and_component_refs(client):
+    product = client.post(
+        "/products",
+        json={"manufacturer": "Example Vendor", "product_name": "Sensor X"},
+        headers=H,
+    )
+    release = client.post(
+        f"/products/{product.json()['id']}/releases",
+        json={"version": "1.2.3"},
+        headers=H,
+    )
+    release_id = release.json()["id"]
+    document = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.5",
+        "serialNumber": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
+        "version": 2,
+        "metadata": {
+            "component": {
+                "type": "application",
+                "bom-ref": "product-sensor-x",
+                "name": "Sensor X",
+                "version": "1.2.3",
+                "purl": "pkg:generic/sensor-x@1.2.3",
+            }
+        },
+        "components": [
+            {
+                "type": "library",
+                "bom-ref": "openssl-component",
+                "name": "openssl",
+                "version": "1.1.1",
+                "purl": "pkg:generic/openssl@1.1.1",
+            }
+        ],
+    }
+
+    imported = client.post(
+        f"/product-releases/{release_id}/sbom",
+        json=document,
+        headers=H,
+    )
+
+    assert imported.status_code == 201, imported.text
+    expected_metadata = {
+        "serial_number": document["serialNumber"],
+        "version": 2,
+        "metadata_component": {
+            "bom_ref": "product-sensor-x",
+            "type": "application",
+            "name": "Sensor X",
+            "version": "1.2.3",
+            "purl": "pkg:generic/sensor-x@1.2.3",
+        },
+    }
+    assert imported.json()["bom_metadata"] == expected_metadata
+
+    imports = client.get(f"/product-releases/{release_id}/sbom", headers=H)
+    assert imports.status_code == 200
+    assert imports.json()[0]["bom_metadata"] == expected_metadata
+
+    components = client.get(
+        f"/sbom/imports/{imported.json()['id']}/components",
+        headers=H,
+    )
+    assert components.status_code == 200
+    assert components.json()[0]["bom_ref"] == "openssl-component"
