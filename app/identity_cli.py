@@ -37,13 +37,16 @@ def main() -> None:
             if not 1 <= args.expires_in_days <= 365:
                 raise SystemExit("--expires-in-days must be between 1 and 365")
             expires_at = utcnow() + timedelta(days=args.expires_in_days)
-            principal, credential, raw_token = identity.create_principal(
-                db,
-                name=args.name,
-                kind=args.kind,
-                scopes=set(args.scopes),
-                expires_at=expires_at,
-            )
+            try:
+                principal, credential, raw_token = identity.create_principal(
+                    db,
+                    name=args.name,
+                    kind=args.kind,
+                    scopes=set(args.scopes),
+                    expires_at=expires_at,
+                )
+            except identity.IdentityConfigurationError as exc:
+                raise SystemExit(str(exc)) from None
             audit.record(
                 db,
                 "offline-admin",
@@ -67,12 +70,15 @@ def main() -> None:
         if args.command == "issue-credential":
             if not 1 <= args.expires_in_days <= 365:
                 raise SystemExit("--expires-in-days must be between 1 and 365")
-            credential, raw_token = identity.issue_credential(
-                db,
-                principal_id=args.principal_id,
-                scopes=set(args.scopes),
-                expires_at=utcnow() + timedelta(days=args.expires_in_days),
-            )
+            try:
+                credential, raw_token = identity.issue_credential(
+                    db,
+                    principal_id=args.principal_id,
+                    scopes=set(args.scopes),
+                    expires_at=utcnow() + timedelta(days=args.expires_in_days),
+                )
+            except identity.IdentityConfigurationError as exc:
+                raise SystemExit(str(exc)) from None
             audit.record(
                 db,
                 "offline-admin",
