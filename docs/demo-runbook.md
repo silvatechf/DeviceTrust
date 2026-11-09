@@ -194,7 +194,7 @@ Capture genuine screenshots from the running application at desktop and mobile w
 
 ### Reassess a stored product SBOM import (proposed in PR #45)
 
-After PR #45 is merged and the local database has been migrated with `alembic upgrade head`, request a new assessment for the accepted import:
+After the local database has been migrated with `alembic upgrade head`, request a new assessment for the accepted import:
 
 ```bash
 curl -sS -X POST "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments" -H "X-API-Key: $API_KEY" -H "Idempotency-Key: demo-assessment-001"
@@ -216,7 +216,7 @@ curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments/ASSESSMENT_ID
 
 Assessment findings are separate from the original import-time findings and their human triage fields. A new assessment does not inherit or overwrite prior triage decisions. An OSV status of `disabled` means OSV enrichment was not run; it does not mean that the import has no vulnerabilities. `incomplete` means the available intelligence did not cover the entire requested assessment.
 
-This workflow is under review in PR #45 and must not be presented as available on `main` until it is merged. OSV is best-effort and does not provide a globally consistent feed snapshot.
+Versioned reassessment history is implemented through PR #45. KEV/EPSS enrichment is implemented in PR #47 and remains unavailable on `main` until PR #47 is merged. OSV is best-effort and does not provide a globally consistent feed snapshot.
 
 
 ### Optional KEV and EPSS enrichment (proposed in the follow-up branch)
