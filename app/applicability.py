@@ -5,7 +5,7 @@ These states are evidence descriptions, not VEX statements or legal conclusions.
 
 from typing import Any
 
-OSV_QUERY_URL = "https://api.osv.dev/v1/query"
+from .sbom import OSV_QUERY_URL
 
 
 def assess_finding(finding: dict[str, Any], component: dict[str, Any]) -> dict[str, Any]:
