@@ -19,12 +19,12 @@ from sqlalchemy.orm import Session
 from app import audit, identity, product_sbom
 from app.audit import record, verify
 from app.db import (
+    APICredential,
     AuditChainState,
     AuditEntry,
     Device,
-    Product,
-    APICredential,
     Principal,
+    Product,
     ProductFinding,
     ProductRelease,
     SBOMAssessment,
