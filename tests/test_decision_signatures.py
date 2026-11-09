@@ -135,6 +135,7 @@ def test_tampered_decision_fails_signature_reverification(client, monkeypatch):
     verified = client.get(f"/sbom/decisions/{decision_id}/signature", headers={"X-API-Key": token})
     assert verified.status_code == 200
     assert verified.json()["signature_valid"] is False
+    assert verified.json()["trust_valid"] is False
 
 
 def test_revoked_key_remains_verifiable_but_is_not_trusted_for_new_signatures(client, monkeypatch):
@@ -160,6 +161,12 @@ def test_revoked_key_remains_verifiable_but_is_not_trusted_for_new_signatures(cl
     assert verified.json()["signature_valid"] is True
     assert verified.json()["trust_valid"] is False
     assert verified.json()["current_key_status"] == "revoked"
+    payload = client.get(
+        f"/sbom/decisions/{decision_id}/signing-payload",
+        params={"key_id": key_id},
+        headers={"X-API-Key": token},
+    )
+    assert payload.status_code == 403
 
 
 def test_signature_rejects_wrong_key_payload_and_cross_principal_key(client, monkeypatch):
