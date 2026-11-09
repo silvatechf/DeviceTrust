@@ -95,7 +95,7 @@ For managed mode, configure DEVICETRUST_AUTH_MODE=managed in the API process and
 4. Submit the Base64 detached signature and key ID to POST /sbom/decisions/{decision_id}/signature. The request body contains only key_id and signature; never submit a private key.
 5. Read GET /sbom/decisions/{decision_id}/signature to re-verify the stored signature against the current decision bytes. The response exposes the detached signature and public key for independent verification. signature_valid describes cryptographic validity; trust_valid additionally requires the key to remain active.
 
-The signed envelope uses RFC 8785 JCS, UTF-8 and a domain separator. It binds the exact decision revision, reviewer principal, finding, state, rationale, evidence references, responses and timestamp. The signature endpoint is idempotent for an identical signature; a different signature for an already signed decision is rejected. A new decision revision is a separate unsigned record and must be signed separately.
+The signed envelope uses RFC 8785 JCS, UTF-8 and a domain separator. It binds the exact decision revision, reviewer principal, finding, state, rationale, evidence references, responses and timestamp. The signature endpoint is idempotent for an identical signature from the same key. Each key can sign a decision once; a rotated key can add another immutable signature without deleting historical signatures. A new decision revision is a separate unsigned record and must be signed separately.
 
 The API token authenticates the request; the detached signature proves possession of the registered private key. Neither is legal identity proof or manufacturer authority.
 
