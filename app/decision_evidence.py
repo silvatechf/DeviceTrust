@@ -78,6 +78,19 @@ def create_manifest(
         raise LookupError("Decision not found")
     if decision.principal_id != principal_id:
         raise PermissionError("Only the decision author can bind its evidence manifest")
+    latest = db.scalar(
+        select(VulnerabilityDecision)
+        .where(
+            VulnerabilityDecision.assessment_finding_id
+            == decision.assessment_finding_id
+        )
+        .order_by(VulnerabilityDecision.revision.desc())
+        .limit(1)
+    )
+    if latest is None or latest.id != decision.id:
+        raise EvidenceManifestConflict(
+            "Only the current decision revision can receive an evidence manifest"
+        )
     if not artifact_ids or len(artifact_ids) > 10 or len(set(artifact_ids)) != len(artifact_ids):
         raise ValueError("Evidence manifest requires 1 to 10 unique artifact IDs")
     if not set(artifact_ids).issubset(set(decision.evidence_references or [])):
