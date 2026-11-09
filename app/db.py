@@ -313,7 +313,7 @@ class SigningKey(Base):
     __tablename__ = "signing_keys"
     __table_args__ = (
         UniqueConstraint("fingerprint", name="uq_signing_key_fingerprint"),
-        CheckConstraint("purpose IN ('decision-signing')", name="ck_signing_key_purpose"),
+        CheckConstraint("purpose IN ('decision-signing', 'decision-approval')", name="ck_signing_key_purpose"),
         CheckConstraint("algorithm = 'Ed25519'", name="ck_signing_key_algorithm"),
     )
 
