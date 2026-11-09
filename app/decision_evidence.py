@@ -157,8 +157,15 @@ def get_manifest(db: Session, decision_id: int) -> dict | None:
         if (
             item.manifest_version != MANIFEST_VERSION
             or not isinstance(item.artifact_ids, list)
+            or not item.artifact_ids
+            or len(item.artifact_ids) > 10
+            or len(item.artifact_ids) != len(set(item.artifact_ids))
+            or any(not isinstance(value, str) for value in item.artifact_ids)
             or not isinstance(item.manifest_sha256, str)
             or len(item.manifest_sha256) != 64
+            or not isinstance(item.created_by, str)
+            or not item.created_by
+            or item.created_at is None
         ):
             raise ValueError("Stored evidence manifest metadata is invalid")
         canonical = rfc8785.dumps(item.manifest_payload)
@@ -170,24 +177,27 @@ def get_manifest(db: Session, decision_id: int) -> dict | None:
                 EvidenceArtifact.id.in_(item.artifact_ids)
             )
         ).all()
-    except (TypeError, ValueError, OverflowError):
+        artifact_map = {artifact.id: artifact for artifact in artifacts}
+        artifact_integrity_valid = (
+            decision is not None
+            and len(artifact_map) == len(item.artifact_ids)
+            and all(
+                evidence_artifacts.verify_artifact(artifact)["valid"]
+                for artifact in artifacts
+            )
+        )
+        if artifact_integrity_valid:
+            current_payload = _manifest_payload(
+                decision,
+                [artifact_map[artifact_id] for artifact_id in item.artifact_ids],
+                created_by=item.created_by,
+                created_at=item.created_at,
+            )
+            artifact_integrity_valid = rfc8785.dumps(current_payload) == canonical
+    except (TypeError, ValueError, OverflowError, AttributeError):
         raise EvidenceManifestIntegrityError(
             "Stored decision evidence manifest integrity validation failed"
         ) from None
-    artifact_map = {artifact.id: artifact for artifact in artifacts}
-    artifact_integrity_valid = (
-        decision is not None
-        and len(artifact_map) == len(item.artifact_ids or [])
-        and all(evidence_artifacts.verify_artifact(artifact)["valid"] for artifact in artifacts)
-    )
-    if artifact_integrity_valid:
-        current_payload = _manifest_payload(
-            decision,
-            [artifact_map[artifact_id] for artifact_id in item.artifact_ids],
-            created_by=item.created_by,
-            created_at=item.created_at,
-        )
-        artifact_integrity_valid = rfc8785.dumps(current_payload) == canonical
     return {
         "decision_id": item.decision_id,
         "manifest_version": item.manifest_version,
