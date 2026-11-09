@@ -11,7 +11,7 @@ It is deliberately a single application. The current scope does not justify the 
 ```mermaid
 flowchart TD
     CLIENT[API client / local console] --> API[FastAPI route]
-    API --> AUTH[API-key dependency]
+    API --> AUTH[Legacy key / managed scoped token]
     AUTH --> VALIDATE[Pydantic or explicit JSON validation]
     VALIDATE --> SERVICE[Domain function / service]
     SERVICE --> ORM[SQLAlchemy session]
@@ -75,8 +75,8 @@ A triage update requires a justification. State-changing operations append audit
 
 ## 5. Trust boundaries
 
-- API clients are untrusted; protected routes use one shared API key.
-- The key represents a broad local operator boundary, not a human identity or role.
+- API clients are untrusted; protected routes use an explicit authentication mode and route-level authorization policy.
+- Legacy mode uses one shared API key and remains the backwards-compatible default. Managed mode validates individual API credentials against principal state and required scopes.
 - Uploaded SBOM and evidence values are untrusted input.
 - Evidence references are opaque; the application does not fetch them.
 - Device security attributes are declarations and are not independently attested.
@@ -108,7 +108,8 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 | Justified vulnerability triage | Implemented prototype |
 | JSON/Markdown reports | Implemented prototype |
 | Hash-chain verification | Implemented with limitations |
-| Individual identity/RBAC/tenant isolation | Not implemented |
+| Individual managed API credentials and route scopes | Implemented prototype; offline CLI administration, legacy mode remains default |
+| Human login/MFA/SSO and tenant isolation | Not implemented |
 | External audit anchoring and immutable retention | Not implemented; transactional writer serialization is not an external checkpoint |
 
 ## 8. Where to verify behavior
