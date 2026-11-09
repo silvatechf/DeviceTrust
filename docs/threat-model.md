@@ -33,7 +33,9 @@ The prototype manages device metadata, posture evidence, SBOM documents, vulnera
 | Internet-exposed management | Separate management-plane posture assessment | API test covers exposed admin interface even when authentication is required; exposure is declared metadata |
 | Concurrent audit writers | Singleton state-row lock; SQLite IMMEDIATE transaction and PostgreSQL row lock | Concurrent application writers cannot append from the same head; lock-row update and audit append share the domain transaction |
 | Audit database rewriting | SHA-256 hash chain | Tests detect mutation; final-entry deletion and privileged recomputation are not detectable without external checkpoints |
-| Compromised API key | Shared key and constant-time comparison | No per-client revocation, scopes, rotation workflow or RBAC |
+| Compromised API key | Individually revocable managed credentials and explicit scopes | Legacy mode remains available; no tenant isolation or MFA |
+| Forged or altered review decision | Ed25519 detached signature over a versioned canonical decision envelope; signature re-verification on read | Key possession is not legal identity; signature is optional in this prototype; no second-person approval yet |
+| Signing-key compromise | Operator-held private keys; public-key registration, expiry and revocation | No hardware-backed key custody, automated compromise response or independent identity proof |
 | Resource exhaustion | SBOM body and component limits | No global request rate limit, concurrency quota or reverse-proxy policy |
 
 ## Abuse cases to test
@@ -45,6 +47,10 @@ The prototype manages device metadata, posture evidence, SBOM documents, vulnera
 5. Mutate retained audit entries and document the final-suffix deletion limitation.
 
 ## Residual risk
+
+Decision signatures improve integrity and key attribution, but the application does not yet require signatures for every decision, enforce second-person approval, verify evidence artifacts or anchor audit checkpoints outside the database. A privileged database operator can still alter or delete records; signature re-verification detects changes to signed decision content but does not protect the entire database or audit history. Revoked keys remain mathematically verifiable for historical signatures, while their current trust status is reported as revoked.
+
+
 
 The prototype is a single trust domain. Any valid API key can read and modify all inventory and triage records. Do not expose it as a multi-customer service or use it as the sole source of security decisions.
 
