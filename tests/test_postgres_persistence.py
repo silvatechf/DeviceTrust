@@ -16,7 +16,16 @@ from sqlalchemy import create_engine, delete, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app import audit, decision_approvals, decision_evidence, decision_signatures, evidence_artifacts, identity, product_sbom, vulnerability_decisions
+from app import (
+    audit,
+    decision_approvals,
+    decision_evidence,
+    decision_signatures,
+    evidence_artifacts,
+    identity,
+    product_sbom,
+    vulnerability_decisions,
+)
 from app.audit import record, verify
 from app.db import (
     APICredential,
@@ -1156,7 +1165,6 @@ def test_decision_evidence_manifest_persists_postgres(monkeypatch):
                     "evidence:write",
                 },
             )
-            principal_id = principal.id
             session.commit()
 
         from tests.test_vulnerability_decisions import _finding
