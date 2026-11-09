@@ -77,10 +77,15 @@ For managed mode, configure DEVICETRUST_AUTH_MODE=managed in the API process and
 
 ## Detached decision-signature workflow
 
-1. Generate an Ed25519 key pair on the operator-controlled workstation. Keep the private key outside DeviceTrust and register only the PEM public key with the offline CLI.
-2. Retrieve the exact canonical signing bytes from GET /sbom/decisions/{decision_id}/signing-payload?key_id=... using a managed credential with assessment:sign. Only the decision author can retrieve this payload.
+1. Generate an encrypted Ed25519 private key and public key on the operator-controlled workstation. For example, OpenSSL prompts for a private-key passphrase:
+   
+       openssl genpkey -algorithm ED25519 -aes-256-cbc -out operator-ed25519-private.pem
+       openssl pkey -in operator-ed25519-private.pem -pubout -out operator-ed25519-public.pem
+
+   Keep the private key outside DeviceTrust and register only the PEM public key with the offline CLI. Protect and back up the private key using the organization's approved key-custody process.
+2. Retrieve the exact canonical signing bytes from GET /sbom/decisions/{decision_id}/signing-payload?key_id=... using a managed credential with assessment:sign. Only the decision author can retrieve this payload. The response contains signing_payload_base64.
 3. Sign the decoded signing_payload_base64 bytes locally with the operator private key. DeviceTrust never receives the private key.
-4. Submit the Base64 detached signature and key ID to POST /sbom/decisions/{decision_id}/signature.
+4. Submit the Base64 detached signature and key ID to POST /sbom/decisions/{decision_id}/signature. The request body contains only key_id and signature; never submit a private key.
 5. Read GET /sbom/decisions/{decision_id}/signature to re-verify the stored signature against the current decision bytes. signature_valid describes cryptographic validity; trust_valid additionally requires the key to remain active.
 
 The signed envelope uses RFC 8785 JCS, UTF-8 and a domain separator. It binds the exact decision revision, reviewer principal, finding, state, rationale, evidence references, responses and timestamp. The signature endpoint is idempotent for an identical signature; a different signature for an already signed decision is rejected. A new decision revision is a separate unsigned record and must be signed separately.
