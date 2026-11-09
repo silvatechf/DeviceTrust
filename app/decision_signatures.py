@@ -268,6 +268,8 @@ def _signature_dict(item: SignedDecision, key: SigningKey) -> dict:
         "algorithm": key.algorithm,
         "envelope_version": item.envelope_version,
         "envelope_sha256": item.envelope_sha256,
+        "signature": item.signature_b64,
+        "public_key_pem": key.public_key_pem,
         "verified_at": item.verified_at,
     }
 
@@ -285,6 +287,7 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
             "key_id": item.signing_key_id,
             "envelope_version": item.envelope_version,
             "envelope_sha256": item.envelope_sha256,
+            "signature": item.signature_b64,
             "verified_at": item.verified_at,
             "signature_valid": False,
             "trust_valid": False,
