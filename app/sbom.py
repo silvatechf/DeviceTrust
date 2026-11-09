@@ -175,7 +175,6 @@ def scan_osv_with_status(
                 if remaining <= 0:
                     deadline_exhausted = True
                     break
-                query_checked_at = datetime.now(timezone.utc).isoformat()
                 try:
                     response = client.post(
                         OSV_QUERY_URL,
@@ -184,6 +183,7 @@ def scan_osv_with_status(
                     )
                     response.raise_for_status()
                     payload = response.json()
+                    query_checked_at = datetime.now(timezone.utc).isoformat()
                 except (httpx.HTTPError, ValueError, TypeError):
                     failed = True
                     queried += 1
@@ -299,7 +299,6 @@ async def scan_osv_with_status_async(
                         deadline_exhausted = True
                         break
                     queried += 1
-                    query_checked_at = datetime.now(timezone.utc).isoformat()
                     try:
                         response = await client.post(
                             OSV_QUERY_URL,
@@ -308,6 +307,7 @@ async def scan_osv_with_status_async(
                         )
                         response.raise_for_status()
                         payload = response.json()
+                        query_checked_at = datetime.now(timezone.utc).isoformat()
                     except (httpx.HTTPError, ValueError, TypeError):
                         failed = True
                         continue
