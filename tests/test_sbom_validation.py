@@ -84,7 +84,6 @@ def test_parser_preserves_original_name_and_version_for_provenance():
     assert parsed[0]["version"] == "1.1.1"
 
 
-
 def test_parser_preserves_bom_and_component_references():
     document = _document([
         {
