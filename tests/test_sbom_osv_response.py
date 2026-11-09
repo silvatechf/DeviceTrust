@@ -337,3 +337,27 @@ def test_async_osv_query_uses_unversioned_purl(monkeypatch):
         "package": {"purl": "pkg:generic/openssl"},
         "version": "3.0.0",
     }
+
+
+def test_osv_finding_retains_query_provenance(monkeypatch):
+    client = _FakeClient({
+        "vulns": [
+            {
+                "id": "GHSA-example",
+                "database_specific": {"severity": "HIGH"},
+            }
+        ]
+    })
+    monkeypatch.setattr(sbom.httpx, "Client", lambda: client)
+
+    findings, status = sbom.scan_osv_with_status(
+        [_component()], include_component_index=True
+    )
+
+    assert status["status"] == "complete"
+    assert len(findings) == 1
+    assert findings[0]["osv_query"]["endpoint"] == sbom.OSV_QUERY_URL
+    assert findings[0]["osv_query"]["package_url"] == "pkg:generic/openssl"
+    assert findings[0]["osv_query"]["component_purl"] == "pkg:generic/openssl@3.0.0"
+    assert findings[0]["osv_query"]["version"] == "3.0.0"
+    assert findings[0]["osv_query"]["checked_at"]
