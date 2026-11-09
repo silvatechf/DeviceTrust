@@ -38,11 +38,11 @@ The route-to-scope policy is explicit in app/identity.py. A protected route with
 - inventory:read, inventory:write
 - evidence:read, evidence:write
 - sbom:read, sbom:write
-- assessment:read, assessment:write, assessment:review
+- assessment:read, assessment:write, assessment:review, assessment:sign
 - audit:read
 - credentials:manage (reserved for future API-based credential administration)
 
-Reports require inventory:read, assessment:read and audit:read. Human review routes require the dedicated assessment:review scope and an active operator principal; service principals and legacy shared-key actors are rejected. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
+Decision-signature submission requires the separate assessment:sign scope and the same active operator principal that authored the decision. The signing key must be registered to that principal and use the decision-signing purpose. Signature reads require assessment:read. Reports require inventory:read, assessment:read and audit:read. Human review routes require the dedicated assessment:review scope and an active operator principal; service principals and legacy shared-key actors are rejected. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
 
 ## Offline administration
 
@@ -60,7 +60,12 @@ The command prints the raw token once. Store it in an approved secret manager or
 
     python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope assessment:read --scope assessment:review
 
-Only active operator principals can create human review decisions; service principals and legacy shared-key requests are rejected. The CLI also supports:
+Only active operator principals can create human review decisions; service principals and legacy shared-key requests are rejected. The CLI also supports offline Ed25519 public-key registration and revocation. Supply a PEM public key file only; private keys must never be passed to DeviceTrust:
+
+    python -m app.identity_cli register-signing-key --principal-id PRINCIPAL_UUID --public-key-file operator-ed25519-public.pem --expires-in-days 365
+    python -m app.identity_cli revoke-signing-key --key-id SIGNING_KEY_UUID
+
+The CLI also supports:
 
     python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope inventory:read --scope audit:read
     python -m app.identity_cli revoke-credential --credential-id CREDENTIAL_UUID
@@ -90,4 +95,5 @@ CI must pass SQLite migration/tests and PostgreSQL migration/persistence tests b
 - No human password, MFA, SSO/OIDC, session management, tenant isolation or customer-facing role hierarchy.
 - No last-used tracking; adding per-request writes would create avoidable contention on the current audit/database transaction path.
 - API tokens identify a configured principal, not a legally verified human.
+- Ed25519 signatures prove possession of a registered private key over the canonical decision envelope, not civil identity, manufacturer authority or claim truth. Key revocation changes current trust status but does not erase historical cryptographic verifiability.
 - Audit hash chaining remains tamper-evident, not immutable; independent external checkpoints are not implemented.
