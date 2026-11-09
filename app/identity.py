@@ -22,6 +22,7 @@ ALLOWED_SCOPES = frozenset(
         "sbom:write",
         "assessment:read",
         "assessment:write",
+        "assessment:review",
         "audit:read",
         "credentials:manage",
     }
@@ -57,6 +58,8 @@ _ROUTE_SCOPES = (
     ("POST", re.compile(r"/sbom/imports/[^/]+/assessments"), frozenset({"assessment:write"})),
     ("GET", re.compile(r"/sbom/imports/[^/]+/assessments"), frozenset({"assessment:read"})),
     ("GET", re.compile(r"/sbom/imports/[^/]+/assessments/[^/]+/findings"), frozenset({"assessment:read"})),
+    ("POST", re.compile(r"/sbom/assessment-findings/[^/]+/decisions"), frozenset({"assessment:review"})),
+    ("GET", re.compile(r"/sbom/assessment-findings/[^/]+/decisions"), frozenset({"assessment:read"})),
     ("GET", re.compile(r"/sbom/imports/[^/]+/components"), frozenset({"sbom:read"})),
     ("GET", re.compile(r"/sbom/components/[^/]+/findings"), frozenset({"sbom:read"})),
     ("POST", re.compile(r"/evidence"), frozenset({"evidence:write"})),
