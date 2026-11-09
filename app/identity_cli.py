@@ -31,7 +31,7 @@ def _parser() -> argparse.ArgumentParser:
 
     register_key = commands.add_parser(
         "register-signing-key",
-        help="Register an operator Ed25519 public key; private keys are never imported.",
+        help="Register an operator Ed25519 public key for signing or approval; private keys are never imported.",
     )
     register_key.add_argument("--principal-id", required=True)
     register_key.add_argument("--public-key-file", required=True)
