@@ -5,7 +5,7 @@ These states are evidence descriptions, not VEX statements or legal conclusions.
 
 from typing import Any
 
-from .sbom import OSV_QUERY_URL
+from .sbom import OSV_QUERY_URL, normalize_osv_query_purl
 
 
 def assess_finding(finding: dict[str, Any], component: dict[str, Any]) -> dict[str, Any]:
@@ -22,10 +22,15 @@ def assess_finding(finding: dict[str, Any], component: dict[str, Any]) -> dict[s
         component_purl = query.get("component_purl")
         version = query.get("version")
         checked_at = query.get("checked_at")
+        try:
+            expected_query_purl = normalize_osv_query_purl(component_purl)
+        except (TypeError, ValueError):
+            expected_query_purl = None
         if (
             query.get("endpoint") != OSV_QUERY_URL
             or not isinstance(package_url, str)
             or not package_url
+            or package_url != expected_query_purl
             or not isinstance(component_purl, str)
             or component_purl != component.get("purl")
             or not isinstance(version, str)
