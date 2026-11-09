@@ -23,6 +23,7 @@ def test_osv_match_is_recorded_as_provider_reported_affected_not_vendor_decision
     assert result["status"] == "osv_reported_affected"
     assert result["basis"] == "osv_package_version_query"
     assert result["queried_version"] == "1.2.3"
+    assert result["component_purl"] == "pkg:pypi/example@1.2.3"
     assert "not independent vendor confirmation" in result["interpretation"]
 
 
@@ -61,6 +62,7 @@ def test_osv_query_version_mismatch_fails_to_unknown():
             "osv_query": {
                 "endpoint": applicability.OSV_QUERY_URL,
                 "package_url": "pkg:generic/example",
+                "component_purl": "pkg:generic/example@1.0.0",
                 "version": "9.9.9",
                 "checked_at": "2026-11-09T10:00:00+00:00",
             },
