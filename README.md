@@ -40,12 +40,12 @@ Implemented prototype workflows:
 7. Persist accepted product-release SBOM imports, component occurrences and product-scoped findings through the authenticated product SBOM API.
 8. Compare accepted SBOM imports for a product release using version-independent PURL identity.
 9. Reassess stored imports through append-only, idempotent assessment runs with component-scoped findings.
-10. Optionally enrich CVE-backed assessment findings with CISA KEV and FIRST EPSS signals (implemented in PR #47, pending merge).
+10. Optionally enrich CVE-backed assessment findings with CISA KEV and FIRST EPSS signals (merged in main via PR #55).
 11. Use a same-origin local operator console.
-12. Authenticate API clients through legacy shared-key mode or individually revocable, expiring, scoped managed tokens (implemented in PR #50, pending merge).
-13. Preserve source-aware applicability signals for versioned findings (implemented in PR #53, pending merge).
-14. Preserve original CycloneDX BOM and component references for future VEX linkage (implemented in the SBOM reference-preservation branch, pending review).
-15. Record attributable, append-only vulnerability review decisions against immutable assessment findings (implemented in the reviewed-decision branch, pending review; VEX export remains future work).
+12. Authenticate API clients through legacy shared-key mode or individually revocable, expiring, scoped managed tokens (merged in main via PR #55).
+13. Preserve source-aware applicability signals for versioned findings (merged in main via PR #55).
+14. Preserve original CycloneDX BOM and component references for future VEX linkage (merged in main via PR #55).
+15. Record attributable, append-only vulnerability review decisions against immutable assessment findings (implemented in the current reviewed-decision PR; VEX export remains future work).
 
 Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. The corresponding pull-request head passed CI and CodeQL before merge; no post-merge workflow run is currently recorded for the merge commit. PostgreSQL integration and API-flow tests are included in the automated test suite, while a clean local Compose walkthrough remains part of the release gate.
 
@@ -72,7 +72,7 @@ The comparison reports additions, removals and matched-component changes. Matchi
 
 Versioned reassessment history was merged through [PR #45](https://github.com/silvatechf/DeviceTrust/pull/45). It appends assessment runs and component-scoped findings without mutating the imported SBOM or legacy triage records. Requests require an idempotency key; a new key deliberately creates a new historical run.
 
-Optional CISA KEV and FIRST EPSS enrichment is implemented in [PR #47](https://github.com/silvatechf/DeviceTrust/pull/47). Provider observations are stored in the assessment snapshot with explicit coverage states and source/date provenance. These CVE-level signals do not establish product impact or produce VEX/CRA decisions. PR #53 adds separate source-aware applicability evidence for versioned findings. The reviewed-decision branch adds a separate append-only operator decision history, requiring rationale and evidence for not_affected; it still does not generate VEX.
+Optional CISA KEV and FIRST EPSS enrichment was integrated into `main` through [PR #55](https://github.com/silvatechf/DeviceTrust/pull/55). Provider observations are stored in the assessment snapshot with explicit coverage states and source/date provenance. These CVE-level signals do not establish product impact or produce VEX/CRA decisions. The same aggregate adds separate source-aware applicability evidence for versioned findings. The current reviewed-decision PR adds a separate append-only operator decision history, requiring rationale and evidence for not_affected; it still does not generate VEX.
 
 The product SBOM persistence API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). Comparison and versioned reassessment are implemented in the current prototype; see the PR history and test matrix for exact validation evidence. None of these workflows makes DeviceTrust a production-ready service.
 
