@@ -75,8 +75,8 @@ Implement trust assurance as four separate, composable controls. They must not b
 4. **Evidence artifact integrity (PR #64; pending integration):** bounded observation-linked artifact BLOBs, server-computed digest/size, integrity re-verification, fail-closed downloads and transactional audit metadata.
 5. **Decision evidence binding (stacked PR; pending CI/review/integration):** immutable per-decision manifests, artifact ID membership checks against original decision references, artifact re-verification, canonical manifest digest and signature/approval envelope v2 binding. Historical signature envelope v1 remains verifiable.
 6. **Evidence provenance:** artifact signatures, source authentication and external anchoring remain follow-up work.
-5. **Audit anchoring:** signed checkpoint format, independent verifier, then one explicitly supported external immutable-storage integration.
-6. **VEX export:** only after the signature, approval, evidence and BOM-reference preconditions are enforced and tested.
+7. **Audit anchoring:** signed checkpoint format, independent verifier, then one explicitly supported external immutable-storage integration.
+8. **VEX export:** only after the signature, approval, evidence and BOM-reference preconditions are enforced and tested.
 
 Each stage is a separate implementation change with migration, threat-model update, tests and documented operational procedure. Do not bundle all stages into one large migration or claim a control is implemented merely because its schema exists.
 
