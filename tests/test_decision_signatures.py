@@ -166,7 +166,7 @@ def test_signature_rejects_wrong_key_payload_and_cross_principal_key(client, mon
     principal_id, token = _operator()
     decision_id = _decision(client, monkeypatch, principal_id, token)
     other_principal_id, _ = _operator()
-    private_key, public_pem = _keypair()
+    _, public_pem = _keypair()
     key_id, _ = _register(other_principal_id, public_pem)
 
     signature = base64.b64encode(b"x" * 64).decode("ascii")
@@ -192,7 +192,7 @@ def test_signature_rejects_wrong_key_payload_and_cross_principal_key(client, mon
 def test_signing_scope_is_separate_and_required(client, monkeypatch):
     principal_id, token = _operator(scopes={"assessment:review", "assessment:read"})
     decision_id = _decision(client, monkeypatch, principal_id, token)
-    private_key, public_pem = _keypair()
+    _, public_pem = _keypair()
     key_id, _ = _register(principal_id, public_pem)
     signature = base64.b64encode(b"x" * 64).decode("ascii")
 
