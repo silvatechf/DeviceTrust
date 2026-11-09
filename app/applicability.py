@@ -19,12 +19,15 @@ def assess_finding(finding: dict[str, Any], component: dict[str, Any]) -> dict[s
                 "basis": "missing_osv_query_evidence",
             }
         package_url = query.get("package_url")
+        component_purl = query.get("component_purl")
         version = query.get("version")
         checked_at = query.get("checked_at")
         if (
             query.get("endpoint") != OSV_QUERY_URL
             or not isinstance(package_url, str)
             or not package_url
+            or not isinstance(component_purl, str)
+            or component_purl != component.get("purl")
             or not isinstance(version, str)
             or version != component.get("version")
             or not isinstance(checked_at, str)
@@ -40,6 +43,7 @@ def assess_finding(finding: dict[str, Any], component: dict[str, Any]) -> dict[s
             "provider": "OSV",
             "endpoint": OSV_QUERY_URL,
             "package_url": package_url,
+            "component_purl": component_purl,
             "queried_version": version,
             "vulnerability_id": finding.get("vuln_id"),
             "checked_at": checked_at,
