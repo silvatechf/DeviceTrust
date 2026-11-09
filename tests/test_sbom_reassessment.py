@@ -256,3 +256,53 @@ def test_concurrent_reassessment_requests_with_same_key_create_one_run(
     )
     assert history.status_code == 200
     assert len(history.json()) == 1
+
+
+def test_reassessment_persists_osv_provider_reported_applicability(client, monkeypatch):
+    import_id = _import(client)
+
+    async def fake_scan(components, *, include_component_index=False):
+        assert include_component_index is True
+        return [{
+            "component_index": 0,
+            "vuln_id": "CVE-2026-1234",
+            "severity": "high",
+            "fixed_in": None,
+            "source": "osv",
+            "osv_query": {
+                "endpoint": "https://api.osv.dev/v1/query",
+                "package_url": "pkg:generic/openssl",
+                "component_purl": "pkg:generic/openssl@3.0.0",
+                "version": "3.0.0",
+                "checked_at": "2026-11-09T10:00:00+00:00",
+            },
+        }], {"status": "complete", "source": "osv"}
+
+    async def fake_intelligence(findings):
+        return findings, {
+            "kev": {"status": "disabled", "source": "cisa-kev"},
+            "epss": {"status": "disabled", "source": "first-epss"},
+        }
+
+    monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
+    monkeypatch.setattr(product_sbom.intelligence, "enrich_findings", fake_intelligence)
+    monkeypatch.setenv("DEVICETRUST_OSV", "1")
+    monkeypatch.delenv("DEVICETRUST_KEV", raising=False)
+    monkeypatch.delenv("DEVICETRUST_EPSS", raising=False)
+
+    created = client.post(
+        f"/sbom/imports/{import_id}/assessments",
+        headers={**H, "Idempotency-Key": "osv-applicability-001"},
+    )
+    assert created.status_code == 201, created.text
+
+    findings = client.get(
+        f"/sbom/imports/{import_id}/assessments/{created.json()['id']}/findings",
+        headers=H,
+    )
+    assert findings.status_code == 200
+    applicability = findings.json()[0]["applicability"]
+    assert applicability["status"] == "osv_reported_affected"
+    assert applicability["package_url"] == "pkg:generic/openssl"
+    assert applicability["component_purl"] == "pkg:generic/openssl@3.0.0"
+    assert applicability["queried_version"] == "3.0.0"
