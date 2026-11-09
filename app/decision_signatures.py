@@ -257,5 +257,6 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
     return {
         **_signature_dict(item, key),
         "signature_valid": signature_valid,
+        "trust_valid": signature_valid and key_status == "active",
         "current_key_status": key_status,
     }
