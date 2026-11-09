@@ -142,13 +142,30 @@ def get_manifest(db: Session, decision_id: int) -> dict | None:
     canonical = rfc8785.dumps(item.manifest_payload)
     actual_digest = hashlib.sha256(canonical).hexdigest()
     digest_valid = hmac.compare_digest(actual_digest, item.manifest_sha256)
+    decision = db.get(VulnerabilityDecision, decision_id)
+    artifacts = db.scalars(
+        select(EvidenceArtifact).where(EvidenceArtifact.id.in_(item.artifact_ids or []))
+    ).all()
+    artifact_map = {artifact.id: artifact for artifact in artifacts}
+    artifact_integrity_valid = (
+        decision is not None
+        and len(artifact_map) == len(item.artifact_ids or [])
+        and all(evidence_artifacts.verify_artifact(artifact)["valid"] for artifact in artifacts)
+    )
+    if artifact_integrity_valid:
+        current_payload = _manifest_payload(
+            decision, [artifact_map[artifact_id] for artifact_id in item.artifact_ids]
+        )
+        artifact_integrity_valid = rfc8785.dumps(current_payload) == canonical
     return {
         "decision_id": item.decision_id,
         "manifest_version": item.manifest_version,
         "manifest": item.manifest_payload,
         "manifest_sha256": item.manifest_sha256,
         "actual_manifest_sha256": actual_digest,
-        "integrity_valid": digest_valid,
+        "manifest_digest_valid": digest_valid,
+        "artifact_integrity_valid": artifact_integrity_valid,
+        "integrity_valid": digest_valid and artifact_integrity_valid,
         "artifact_ids": item.artifact_ids,
         "created_by": item.created_by,
         "created_at": item.created_at,
