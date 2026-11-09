@@ -213,6 +213,7 @@ class SBOMAssessmentFinding(Base):
     fixed_in: Mapped[str | None] = mapped_column(String(100), nullable=True)
     source: Mapped[str] = mapped_column(String(20))
     intelligence: Mapped[dict] = mapped_column(JSON, default=dict)
+    applicability: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class Principal(Base):
