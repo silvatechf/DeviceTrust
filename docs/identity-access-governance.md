@@ -12,12 +12,12 @@ A principal represents an accountable operator or machine integration.
 - Principal kinds are operator or service.
 - Principals can be active or disabled.
 - Each API credential belongs to exactly one principal.
-- Credentials have a unique non-secret prefix, a SHA-256 token digest, an allow-listed scope set, creation/expiry timestamps and a revocation timestamp.
+- Credentials have a unique non-secret prefix, a keyed HMAC-SHA256 token verifier, an allow-listed scope set, creation/expiry timestamps and a revocation timestamp.
 - Tokens contain 256 bits of cryptographically generated entropy. The raw token is displayed only by the offline creation command and is never stored.
 - Credentials expire after 90 days by default; the creation service rejects expiries beyond 365 days.
 - Authentication checks credential digest, expiry, revocation and principal status on every request. No positive authentication cache is used.
 
-SHA-256 is appropriate only because tokens are generated with high entropy. It is not a password hashing strategy. Human passwords are not supported.
+The HMAC verifier uses a 32-byte hex pepper supplied through DEVICETRUST_CREDENTIAL_PEPPER. Configure the same pepper for the API process and offline CLI, and keep it outside the database. This is a machine-token verifier, not a password hashing strategy. Human passwords are not supported. Managed authentication fails closed with 503 if the pepper is missing or malformed.
 
 ## Authentication modes
 
@@ -50,6 +50,8 @@ Apply migrations before using the CLI:
 
     alembic upgrade head
 
+Generate a 32-byte random pepper (for example with Python secrets.token_hex(32)), store it as DEVICETRUST_CREDENTIAL_PEPPER in the deployment secret store, and make it available to both the API and CLI processes.
+
 Create a principal and credential. Repeat --scope for each allowed scope:
 
     python -m app.identity_cli create-principal --name "Local operator" --kind operator --scope inventory:read --scope inventory:write --scope evidence:read --scope evidence:write --scope sbom:read --scope sbom:write --scope assessment:read --scope assessment:write --scope audit:read
@@ -80,6 +82,7 @@ CI must pass SQLite migration/tests and PostgreSQL migration/persistence tests b
 
 - Legacy mode remains the default until deployment/client migration evidence supports changing it.
 - Credential lifecycle administration is offline CLI only; credentials:manage has no HTTP management endpoints yet.
+- Rotating DEVICETRUST_CREDENTIAL_PEPPER invalidates every existing token verifier. Coordinate a maintenance window and issue replacement credentials to each principal after the pepper change.
 - No human password, MFA, SSO/OIDC, session management, tenant isolation or customer-facing role hierarchy.
 - No last-used tracking; adding per-request writes would create avoidable contention on the current audit/database transaction path.
 - API tokens identify a configured principal, not a legally verified human.
