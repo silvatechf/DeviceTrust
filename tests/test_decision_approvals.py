@@ -311,9 +311,7 @@ def test_tampered_approval_record_fails_cryptographic_verification(client, monke
     assert approved.status_code == 201, approved.text
 
     with SessionLocal() as db:
-        item = db.scalar(
-            db.query(DecisionApproval).filter_by(decision_id=decision_id).statement
-        )
+        item = db.query(DecisionApproval).filter_by(decision_id=decision_id).first()
         item.envelope_sha256 = "0" * 64
         db.commit()
 
