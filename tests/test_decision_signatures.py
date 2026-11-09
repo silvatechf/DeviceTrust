@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
 
 from app import decision_signatures, identity
-from app.db import SessionLocal, SignedDecision, SigningKey, VulnerabilityDecision
+from app.db import SessionLocal, SignedDecision, VulnerabilityDecision
 
 from .test_vulnerability_decisions import _finding
 
