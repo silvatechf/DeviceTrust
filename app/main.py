@@ -1,3 +1,4 @@
+import hashlib
 import hmac
 import json
 import os
@@ -9,12 +10,23 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
-from . import audit, decision_approvals, decision_signatures, identity, posture, product_sbom, sbom, vulnerability_decisions
+from . import (
+    audit,
+    decision_approvals,
+    decision_signatures,
+    evidence_artifacts,
+    identity,
+    posture,
+    product_sbom,
+    sbom,
+    vulnerability_decisions,
+)
 from .db import (
     AuditEntry,
     Device,
+    EvidenceArtifact,
     EvidenceObservation,
     ProductFinding,
     ProductRelease,
@@ -38,6 +50,7 @@ from .schemas import (
 
 SEV = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
 MAX_SBOM_BYTES = 2 * 1024 * 1024
+MAX_EVIDENCE_ARTIFACT_BYTES = evidence_artifacts.MAX_ARTIFACT_BYTES
 
 
 app = FastAPI(title="DeviceTrust", version="0.2.0")
@@ -598,6 +611,149 @@ def record_evidence(
     db.commit()
     db.refresh(observation)
     return _evidence_dict(observation)
+
+
+@app.post("/evidence/{observation_id}/artifacts", status_code=201)
+async def attach_evidence_artifact(
+    observation_id: int,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    actor: str = Depends(auth),
+):
+    declared_length = request.headers.get("content-length")
+    if declared_length is not None:
+        try:
+            if int(declared_length) > MAX_EVIDENCE_ARTIFACT_BYTES:
+                raise HTTPException(413, "Evidence artifact exceeds the 5 MiB limit")
+        except ValueError:
+            raise HTTPException(400, "Invalid Content-Length header") from None
+
+    media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if media_type not in evidence_artifacts.ALLOWED_MEDIA_TYPES:
+        raise HTTPException(415, "Evidence artifact media type is not allowed")
+
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw) + len(chunk) > MAX_EVIDENCE_ARTIFACT_BYTES:
+            raise HTTPException(413, "Evidence artifact exceeds the 5 MiB limit")
+        raw.extend(chunk)
+
+    try:
+        artifact, created = evidence_artifacts.create_artifact(
+            db,
+            observation_id=observation_id,
+            content=bytes(raw),
+            media_type=media_type,
+            actor=actor,
+        )
+        db.commit()
+        response.status_code = 201 if created else 200
+        return evidence_artifacts.artifact_metadata(artifact, include_integrity=True) | {
+            "created": created,
+            "verification": evidence_artifacts.verify_artifact(artifact),
+        }
+    except LookupError as error:
+        db.rollback()
+        raise HTTPException(404, str(error)) from None
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(422, str(error)) from None
+    except IntegrityError:
+        db.rollback()
+        digest = hashlib.sha256(raw).hexdigest()
+        existing = db.scalar(
+            select(EvidenceArtifact).where(
+                EvidenceArtifact.observation_id == observation_id,
+                EvidenceArtifact.sha256 == digest,
+                EvidenceArtifact.media_type == media_type,
+            )
+        )
+        if existing is not None and hmac.compare_digest(existing.content, bytes(raw)):
+            response.status_code = 200
+            return evidence_artifacts.artifact_metadata(existing, include_integrity=True) | {
+                "created": False,
+                "verification": evidence_artifacts.verify_artifact(existing),
+            }
+        raise HTTPException(409, "Evidence artifact conflicts with existing metadata") from None
+
+
+@app.get("/evidence/{observation_id}/artifacts")
+def list_evidence_artifacts(
+    observation_id: int,
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    if db.get(EvidenceObservation, observation_id) is None:
+        raise HTTPException(404, "Evidence observation not found")
+    rows = db.scalars(
+        select(EvidenceArtifact)
+        .where(EvidenceArtifact.observation_id == observation_id)
+        .options(
+            load_only(
+                EvidenceArtifact.id,
+                EvidenceArtifact.observation_id,
+                EvidenceArtifact.sha256,
+                EvidenceArtifact.byte_size,
+                EvidenceArtifact.media_type,
+                EvidenceArtifact.uploaded_by,
+                EvidenceArtifact.created_at,
+            )
+        )
+        .order_by(EvidenceArtifact.created_at, EvidenceArtifact.id)
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return [evidence_artifacts.artifact_metadata(item) for item in rows]
+
+
+@app.get("/evidence/artifacts/{artifact_id}")
+def get_evidence_artifact(
+    artifact_id: str,
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    artifact = db.get(EvidenceArtifact, artifact_id)
+    if artifact is None:
+        raise HTTPException(404, "Evidence artifact not found")
+    return evidence_artifacts.artifact_metadata(artifact, include_integrity=True)
+
+
+@app.get("/evidence/artifacts/{artifact_id}/verify")
+def verify_evidence_artifact(
+    artifact_id: str,
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    artifact = db.get(EvidenceArtifact, artifact_id)
+    if artifact is None:
+        raise HTTPException(404, "Evidence artifact not found")
+    return evidence_artifacts.verify_artifact(artifact)
+
+
+@app.get("/evidence/artifacts/{artifact_id}/content")
+def download_evidence_artifact(
+    artifact_id: str,
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    artifact = db.get(EvidenceArtifact, artifact_id)
+    if artifact is None:
+        raise HTTPException(404, "Evidence artifact not found")
+    verification = evidence_artifacts.verify_artifact(artifact)
+    if not verification["valid"]:
+        raise HTTPException(503, "Stored evidence artifact failed integrity verification")
+    return Response(
+        content=artifact.content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="evidence-{artifact.id}"',
+            "X-Content-Type-Options": "nosniff",
+            "X-Content-SHA256": artifact.sha256,
+        },
+    )
 
 
 @app.get("/evidence")

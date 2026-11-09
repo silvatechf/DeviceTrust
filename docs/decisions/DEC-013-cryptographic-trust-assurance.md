@@ -1,6 +1,6 @@
 # DEC-013: Cryptographic trust, independent approval and audit anchoring
 
-- Status: Ed25519 decision signatures integrated into main through PR #58; independent approval implemented in the current feature branch pending CI/review/integration; evidence verification and external anchoring remain pending
+- Status: Decision signatures and independent approval integrated through PRs #58 and #62; bounded observation-linked artifact storage and digest verification implemented in PR #64 (CI validated; review/integration pending); exact decision-revision evidence binding, source authentication and external anchoring remain pending
 - Date: 2026-11-09
 - Scope: Attributable vulnerability decisions, evidence provenance and audit integrity
 
@@ -41,11 +41,13 @@ Implement trust assurance as four separate, composable controls. They must not b
 ### 3. Evidence integrity and provenance verification
 
 - Keep evidence references opaque and never dereference arbitrary user-supplied URLs from the API.
-- Introduce an evidence manifest that binds each evidence item to a SHA-256 digest, media type, byte length, source, observation/recording times and optional signer/key identity.
-- Verify uploaded artifact digests against the manifest before acceptance. If evidence is signed, verify the detached signature against a registered, purpose-appropriate public key.
-- Preserve separate states for integrity verified, signature verified, source authenticated and claim reviewed. None implies another.
-- A digest proves byte equality with the supplied digest, not source identity or factual correctness. A valid signature proves control of a key, not the truth of the signed claim.
-- Do not label evidence "verified" without naming the exact verification performed and its trust policy.
+- Persist a bounded per-artifact manifest record that binds an observation to a server-generated artifact UUID, SHA-256 digest, media type, byte length, uploader actor and server recording time. The current implementation stores 1–5 MiB artifact bytes as a database BLOB and does not derive a filesystem path from user input.
+- Compute SHA-256 over exact received bytes; never accept a client-supplied artifact digest as the authoritative digest. Recompute digest and byte length on verification and before content download.
+- Reject unsupported declared media types and oversized/empty uploads. Serve untrusted bytes only as an attachment with `application/octet-stream` and `nosniff`.
+- Commit artifact metadata, bytes and audit event in one transaction; identical observation/digest/media-type uploads are idempotent.
+- Preserve separate states for byte integrity, signature verification, source authentication and claim review. The current artifact workflow establishes only stored-byte integrity; it does not authenticate source or claim.
+- Artifact records are linked to observations, not yet to exact vulnerability decision revisions. Existing decision evidence references remain opaque.
+- A digest detects byte mismatch against stored metadata, not source identity or factual correctness. A privileged database writer can replace both bytes and digest. Independent anchoring and source-specific signatures remain future work.
 
 ### 4. External audit checkpoints
 
@@ -69,8 +71,8 @@ Implement trust assurance as four separate, composable controls. They must not b
 
 1. **Signature foundation (implemented in PR #58):** canonical domain-separated envelope, Ed25519 verification, operator-bound public-key registry, offline registration/revocation and signature re-verification. The implementation uses `cryptography` and keeps private keys outside DeviceTrust. RFC 8785 canonicalization is used by the implementation; independent cross-language test vectors and a formal key-custody runbook remain follow-up work.
 2. **Decision signing (initial implementation in PR #58):** an author can attach one verified detached signature to an immutable decision revision; historical unsigned records remain explicitly unsigned. Making a signature mandatory for every new decision is not yet enforced.
-3. **Second-person approval (implemented in the current feature branch; pending validation and integration):** separate approver identity and purpose-specific key; domain-separated approval envelope; exact decision digest/revision binding; versioned one-author-plus-one-independent-approver policy; immutable history and dynamic trust/eligibility evaluation.
-4. **Evidence verification:** bounded artifact manifest and digest/signature verification with separate trust states.
+3. **Second-person approval (integrated through PR #62):** separate approver identity and purpose-specific key; domain-separated approval envelope; exact decision digest/revision binding; versioned one-author-plus-one-independent-approver policy; immutable history and dynamic trust/eligibility evaluation.
+4. **Evidence artifact integrity (PR #64; CI validated, integration pending):** bounded observation-linked artifact BLOBs, server-computed digest/size, integrity re-verification, fail-closed downloads and transactional audit metadata. Exact decision-revision binding, artifact signatures, source authentication and external anchoring remain follow-up work.
 5. **Audit anchoring:** signed checkpoint format, independent verifier, then one explicitly supported external immutable-storage integration.
 6. **VEX export:** only after the signature, approval, evidence and BOM-reference preconditions are enforced and tested.
 
@@ -85,7 +87,7 @@ Each stage is a separate implementation change with migration, threat-model upda
 - Approval is invalid for current export eligibility after a new decision revision is appended.
 - The author cannot approve their own decision using another credential or key; approval requires a distinct active operator and a key registered for decision-approval purpose.
 - Approval requires a currently trusted author signature and an approval payload within its bounded validity window.
-- Evidence digest mismatch, missing manifest fields and untrusted signing keys fail closed.
+- Evidence digest or byte-length mismatch is detected; content download fails closed. Current manifests do not yet establish source authentication, artifact signatures or exact decision-revision binding.
 - External checkpoint verification detects chain rewrite, truncation and rollback when an independently retained checkpoint is supplied.
 - SQLite and PostgreSQL migration, transaction, concurrency and rollback behavior are tested.
 - Logs and audit records contain identifiers and digests, not private keys, raw evidence bytes, credentials or unredacted sensitive references.

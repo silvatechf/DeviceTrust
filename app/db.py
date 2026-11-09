@@ -1,7 +1,19 @@
 import os
 from datetime import date, datetime, timezone
 
-from sqlalchemy import JSON, BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, create_engine
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///devicetrust.db")
@@ -46,6 +58,30 @@ class EvidenceObservation(Base):
     verification_status: Mapped[str] = mapped_column(String(16), default="unverified")
     evidence_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
     evidence_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class EvidenceArtifact(Base):
+    __tablename__ = "evidence_artifacts"
+    __table_args__ = (
+        UniqueConstraint(
+            "observation_id",
+            "sha256",
+            "media_type",
+            name="uq_evidence_artifact_observation_digest_type",
+        ),
+        CheckConstraint("byte_size > 0 AND byte_size <= 5242880", name="ck_evidence_artifact_size"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    observation_id: Mapped[int] = mapped_column(
+        ForeignKey("evidence_observations.id"), nullable=False, index=True
+    )
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    media_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    uploaded_by: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Vulnerability(Base):

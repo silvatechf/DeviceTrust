@@ -120,6 +120,18 @@ def test_scope_matrix_is_explicit_and_least_privilege():
     assert identity.required_scopes("POST", "/devices") == frozenset({"inventory:write"})
     assert identity.required_scopes("GET", "/audit") == frozenset({"audit:read"})
     assert identity.required_scopes(
+        "POST", "/evidence/123/artifacts"
+    ) == frozenset({"evidence:write"})
+    assert identity.required_scopes(
+        "GET", "/evidence/artifacts/12345678-1234-1234-1234-123456789abc"
+    ) == frozenset({"evidence:read"})
+    assert identity.required_scopes(
+        "GET", "/evidence/artifacts/12345678-1234-1234-1234-123456789abc/content"
+    ) == frozenset({"evidence:read"})
+    assert identity.required_scopes(
+        "GET", "/evidence/artifacts/12345678-1234-1234-1234-123456789abc/verify"
+    ) == frozenset({"evidence:read"})
+    assert identity.required_scopes(
         "GET", "/sbom/decisions/42/approval-payload"
     ) == frozenset({"assessment:approve"})
     assert identity.required_scopes(
