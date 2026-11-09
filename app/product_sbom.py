@@ -100,6 +100,7 @@ async def import_cyclonedx(
     bom_metadata = {
         "serial_number": parsed_document["serial_number"],
         "version": parsed_document["version"],
+        "version_explicit": parsed_document["version_explicit"],
         "metadata_component": parsed_document["metadata_component"],
     }
     digest = hashlib.sha256(raw_document).hexdigest()
