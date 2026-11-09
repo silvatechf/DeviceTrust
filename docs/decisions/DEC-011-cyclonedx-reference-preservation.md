@@ -14,7 +14,7 @@ The product SBOM importer previously retained component name, version and PURL, 
 
 Preserve the minimum source identity needed for future, reviewable VEX linkage:
 
-- Store the CycloneDX top-level serialNumber and version when supplied.
+- Store the CycloneDX top-level serialNumber and effective version. If version is omitted, apply the CycloneDX default of 1 and record that it was not explicitly supplied.
 - Preserve a bounded identity snapshot of metadata.component (type, bom-ref, name, version and PURL).
 - Preserve each top-level component's optional bom-ref.
 - Reject malformed serial numbers, invalid BOM versions, invalid references and duplicate bom-ref values within the parsed top-level BOM identity.
@@ -33,7 +33,7 @@ Migration 0008 adds sbom_imports.bom_metadata and nullable sbom_components.bom_r
 
 ## Consequences and limitations
 
-- New imports can be linked to their original BOM when a serial number, BOM version and component reference are present.
+- New imports can be linked to their original BOM when a serial number and component reference are present; the effective BOM version is always available because CycloneDX defaults it to 1.
 - Components without bom-ref remain explicitly unreferenced; PURL-based fallback semantics are not invented in this change.
 - Nested component graphs are not newly supported by this parser change; preservation applies to the currently parsed top-level component set.
 - No human-reviewed vulnerability decisions, VEX export, signature or CRA conclusion is generated.
