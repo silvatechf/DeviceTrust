@@ -920,7 +920,7 @@ def test_ed25519_decision_signature_persists_and_reverifies_postgres():
         session.add(finding)
         session.flush()
         finding_id = finding.id
-        decision, created = vulnerability_decisions.create_decision(
+        decision, _created = vulnerability_decisions.create_decision(
             session,
             finding_id=finding_id,
             principal_id=principal_id,
