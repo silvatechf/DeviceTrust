@@ -213,3 +213,35 @@ class SBOMAssessmentFinding(Base):
     fixed_in: Mapped[str | None] = mapped_column(String(100), nullable=True)
     source: Mapped[str] = mapped_column(String(20))
     intelligence: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class Principal(Base):
+    __tablename__ = "principals"
+    __table_args__ = (
+        CheckConstraint("kind IN ('operator', 'service')", name="ck_principal_kind"),
+        CheckConstraint("status IN ('active', 'disabled')", name="ck_principal_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class APICredential(Base):
+    __tablename__ = "api_credentials"
+    __table_args__ = (
+        UniqueConstraint("prefix", name="uq_api_credential_prefix"),
+        UniqueConstraint("token_digest", name="uq_api_credential_token_digest"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    principal_id: Mapped[str] = mapped_column(ForeignKey("principals.id"), nullable=False, index=True)
+    prefix: Mapped[str] = mapped_column(String(12), nullable=False)
+    token_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    scopes: Mapped[list] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
