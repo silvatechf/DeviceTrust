@@ -11,7 +11,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import audit, identity, posture, product_sbom, sbom
+from . import audit, identity, posture, product_sbom, sbom, vulnerability_decisions
 from .db import (
     AuditEntry,
     Device,
@@ -31,6 +31,7 @@ from .schemas import (
     ProductReleaseIn,
     SecurityProfile,
     TriageIn,
+    VulnerabilityDecisionIn,
 )
 
 SEV = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
@@ -320,6 +321,61 @@ def list_product_sbom_assessment_findings(
         return product_sbom.list_assessment_findings(
             db, import_id, assessment_id
         )
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from None
+
+
+@app.post("/sbom/assessment-findings/{finding_id}/decisions", status_code=201)
+def create_vulnerability_decision(
+    finding_id: int,
+    body: VulnerabilityDecisionIn,
+    response: Response,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    db: Session = Depends(get_write_db),
+    actor: str = Depends(auth),
+):
+    if not actor.startswith("principal:"):
+        raise HTTPException(
+            403,
+            "Human review decisions require a managed operator principal",
+        )
+    principal_id = actor.removeprefix("principal:")
+    try:
+        decision, created = vulnerability_decisions.create_decision(
+            db,
+            finding_id=finding_id,
+            principal_id=principal_id,
+            idempotency_key=idempotency_key,
+            **body.model_dump(),
+        )
+        db.commit()
+        response.status_code = 201 if created else 200
+        return decision
+    except LookupError as error:
+        db.rollback()
+        raise HTTPException(404, str(error)) from None
+    except PermissionError as error:
+        db.rollback()
+        raise HTTPException(403, str(error)) from None
+    except vulnerability_decisions.IdempotencyConflict as error:
+        db.rollback()
+        raise HTTPException(409, str(error)) from None
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(422, str(error)) from None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Decision revision conflicts with existing history") from None
+
+
+@app.get("/sbom/assessment-findings/{finding_id}/decisions")
+def list_vulnerability_decisions(
+    finding_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    try:
+        return vulnerability_decisions.list_decisions(db, finding_id)
     except LookupError as error:
         raise HTTPException(404, str(error)) from None
 

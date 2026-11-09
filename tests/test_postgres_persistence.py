@@ -16,7 +16,7 @@ from sqlalchemy import create_engine, delete, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app import audit, identity, product_sbom
+from app import audit, identity, product_sbom, vulnerability_decisions
 from app.audit import record, verify
 from app.db import (
     APICredential,
@@ -31,6 +31,7 @@ from app.db import (
     SBOMAssessmentFinding,
     SBOMComponent,
     SBOMImport,
+    VulnerabilityDecision,
 )
 from app.db import engine as application_engine
 from app.main import app
@@ -211,6 +212,12 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert inspect(target_engine).has_table("sbom_assessment_findings")
         assert inspect(target_engine).has_table("principals")
         assert inspect(target_engine).has_table("api_credentials")
+        assert inspect(target_engine).has_table("vulnerability_decisions")
+        decision_columns = {
+            column["name"]
+            for column in inspect(target_engine).get_columns("vulnerability_decisions")
+        }
+        assert {"request_key_hash", "request_fingerprint"}.issubset(decision_columns)
         assessment_finding_columns = {
             column["name"]: column
             for column in inspect(target_engine).get_columns(
@@ -235,7 +242,13 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
             ) == 1
         command.check(config)
 
+        command.downgrade(config, "0008_sbom_reference_preservation")
+        assert not inspect(target_engine).has_table("vulnerability_decisions")
+        command.upgrade(config, "head")
+        assert inspect(target_engine).has_table("vulnerability_decisions")
+
         command.downgrade(config, "0007_sbom_finding_applicability")
+        assert not inspect(target_engine).has_table("vulnerability_decisions")
         assert "bom_metadata" not in {
             column["name"] for column in inspect(target_engine).get_columns("sbom_imports")
         }
@@ -251,6 +264,7 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         }
 
         command.downgrade(config, "0006_identity_access")
+        assert not inspect(target_engine).has_table("vulnerability_decisions")
         assert "applicability" not in {
             column["name"]
             for column in inspect(target_engine).get_columns("sbom_assessment_findings")
@@ -267,6 +281,7 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert not inspect(target_engine).has_table("sbom_assessment_findings")
         assert not inspect(target_engine).has_table("api_credentials")
         assert not inspect(target_engine).has_table("principals")
+        assert not inspect(target_engine).has_table("vulnerability_decisions")
 
         command.upgrade(config, "head")
         assert inspect(target_engine).has_table("audit_chain_state")
@@ -657,4 +672,162 @@ def test_managed_api_credentials_authenticate_and_revoke_postgres():
         with Session(application_engine) as session:
             session.query(APICredential).filter_by(id=credential_id).delete()
             session.query(Principal).filter_by(id=principal_id).delete()
+            session.commit()
+
+
+
+def test_review_decisions_persist_and_link_revisions_postgres():
+    suffix = uuid4().hex
+    principal_id = str(uuid4())
+    finding_id = None
+    product_id = release_id = import_id = component_id = assessment_id = None
+
+    with Session(application_engine) as session:
+        principal = Principal(
+            id=principal_id,
+            name=f"PostgreSQL reviewer {suffix[:8]}",
+            kind="operator",
+            status="active",
+        )
+        product = Product(
+            manufacturer="PostgreSQL VEX Integration",
+            product_name=f"Reviewed Decision {suffix[:8]}",
+        )
+        session.add_all([principal, product])
+        session.flush()
+        product_id = product.id
+
+        release = ProductRelease(product_id=product.id, version="9.1.0")
+        session.add(release)
+        session.flush()
+        release_id = release.id
+
+        imported = SBOMImport(
+            product_release_id=release.id,
+            format="CycloneDX",
+            spec_version="1.5",
+            source_type="manual",
+            content_sha256=hashlib.sha256(suffix.encode()).hexdigest(),
+            parser_version="0.4.0",
+            status="accepted",
+            component_count=1,
+            validation_summary={"valid": True},
+            bom_metadata={"serial_number": None, "version": 1, "version_explicit": False, "metadata_component": None},
+        )
+        session.add(imported)
+        session.flush()
+        import_id = imported.id
+
+        component = SBOMComponent(
+            sbom_import_id=imported.id,
+            ordinal=0,
+            name="libexample",
+            version="1.0.0",
+            purl="pkg:generic/libexample@1.0.0",
+            bom_ref=f"component-{suffix[:8]}",
+        )
+        session.add(component)
+        session.flush()
+        component_id = component.id
+
+        assessment = SBOMAssessment(
+            sbom_import_id=imported.id,
+            request_key_hash=hashlib.sha256(f"request-{suffix}".encode()).hexdigest(),
+            source_fingerprint=hashlib.sha256(f"source-{suffix}".encode()).hexdigest(),
+            status="complete",
+            component_count=1,
+            finding_count=1,
+            enrichment_metadata={},
+        )
+        session.add(assessment)
+        session.flush()
+        assessment_id = assessment.id
+
+        finding = SBOMAssessmentFinding(
+            assessment_id=assessment.id,
+            sbom_component_id=component.id,
+            vuln_id="CVE-2026-54321",
+            severity="high",
+            fixed_in="1.0.1",
+            source="osv",
+            intelligence={},
+            applicability={"status": "osv_reported_affected"},
+        )
+        session.add(finding)
+        session.flush()
+        finding_id = finding.id
+        session.commit()
+
+    try:
+        with Session(application_engine) as session:
+            audit.acquire_chain_lock(session)
+            first, first_created = vulnerability_decisions.create_decision(
+                session,
+                finding_id=finding_id,
+                principal_id=principal_id,
+                state="in_triage",
+                justification=None,
+                detail="The vendor impact statement is being reviewed.",
+                evidence_references=[],
+                responses=[],
+                idempotency_key="postgres-review-001",
+            )
+            session.commit()
+
+        with Session(application_engine) as session:
+            audit.acquire_chain_lock(session)
+            retried, retry_created = vulnerability_decisions.create_decision(
+                session,
+                finding_id=finding_id,
+                principal_id=principal_id,
+                state="in_triage",
+                justification=None,
+                detail="The vendor impact statement is being reviewed.",
+                evidence_references=[],
+                responses=[],
+                idempotency_key="postgres-review-001",
+            )
+            session.commit()
+
+        with Session(application_engine) as session:
+            audit.acquire_chain_lock(session)
+            second, second_created = vulnerability_decisions.create_decision(
+                session,
+                finding_id=finding_id,
+                principal_id=principal_id,
+                state="not_affected",
+                justification="code_not_reachable",
+                detail="Runtime call-path analysis confirms the vulnerable function is not invoked.",
+                evidence_references=["evidence://postgres/review-001"],
+                responses=["will_not_fix"],
+                idempotency_key="postgres-review-002",
+            )
+            session.commit()
+
+        assert first_created is True
+        assert retry_created is False
+        assert retried["id"] == first["id"]
+        assert second_created is True
+        assert first["revision"] == 1
+        assert second["revision"] == 2
+        assert second["supersedes_id"] == first["id"]
+
+        with Session(application_engine) as session:
+            rows = session.scalars(
+                select(VulnerabilityDecision)
+                .where(VulnerabilityDecision.assessment_finding_id == finding_id)
+                .order_by(VulnerabilityDecision.revision)
+            ).all()
+            assert [row.revision for row in rows] == [1, 2]
+            assert audit.verify(session)["valid"] is True
+    finally:
+        with Session(application_engine) as session:
+            session.execute(delete(VulnerabilityDecision).where(VulnerabilityDecision.assessment_finding_id == finding_id))
+            session.execute(delete(SBOMAssessmentFinding).where(SBOMAssessmentFinding.id == finding_id))
+            session.execute(delete(SBOMAssessment).where(SBOMAssessment.id == assessment_id))
+            session.execute(delete(SBOMComponent).where(SBOMComponent.id == component_id))
+            session.execute(delete(SBOMImport).where(SBOMImport.id == import_id))
+            session.execute(delete(ProductRelease).where(ProductRelease.id == release_id))
+            session.execute(delete(Product).where(Product.id == product_id))
+            session.execute(delete(Principal).where(Principal.id == principal_id))
             session.commit()

@@ -1,6 +1,6 @@
 # DEC-011: Preserve CycloneDX identity for future VEX linkage
 
-- Status: Implemented prototype in the SBOM reference-preservation branch; pending review and merge
+- Status: Implemented prototype; integrated into `main` through [PR #55](https://github.com/silvatechf/DeviceTrust/pull/55)
 - Date: 2026-11-09
 - Scope: Product-release SBOM imports and future standalone CycloneDX VEX references
 

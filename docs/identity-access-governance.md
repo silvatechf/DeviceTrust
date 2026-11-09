@@ -38,11 +38,11 @@ The route-to-scope policy is explicit in app/identity.py. A protected route with
 - inventory:read, inventory:write
 - evidence:read, evidence:write
 - sbom:read, sbom:write
-- assessment:read, assessment:write
+- assessment:read, assessment:write, assessment:review
 - audit:read
 - credentials:manage (reserved for future API-based credential administration)
 
-Reports require inventory:read, assessment:read and audit:read. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
+Reports require inventory:read, assessment:read and audit:read. Human review routes require the dedicated assessment:review scope and an active operator principal; service principals and legacy shared-key actors are rejected. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
 
 ## Offline administration
 
@@ -56,7 +56,11 @@ Create a principal and credential. Repeat --scope for each allowed scope:
 
     python -m app.identity_cli create-principal --name "Local operator" --kind operator --scope inventory:read --scope inventory:write --scope evidence:read --scope evidence:write --scope sbom:read --scope sbom:write --scope assessment:read --scope assessment:write --scope audit:read
 
-The command prints the raw token once. Store it in an approved secret manager or local secret store; do not commit it or place it in shell history. The CLI also supports:
+The command prints the raw token once. Store it in an approved secret manager or local secret store; do not commit it or place it in shell history. To issue a separate reviewer credential to an existing operator, grant the review scope explicitly:
+
+    python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope assessment:read --scope assessment:review
+
+Only active operator principals can create human review decisions; service principals and legacy shared-key requests are rejected. The CLI also supports:
 
     python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope inventory:read --scope audit:read
     python -m app.identity_cli revoke-credential --credential-id CREDENTIAL_UUID

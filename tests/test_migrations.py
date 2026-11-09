@@ -20,6 +20,25 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         assert inspect(engine).has_table("audit_chain_state")
         assert inspect(engine).has_table("principals")
         assert inspect(engine).has_table("api_credentials")
+        assert inspect(engine).has_table("vulnerability_decisions")
+        decision_columns = {
+            column["name"]: column
+            for column in inspect(engine).get_columns("vulnerability_decisions")
+        }
+        assert {
+            "assessment_finding_id",
+            "principal_id",
+            "revision",
+            "request_key_hash",
+            "request_fingerprint",
+            "supersedes_id",
+            "state",
+            "justification",
+            "detail",
+            "evidence_references",
+            "responses",
+            "created_at",
+        }.issubset(decision_columns)
         finding_columns = {
             column["name"]: column
             for column in inspect(engine).get_columns("sbom_assessment_findings")
@@ -47,7 +66,13 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
             ) == 1
         command.check(config)
 
+        command.downgrade(config, "0008_sbom_reference_preservation")
+        assert not inspect(engine).has_table("vulnerability_decisions")
+        command.upgrade(config, "head")
+        assert inspect(engine).has_table("vulnerability_decisions")
+
         command.downgrade(config, "0007_sbom_finding_applicability")
+        assert not inspect(engine).has_table("vulnerability_decisions")
         assert "bom_metadata" not in {
             column["name"] for column in inspect(engine).get_columns("sbom_imports")
         }
@@ -63,6 +88,7 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         }
 
         command.downgrade(config, "0006_identity_access")
+        assert not inspect(engine).has_table("vulnerability_decisions")
         assert "applicability" not in {
             column["name"]
             for column in inspect(engine).get_columns("sbom_assessment_findings")
@@ -76,6 +102,7 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         command.downgrade(config, "0002_persistent_sbom")
         assert not inspect(engine).has_table("api_credentials")
         assert not inspect(engine).has_table("principals")
+        assert not inspect(engine).has_table("vulnerability_decisions")
         assert not inspect(engine).has_table("audit_chain_state")
 
         command.upgrade(config, "head")
