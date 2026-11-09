@@ -946,7 +946,7 @@ def test_ed25519_decision_signature_persists_and_reverifies_postgres():
             signature = base64.b64encode(
                 private_key.sign(decision_signatures.signing_envelope(decision_row))
             ).decode("ascii")
-            result = decision_signatures.sign_decision(
+            result, created = decision_signatures.sign_decision(
                 session,
                 decision_id=decision_id,
                 principal_id=principal_id,
@@ -954,6 +954,7 @@ def test_ed25519_decision_signature_persists_and_reverifies_postgres():
                 signature_b64=signature,
             )
             session.commit()
+            assert created is True
             assert result["key_id"] == key_id
 
         with Session(application_engine) as session:
