@@ -1,10 +1,11 @@
 import base64
 import hashlib
 
+import pytest
 import rfc8785
 from sqlalchemy import update
 
-from app import decision_signatures, identity
+from app import decision_evidence, decision_signatures, identity
 from app.db import DecisionEvidenceManifest, EvidenceArtifact, SessionLocal, VulnerabilityDecision
 
 from .conftest import H
@@ -354,3 +355,33 @@ def test_manifest_cannot_be_bound_to_superseded_decision_revision(client, monkey
         json={"artifact_ids": [artifact_id]},
     )
     assert blocked.status_code == 409
+
+
+def test_manifest_and_audit_event_roll_back_together(client, monkeypatch):
+    principal_id, token = _operator_with_scopes()
+    artifact_id, _ = _artifact(client)
+    decision_id = _decision(client, monkeypatch, principal_id, token, artifact_id)
+    original_record = decision_evidence.audit.record
+
+    def fail_after_audit_append(db, actor, action, entity, payload):
+        original_record(db, actor, action, entity, payload)
+        raise RuntimeError("injected manifest audit failure")
+
+    monkeypatch.setattr(decision_evidence.audit, "record", fail_after_audit_append)
+    with SessionLocal() as db:
+        with pytest.raises(RuntimeError, match="injected manifest audit failure"):
+            decision_evidence.create_manifest(
+                db,
+                decision_id=decision_id,
+                principal_id=principal_id,
+                artifact_ids=[artifact_id],
+            )
+        db.rollback()
+
+    with SessionLocal() as db:
+        assert (
+            db.query(DecisionEvidenceManifest)
+            .filter_by(decision_id=decision_id)
+            .count()
+            == 0
+        )
