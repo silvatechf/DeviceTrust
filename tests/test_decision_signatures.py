@@ -288,6 +288,27 @@ def test_signature_and_audit_event_roll_back_together(client, monkeypatch):
         assert db.query(AuditEntry).count() == audit_before
         assert db.get(AuditChainState, 1).version == chain_version_before
 
+def test_disabled_operator_signature_remains_verifiable_but_untrusted(client, monkeypatch):
+    principal_id, token = _operator()
+    decision_id = _decision(client, monkeypatch, principal_id, token)
+    private_key, public_pem = _keypair()
+    key_id, _ = _register(principal_id, public_pem)
+    signature = _signature_for(client, token, decision_id, key_id, private_key)
+    signed = client.post(
+        f"/sbom/decisions/{decision_id}/signature",
+        headers={"X-API-Key": token},
+        json={"key_id": key_id, "signature": signature},
+    )
+    assert signed.status_code == 201
+    with SessionLocal() as db:
+        identity.disable_principal(db, principal_id)
+        db.commit()
+    with SessionLocal() as db:
+        verified = decision_signatures.get_decision_signature(db, decision_id)
+    assert verified["signature_valid"] is True
+    assert verified["trust_valid"] is False
+    assert verified["signatures"][0]["current_principal_status"] == "disabled_or_invalid"
+
 def test_service_principal_cannot_register_decision_signing_key():
     with SessionLocal() as db:
         principal, _credential, _token = identity.create_principal(
