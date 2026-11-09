@@ -228,6 +228,24 @@ def test_signing_scope_is_separate_and_required(client, monkeypatch):
     assert response.json()["detail"] == "Insufficient API credential scope"
 
 
+def test_service_principal_cannot_register_decision_signing_key():
+    with SessionLocal() as db:
+        principal, _credential, _token = identity.create_principal(
+            db,
+            name="Signing service principal",
+            kind="service",
+            scopes={"assessment:sign"},
+        )
+        principal_id = principal.id
+        db.commit()
+    _, public_pem = _keypair()
+    with SessionLocal() as db:
+        with pytest.raises(PermissionError, match="Only operator principals"):
+            decision_signatures.register_public_key(
+                db, principal_id=principal_id, public_key_pem=public_pem
+            )
+        db.rollback()
+
 def test_expired_signing_key_cannot_provide_payload_or_sign(client, monkeypatch):
     principal_id, token = _operator()
     decision_id = _decision(client, monkeypatch, principal_id, token)
