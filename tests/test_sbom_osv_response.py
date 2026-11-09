@@ -305,3 +305,35 @@ def test_osv_skips_invalid_purl_and_marks_coverage_incomplete(monkeypatch):
     assert client.calls == []
     assert status["status"] == "incomplete"
     assert status["skipped_invalid_purl"] == 1
+
+
+def test_async_osv_query_uses_unversioned_purl(monkeypatch):
+    import asyncio
+
+    class _CapturingAsyncClient:
+        def __init__(self):
+            self.calls = []
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def post(self, url, *, json, timeout):
+            self.calls.append((url, json, timeout))
+            return _FakeResponse({"vulns": []})
+
+    client = _CapturingAsyncClient()
+    monkeypatch.setattr(sbom.httpx, "AsyncClient", lambda: client)
+
+    findings, status = asyncio.run(
+        sbom.scan_osv_with_status_async([_component()])
+    )
+
+    assert findings == []
+    assert status["status"] == "complete"
+    assert client.calls[0][1] == {
+        "package": {"purl": "pkg:generic/openssl"},
+        "version": "3.0.0",
+    }
