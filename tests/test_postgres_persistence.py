@@ -16,12 +16,13 @@ from sqlalchemy import create_engine, delete, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app import audit, decision_signatures, identity, product_sbom, vulnerability_decisions
+from app import audit, decision_approvals, decision_signatures, identity, product_sbom, vulnerability_decisions
 from app.audit import record, verify
 from app.db import (
     APICredential,
     AuditChainState,
     AuditEntry,
+    DecisionApproval,
     Device,
     Principal,
     Product,
@@ -832,6 +833,7 @@ def test_review_decisions_persist_and_link_revisions_postgres():
             session.execute(delete(ProductRelease).where(ProductRelease.id == release_id))
             session.execute(delete(Product).where(Product.id == product_id))
             session.execute(delete(Principal).where(Principal.id == principal_id))
+            session.execute(delete(Principal).where(Principal.id == approver_id))
             session.commit()
 
 
@@ -843,8 +845,9 @@ def test_ed25519_decision_signature_persists_and_reverifies_postgres():
 
     suffix = uuid4().hex
     principal_id = str(uuid4())
+    approver_id = str(uuid4())
     product_id = release_id = import_id = component_id = assessment_id = finding_id = decision_id = None
-    key_id = None
+    key_id = approval_key_id = None
     private_key = Ed25519PrivateKey.generate()
     public_pem = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.PEM,
@@ -858,11 +861,17 @@ def test_ed25519_decision_signature_persists_and_reverifies_postgres():
             kind="operator",
             status="active",
         )
+        approver = Principal(
+            id=approver_id,
+            name=f"PostgreSQL independent approver {suffix[:8]}",
+            kind="operator",
+            status="active",
+        )
         product = Product(
             manufacturer="PostgreSQL Signing Integration",
             product_name=f"Signed Decision {suffix[:8]}",
         )
-        session.add_all([principal, product])
+        session.add_all([principal, approver, product])
         session.flush()
         product_id = product.id
         release = ProductRelease(product_id=product.id, version="2.0.0")
@@ -965,13 +974,73 @@ def test_ed25519_decision_signature_persists_and_reverifies_postgres():
             assert session.scalar(
                 select(SignedDecision).where(SignedDecision.decision_id == decision_id)
             ) is not None
+
+        approval_private_key = Ed25519PrivateKey.generate()
+        approval_public_pem = approval_private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        with Session(application_engine) as session:
+            approval_key = decision_signatures.register_public_key(
+                session,
+                principal_id=approver_id,
+                public_key_pem=approval_public_pem,
+                purpose="decision-approval",
+            )
+            approval_key_id = approval_key.id
+            approval_fingerprint = approval_key.fingerprint
+            session.commit()
+
+        with Session(application_engine) as session:
+            decision_row = session.get(VulnerabilityDecision, decision_id)
+            decision_digest = hashlib.sha256(
+                decision_signatures.signing_envelope(decision_row)
+            ).hexdigest()
+            approved_at = utcnow()
+            envelope = decision_approvals.approval_envelope(
+                decision_row,
+                decision_digest=decision_digest,
+                approver_principal_id=approver_id,
+                key_id=approval_key_id,
+                key_fingerprint=approval_fingerprint,
+                approved_at=approved_at,
+            )
+            approval_signature = base64.b64encode(
+                approval_private_key.sign(envelope)
+            ).decode("ascii")
+            approval, approval_created = decision_approvals.approve_decision(
+                session,
+                decision_id=decision_id,
+                principal_id=approver_id,
+                key_id=approval_key_id,
+                approved_at=approved_at,
+                signature_b64=approval_signature,
+            )
+            session.commit()
+            assert approval_created is True
+            assert approval["approver_principal_id"] == approver_id
+
+        with Session(application_engine) as session:
+            approval_status = decision_approvals.get_decision_approval(
+                session, decision_id
+            )
+            assert approval_status["approval_policy_satisfied"] is True
+            assert approval_status["valid_approver_count"] == 1
+            assert session.scalar(
+                select(DecisionApproval).where(
+                    DecisionApproval.decision_id == decision_id
+                )
+            ) is not None
     finally:
         with Session(application_engine) as session:
             if decision_id is not None:
+                session.execute(delete(DecisionApproval).where(DecisionApproval.decision_id == decision_id))
                 session.execute(delete(SignedDecision).where(SignedDecision.decision_id == decision_id))
                 session.execute(delete(VulnerabilityDecision).where(VulnerabilityDecision.id == decision_id))
             if key_id is not None:
                 session.execute(delete(SigningKey).where(SigningKey.id == key_id))
+            if approval_key_id is not None:
+                session.execute(delete(SigningKey).where(SigningKey.id == approval_key_id))
             if finding_id is not None:
                 session.execute(delete(SBOMAssessmentFinding).where(SBOMAssessmentFinding.id == finding_id))
             if assessment_id is not None:
