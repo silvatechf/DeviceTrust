@@ -211,11 +211,15 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert inspect(target_engine).has_table("sbom_assessment_findings")
         assert inspect(target_engine).has_table("principals")
         assert inspect(target_engine).has_table("api_credentials")
-        assert "intelligence" in {
-            column["name"] for column in inspect(target_engine).get_columns(
+        assessment_finding_columns = {
+            column["name"]: column
+            for column in inspect(target_engine).get_columns(
                 "sbom_assessment_findings"
             )
         }
+        assert "intelligence" in assessment_finding_columns
+        assert "applicability" in assessment_finding_columns
+        assert assessment_finding_columns["applicability"]["nullable"] is False
         with target_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
@@ -561,6 +565,7 @@ def test_versioned_sbom_assessment_survives_postgres_engine_disposal(monkeypatch
             assert len(findings) == 1
             assert findings[0].sbom_component_id == component_id
             assert findings[0].vuln_id == "CVE-2099-9001"
+            assert findings[0].applicability["status"] == "synthetic_candidate"
             assert verify(session)["valid"] is True
     finally:
         with Session(verification_engine) as session:
