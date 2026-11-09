@@ -346,3 +346,31 @@ class SignedDecision(Base):
     envelope_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     signature_b64: Mapped[str] = mapped_column(String(128), nullable=False)
     verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+class DecisionApproval(Base):
+    __tablename__ = "decision_approvals"
+    __table_args__ = (
+        UniqueConstraint(
+            "decision_id",
+            "signing_key_id",
+            name="uq_decision_approval_decision_key",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    decision_id: Mapped[int] = mapped_column(
+        ForeignKey("vulnerability_decisions.id"), nullable=False, index=True
+    )
+    signing_key_id: Mapped[str] = mapped_column(
+        ForeignKey("signing_keys.id"), nullable=False, index=True
+    )
+    principal_id: Mapped[str] = mapped_column(
+        ForeignKey("principals.id"), nullable=False, index=True
+    )
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    envelope_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    decision_envelope_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    envelope_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    signature_b64: Mapped[str] = mapped_column(String(128), nullable=False)
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
