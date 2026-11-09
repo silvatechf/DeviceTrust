@@ -110,7 +110,7 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 | Bounded CycloneDX ingestion | Implemented prototype |
 | Synthetic local advisory matching | Implemented demo behavior |
 | Optional OSV lookup | Best-effort integration; versionless PURL plus separate version query contract |
-| Source-aware assessment applicability | Implemented prototype in PR #51; no automated `not_affected` or VEX decision |
+| Source-aware assessment applicability | Implemented prototype in PR #53; no automated `not_affected` or VEX decision |
 | Justified vulnerability triage | Implemented prototype |
 | JSON/Markdown reports | Implemented prototype |
 | Hash-chain verification | Implemented with limitations |
