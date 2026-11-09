@@ -815,6 +815,7 @@ def test_product_sbom_import_preserves_bom_identity_and_component_refs(client):
     expected_metadata = {
         "serial_number": document["serialNumber"],
         "version": 2,
+        "version_explicit": True,
         "metadata_component": {
             "bom_ref": "product-sensor-x",
             "type": "application",
