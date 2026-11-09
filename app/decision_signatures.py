@@ -3,6 +3,7 @@
 import base64
 import binascii
 import hashlib
+import hmac
 from datetime import timezone
 
 import rfc8785
@@ -49,6 +50,24 @@ def signing_envelope(decision: VulnerabilityDecision) -> bytes:
     }
     canonical = rfc8785.dumps(payload)
     return DOMAIN_SEPARATOR + canonical
+
+
+def _registered_public_key(key: SigningKey) -> Ed25519PublicKey:
+    if key.algorithm != "Ed25519":
+        raise ValueError("registered signing key algorithm is not supported")
+    try:
+        public_key = serialization.load_pem_public_key(key.public_key_pem.encode("ascii"))
+    except (ValueError, TypeError, UnicodeError):
+        raise ValueError("registered public key material is invalid") from None
+    if not isinstance(public_key, Ed25519PublicKey):
+        raise ValueError("registered signing key is not Ed25519")
+    raw = public_key.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    if not hmac.compare_digest(hashlib.sha256(raw).hexdigest(), key.fingerprint):
+        raise ValueError("registered public key fingerprint does not match key material")
+    return public_key
 
 
 def _decode_signature(value: str) -> bytes:
@@ -152,6 +171,10 @@ def get_signing_payload(db: Session, *, decision_id: int, principal_id: str, key
             expiry = expiry.replace(tzinfo=timezone.utc)
         if expiry <= utcnow():
             raise PermissionError("Signing key has expired")
+    principal = db.get(Principal, principal_id)
+    if principal is None or principal.status != "active" or principal.kind != "operator":
+        raise PermissionError("An active operator principal is required")
+    _registered_public_key(key)
     envelope = signing_envelope(decision)
     return {
         "decision_id": decision_id,
@@ -191,9 +214,7 @@ def sign_decision(
     signature = _decode_signature(signature_b64)
     envelope = signing_envelope(decision)
     envelope_digest = hashlib.sha256(envelope).hexdigest()
-    public_key = serialization.load_pem_public_key(key.public_key_pem.encode("ascii"))
-    if not isinstance(public_key, Ed25519PublicKey):
-        raise ValueError("registered signing key is not Ed25519")
+    public_key = _registered_public_key(key)
     try:
         public_key.verify(signature, envelope)
     except (InvalidSignature, TypeError):
@@ -276,9 +297,7 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
     if signature_valid:
         try:
             signature = _decode_signature(item.signature_b64)
-            public_key = serialization.load_pem_public_key(key.public_key_pem.encode("ascii"))
-            if not isinstance(public_key, Ed25519PublicKey):
-                raise ValueError("registered signing key is not Ed25519")
+            public_key = _registered_public_key(key)
             public_key.verify(signature, current_envelope)
         except (ValueError, InvalidSignature, TypeError):
             signature_valid = False
