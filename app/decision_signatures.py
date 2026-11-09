@@ -224,7 +224,8 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
     if item is None:
         return None
     key = db.get(SigningKey, item.signing_key_id)
-    if key is None:
+    decision = db.get(VulnerabilityDecision, decision_id)
+    if key is None or decision is None:
         return {
             "id": item.id,
             "decision_id": item.decision_id,
@@ -232,7 +233,31 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
             "envelope_version": item.envelope_version,
             "envelope_sha256": item.envelope_sha256,
             "verified_at": item.verified_at,
+            "signature_valid": False,
             "current_key_status": "missing",
         }
-    status = "revoked" if key.revoked_at else "active"
-    return {**_signature_dict(item, key), "current_key_status": status}
+
+    current_envelope = signing_envelope(decision)
+    current_digest = hashlib.sha256(current_envelope).hexdigest()
+    signature_valid = current_digest == item.envelope_sha256
+    if signature_valid:
+        try:
+            signature = _decode_signature(item.signature_b64)
+            public_key = serialization.load_pem_public_key(key.public_key_pem.encode("ascii"))
+            public_key.verify(signature, current_envelope)
+        except (ValueError, InvalidSignature):
+            signature_valid = False
+
+    key_status = "revoked" if key.revoked_at else "active"
+    if key.expires_at is not None:
+        expiry = key.expires_at
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry <= utcnow():
+            key_status = "expired"
+
+    return {
+        **_signature_dict(item, key),
+        "signature_valid": signature_valid,
+        "current_key_status": key_status,
+    }
