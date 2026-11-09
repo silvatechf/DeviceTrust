@@ -52,9 +52,12 @@ def parse_cyclonedx_document(doc: dict) -> dict:
         except ValueError:
             raise ValueError("CycloneDX serialNumber must be a URN UUID.") from None
 
-    bom_version = doc.get("version")
-    if bom_version is not None and (
-        isinstance(bom_version, bool) or not isinstance(bom_version, int) or bom_version < 1
+    bom_version_explicit = "version" in doc
+    bom_version = doc.get("version", 1)
+    if (
+        isinstance(bom_version, bool)
+        or not isinstance(bom_version, int)
+        or bom_version < 1
     ):
         raise ValueError("CycloneDX BOM version must be a positive integer.")
 
@@ -163,6 +166,7 @@ def parse_cyclonedx_document(doc: dict) -> dict:
     return {
         "serial_number": serial_number,
         "version": bom_version,
+        "version_explicit": bom_version_explicit,
         "metadata_component": metadata_component_data,
         "components": parsed,
     }
