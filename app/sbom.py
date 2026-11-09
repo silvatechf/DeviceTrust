@@ -224,7 +224,10 @@ def scan_osv_with_status(
         failed = True
 
     deduplicated = sum(len(indexes) - 1 for indexes in unique_queries.values())
-    incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0 or skipped_invalid_purl > 0
+    incomplete = (
+        failed or budget_exhausted or deadline_exhausted
+        or skipped_no_purl > 0 or skipped_invalid_purl > 0
+    )
     status = {
         "status": "incomplete" if incomplete else "complete",
         "source": "osv",
@@ -273,7 +276,9 @@ async def scan_osv_with_status_async(
                 except (TypeError, ValueError):
                     skipped_invalid_purl += 1
                     continue
-                unique_queries.setdefault((query_purl, component["version"]), []).append(index)
+                unique_queries.setdefault(
+                    (query_purl, component["version"]), []
+                ).append(index)
 
             async with httpx.AsyncClient() as client:
                 for (purl, version), indexes in unique_queries.items():
