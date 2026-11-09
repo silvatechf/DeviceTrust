@@ -21,7 +21,7 @@ from .db import (
     SessionLocal,
 )
 
-PARSER_VERSION = "0.3.0"
+PARSER_VERSION = "0.4.0"
 
 
 def create_product(
@@ -95,7 +95,13 @@ async def import_cyclonedx(
     source_type: str,
     source_reference: str | None,
 ) -> tuple[SBOMImport, bool]:
-    components = sbom.parse_cyclonedx(document)
+    parsed_document = sbom.parse_cyclonedx_document(document)
+    components = parsed_document["components"]
+    bom_metadata = {
+        "serial_number": parsed_document["serial_number"],
+        "version": parsed_document["version"],
+        "metadata_component": parsed_document["metadata_component"],
+    }
     digest = hashlib.sha256(raw_document).hexdigest()
 
     existing_query = select(SBOMImport).where(
@@ -139,6 +145,7 @@ async def import_cyclonedx(
         parser_version=PARSER_VERSION,
         status="accepted",
         component_count=len(components),
+        bom_metadata=bom_metadata,
         validation_summary={
             "valid": True,
             "component_count": len(components),
@@ -157,6 +164,7 @@ async def import_cyclonedx(
                 name=component["source_name"],
                 version=component["source_version"],
                 purl=component["purl"],
+                bom_ref=component["bom_ref"],
             )
             db.add(occurrence)
             db.flush()
@@ -233,6 +241,7 @@ def _component_snapshot(component: SBOMComponent) -> dict:
         "name": component.name,
         "version": component.version,
         "purl": component.purl,
+        "bom_ref": component.bom_ref,
     }
 
 
