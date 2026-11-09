@@ -756,7 +756,7 @@ def test_review_decisions_persist_and_link_revisions_postgres():
     try:
         with Session(application_engine) as session:
             audit.acquire_chain_lock(session)
-            first = vulnerability_decisions.create_decision(
+            first, first_created = vulnerability_decisions.create_decision(
                 session,
                 finding_id=finding_id,
                 principal_id=principal_id,
@@ -765,12 +765,28 @@ def test_review_decisions_persist_and_link_revisions_postgres():
                 detail="The vendor impact statement is being reviewed.",
                 evidence_references=[],
                 responses=[],
+                idempotency_key="postgres-review-001",
             )
             session.commit()
 
         with Session(application_engine) as session:
             audit.acquire_chain_lock(session)
-            second = vulnerability_decisions.create_decision(
+            retried, retry_created = vulnerability_decisions.create_decision(
+                session,
+                finding_id=finding_id,
+                principal_id=principal_id,
+                state="in_triage",
+                justification=None,
+                detail="The vendor impact statement is being reviewed.",
+                evidence_references=[],
+                responses=[],
+                idempotency_key="postgres-review-001",
+            )
+            session.commit()
+
+        with Session(application_engine) as session:
+            audit.acquire_chain_lock(session)
+            second, second_created = vulnerability_decisions.create_decision(
                 session,
                 finding_id=finding_id,
                 principal_id=principal_id,
@@ -779,9 +795,14 @@ def test_review_decisions_persist_and_link_revisions_postgres():
                 detail="Runtime call-path analysis confirms the vulnerable function is not invoked.",
                 evidence_references=["evidence://postgres/review-001"],
                 responses=["will_not_fix"],
+                idempotency_key="postgres-review-002",
             )
             session.commit()
 
+        assert first_created is True
+        assert retry_created is False
+        assert retried["id"] == first["id"]
+        assert second_created is True
         assert first["revision"] == 1
         assert second["revision"] == 2
         assert second["supersedes_id"] == first["id"]
