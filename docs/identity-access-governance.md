@@ -56,10 +56,11 @@ Create a principal and credential. Repeat --scope for each allowed scope:
 
 The command prints the raw token once. Store it in an approved secret manager or local secret store; do not commit it or place it in shell history. The CLI also supports:
 
+    python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope inventory:read --scope audit:read
     python -m app.identity_cli revoke-credential --credential-id CREDENTIAL_UUID
     python -m app.identity_cli disable-principal --principal-id PRINCIPAL_UUID
 
-Credential creation, revocation and principal disablement append audit events in the same database transaction as the identity change. The actor for offline administration is the fixed value offline-admin; it does not prove the OS user's identity.
+Principal creation, credential issuance/revocation and principal disablement append audit events in the same database transaction as the identity change. The actor for offline administration is the fixed value offline-admin; it does not prove the OS user's identity.
 
 For managed mode, configure DEVICETRUST_AUTH_MODE=managed in the API process and submit the generated token using X-API-Key. The console keeps the token in page memory only.
 
