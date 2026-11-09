@@ -1,4 +1,5 @@
 import base64
+from datetime import timedelta
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -6,7 +7,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
 
 from app import decision_signatures, identity
-from app.db import SessionLocal, SignedDecision, VulnerabilityDecision
+from app.db import SessionLocal, SignedDecision, SigningKey, VulnerabilityDecision, utcnow
 
 from .test_vulnerability_decisions import _finding
 
@@ -226,6 +227,23 @@ def test_signing_scope_is_separate_and_required(client, monkeypatch):
     assert response.status_code == 403
     assert response.json()["detail"] == "Insufficient API credential scope"
 
+
+def test_expired_signing_key_cannot_provide_payload_or_sign(client, monkeypatch):
+    principal_id, token = _operator()
+    decision_id = _decision(client, monkeypatch, principal_id, token)
+    _, public_pem = _keypair()
+    key_id, _ = _register(principal_id, public_pem)
+    with SessionLocal() as db:
+        key = db.get(SigningKey, key_id)
+        key.expires_at = utcnow() - timedelta(seconds=1)
+        db.commit()
+    payload = client.get(
+        f"/sbom/decisions/{decision_id}/signing-payload",
+        params={"key_id": key_id},
+        headers={"X-API-Key": token},
+    )
+    assert payload.status_code == 403
+    assert payload.json()["detail"] == "Signing key has expired"
 
 def test_only_ed25519_public_keys_can_be_registered():
     from cryptography.hazmat.primitives.asymmetric.rsa import generate_private_key
