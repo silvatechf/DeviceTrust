@@ -229,11 +229,18 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
             ) == 1
         command.check(config)
 
-        command.downgrade(config, "0002_persistent_sbom")
+        command.downgrade(config, "0006_identity_access")
         assert "applicability" not in {
             column["name"]
             for column in inspect(target_engine).get_columns("sbom_assessment_findings")
         }
+        command.upgrade(config, "head")
+        assert "applicability" in {
+            column["name"]
+            for column in inspect(target_engine).get_columns("sbom_assessment_findings")
+        }
+
+        command.downgrade(config, "0002_persistent_sbom")
         assert not inspect(target_engine).has_table("audit_chain_state")
         assert not inspect(target_engine).has_table("sbom_assessments")
         assert not inspect(target_engine).has_table("sbom_assessment_findings")
