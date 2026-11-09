@@ -329,6 +329,8 @@ def list_product_sbom_assessment_findings(
 def create_vulnerability_decision(
     finding_id: int,
     body: VulnerabilityDecisionIn,
+    response: Response,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
     db: Session = Depends(get_write_db),
     actor: str = Depends(auth),
 ):
@@ -339,13 +341,15 @@ def create_vulnerability_decision(
         )
     principal_id = actor.removeprefix("principal:")
     try:
-        decision = vulnerability_decisions.create_decision(
+        decision, created = vulnerability_decisions.create_decision(
             db,
             finding_id=finding_id,
             principal_id=principal_id,
+            idempotency_key=idempotency_key,
             **body.model_dump(),
         )
         db.commit()
+        response.status_code = 201 if created else 200
         return decision
     except LookupError as error:
         db.rollback()
@@ -353,6 +357,9 @@ def create_vulnerability_decision(
     except PermissionError as error:
         db.rollback()
         raise HTTPException(403, str(error)) from None
+    except vulnerability_decisions.IdempotencyConflict as error:
+        db.rollback()
+        raise HTTPException(409, str(error)) from None
     except ValueError as error:
         db.rollback()
         raise HTTPException(422, str(error)) from None
