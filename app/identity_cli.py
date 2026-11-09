@@ -17,6 +17,11 @@ def _parser() -> argparse.ArgumentParser:
     create.add_argument("--scope", action="append", required=True, dest="scopes")
     create.add_argument("--expires-in-days", type=int, default=90)
 
+    issue = commands.add_parser("issue-credential", help="Issue an additional or replacement credential.")
+    issue.add_argument("--principal-id", required=True)
+    issue.add_argument("--scope", action="append", required=True, dest="scopes")
+    issue.add_argument("--expires-in-days", type=int, default=90)
+
     revoke = commands.add_parser("revoke-credential", help="Revoke an API credential.")
     revoke.add_argument("--credential-id", required=True)
 
@@ -53,6 +58,34 @@ def main() -> None:
             )
             db.commit()
             print(f"Principal ID: {principal.id}")
+            print(f"Credential ID: {credential.id}")
+            print(f"Expires at: {credential.expires_at.isoformat()}")
+            print("API token (shown once; store it securely):")
+            print(raw_token)
+            return
+
+        if args.command == "issue-credential":
+            if not 1 <= args.expires_in_days <= 365:
+                raise SystemExit("--expires-in-days must be between 1 and 365")
+            credential, raw_token = identity.issue_credential(
+                db,
+                principal_id=args.principal_id,
+                scopes=set(args.scopes),
+                expires_at=utcnow() + timedelta(days=args.expires_in_days),
+            )
+            audit.record(
+                db,
+                "offline-admin",
+                "identity.credential_create",
+                credential.id,
+                {
+                    "principal_id": credential.principal_id,
+                    "credential_id": credential.id,
+                    "scopes": credential.scopes,
+                    "expires_at": credential.expires_at.isoformat(),
+                },
+            )
+            db.commit()
             print(f"Credential ID: {credential.id}")
             print(f"Expires at: {credential.expires_at.isoformat()}")
             print("API token (shown once; store it securely):")
