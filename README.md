@@ -81,7 +81,7 @@ The product SBOM persistence API was merged through [PR #22](https://github.com/
 
 - Product-to-device relationship inference.
 - SPDX ingestion or CycloneDX VEX generation.
-- CycloneDX VEX generation, digital signatures, second-person approval and vendor-specific backport analysis. Attributable human review records are implemented in the reviewed-decision branch; they are not yet exported as VEX statements.
+- CycloneDX VEX generation, second-person approval, evidence-artifact verification, external audit anchoring and vendor-specific backport analysis. Ed25519 detached decision signatures and offline public-key lifecycle are implemented in the trust-assurance work, but signatures remain optional and do not establish legal identity or manufacturer authority.
 - Human login, MFA, SSO, tenant isolation and web-based credential administration. Managed API principals and route scopes are implemented in the identity implementation branch; offline CLI administration is required.
 - Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
 - Active LAN discovery, packet capture, device agents or independent firmware/hardware attestation.
