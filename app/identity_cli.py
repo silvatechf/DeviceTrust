@@ -146,6 +146,7 @@ def main() -> None:
             db.commit()
             print(f"Signing key ID: {key.id}")
             print(f"Principal ID: {key.principal_id}")
+            print(f"Purpose: {key.purpose}")
             print(f"Fingerprint (SHA-256): {key.fingerprint}")
             print(f"Expires at: {key.expires_at.isoformat() if key.expires_at else 'never'}")
             return
