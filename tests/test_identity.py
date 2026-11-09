@@ -119,6 +119,15 @@ def test_scope_matrix_is_explicit_and_least_privilege():
     assert identity.required_scopes("GET", "/devices") == frozenset({"inventory:read"})
     assert identity.required_scopes("POST", "/devices") == frozenset({"inventory:write"})
     assert identity.required_scopes("GET", "/audit") == frozenset({"audit:read"})
+    assert identity.required_scopes(
+        "GET", "/sbom/decisions/42/approval-payload"
+    ) == frozenset({"assessment:approve"})
+    assert identity.required_scopes(
+        "POST", "/sbom/decisions/42/approval"
+    ) == frozenset({"assessment:approve"})
+    assert identity.required_scopes(
+        "GET", "/sbom/decisions/42/approval"
+    ) == frozenset({"assessment:read"})
     assert identity.required_scopes("GET", "/devices/EDGE-1/report") == frozenset(
         {"inventory:read", "assessment:read", "audit:read"}
     )
