@@ -62,6 +62,7 @@ _ROUTE_SCOPES = (
     ("GET", re.compile(r"/sbom/imports/[^/]+/assessments/[^/]+/findings"), frozenset({"assessment:read"})),
     ("POST", re.compile(r"/sbom/assessment-findings/[^/]+/decisions"), frozenset({"assessment:review"})),
     ("POST", re.compile(r"/sbom/decisions/[^/]+/evidence-manifest"), frozenset({"assessment:review"})),
+    ("GET", re.compile(r"/sbom/decisions/[^/]+/evidence-manifest"), frozenset({"assessment:read"})),
     ("GET", re.compile(r"/sbom/assessment-findings/[^/]+/decisions"), frozenset({"assessment:read"})),
     ("POST", re.compile(r"/sbom/decisions/[^/]+/signature"), frozenset({"assessment:sign"})),
     ("GET", re.compile(r"/sbom/decisions/[^/]+/signing-payload"), frozenset({"assessment:sign"})),
