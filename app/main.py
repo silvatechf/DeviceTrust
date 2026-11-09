@@ -409,7 +409,7 @@ def create_decision_evidence_manifest(
         raise HTTPException(403, "Evidence manifest binding requires a managed operator principal")
     principal_id = actor.removeprefix("principal:")
     try:
-        manifest, created = decision_evidence.create_manifest(
+        _manifest, created = decision_evidence.create_manifest(
             db,
             decision_id=decision_id,
             principal_id=principal_id,
@@ -441,7 +441,10 @@ def get_decision_evidence_manifest(
     db: Session = Depends(get_db),
     _: str = Depends(auth),
 ):
-    result = decision_evidence.get_manifest(db, decision_id)
+    try:
+        result = decision_evidence.get_manifest(db, decision_id)
+    except decision_evidence.EvidenceManifestIntegrityError:
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     if result is None:
         raise HTTPException(404, "Decision evidence manifest not found")
     return result
