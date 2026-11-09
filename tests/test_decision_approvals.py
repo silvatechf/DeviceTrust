@@ -1,11 +1,12 @@
 import base64
 from datetime import timedelta
 
+import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app import decision_approvals, decision_signatures, identity
-from app.db import DecisionApproval, SessionLocal, SigningKey, utcnow
+from app.db import AuditChainState, AuditEntry, DecisionApproval, SessionLocal, SigningKey, utcnow
 
 from .test_vulnerability_decisions import _finding
 
@@ -380,3 +381,37 @@ def test_corrupted_approval_key_registry_fails_closed(client, monkeypatch):
     assert response.json()["detail"] == (
         "Registered approval key integrity validation failed"
     )
+
+
+def test_approval_and_audit_event_roll_back_together(client, monkeypatch):
+    author_id, author_token = _operator("Approval transaction author")
+    approver_id, approver_token = _operator("Approval transaction reviewer")
+    _finding_id, decision_id = _decision(client, monkeypatch, author_id, author_token)
+    _sign_author(client, author_token, decision_id, author_id)
+    submission = _approval_submission(
+        client, decision_id, approver_id, approver_token
+    )
+    with SessionLocal() as db:
+        approval_count_before = db.query(DecisionApproval).count()
+        audit_count_before = db.query(AuditEntry).count()
+        chain_version_before = db.get(AuditChainState, 1).version
+
+    original_record = decision_approvals.audit.record
+
+    def fail_after_audit_append(db, actor, action, entity, payload):
+        original_record(db, actor, action, entity, payload)
+        raise RuntimeError("injected approval audit failure")
+
+    monkeypatch.setattr(decision_approvals.audit, "record", fail_after_audit_append)
+    with pytest.raises(RuntimeError, match="injected approval audit failure"):
+        client.post(
+            f"/sbom/decisions/{decision_id}/approval",
+            headers={"X-API-Key": approver_token},
+            json=submission,
+        )
+    monkeypatch.setattr(decision_approvals.audit, "record", original_record)
+
+    with SessionLocal() as db:
+        assert db.query(DecisionApproval).count() == approval_count_before
+        assert db.query(AuditEntry).count() == audit_count_before
+        assert db.get(AuditChainState, 1).version == chain_version_before
