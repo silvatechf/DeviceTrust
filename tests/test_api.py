@@ -836,3 +836,43 @@ def test_product_sbom_import_preserves_bom_identity_and_component_refs(client):
     )
     assert components.status_code == 200
     assert components.json()[0]["bom_ref"] == "openssl-component"
+
+    import_id = imported.json()["id"]
+    with SessionLocal() as db:
+        legacy_import = db.get(SBOMImport, import_id)
+        assert legacy_import is not None
+        legacy_import.parser_version = "0.3.0"
+        legacy_import.bom_metadata = {}
+        legacy_component = db.query(SBOMComponent).filter_by(
+            sbom_import_id=import_id
+        ).one()
+        legacy_component.bom_ref = None
+        db.commit()
+
+    reimported = client.post(
+        f"/product-releases/{release_id}/sbom",
+        json=document,
+        headers=H,
+    )
+
+    assert reimported.status_code == 201, reimported.text
+    assert reimported.json()["id"] == import_id
+    assert reimported.json()["created"] is False
+    assert reimported.json()["bom_metadata"] == expected_metadata
+
+    imports_after_reprocessing = client.get(
+        f"/product-releases/{release_id}/sbom",
+        headers=H,
+    )
+    assert len(imports_after_reprocessing.json()) == 1
+
+    components_after_reprocessing = client.get(
+        f"/sbom/imports/{import_id}/components",
+        headers=H,
+    )
+    assert components_after_reprocessing.json()[0]["bom_ref"] == "openssl-component"
+
+    with SessionLocal() as db:
+        assert db.query(AuditEntry).filter_by(
+            action="sbom.product_import_metadata_reprocessed"
+        ).count() == 1
