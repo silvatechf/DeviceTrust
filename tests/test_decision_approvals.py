@@ -1,12 +1,9 @@
 import base64
-from datetime import timedelta
-
-import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app import decision_approvals, decision_signatures, identity
-from app.db import DecisionApproval, SessionLocal, utcnow
+from app.db import DecisionApproval, SessionLocal
 
 from .test_vulnerability_decisions import _finding
 
@@ -287,7 +284,7 @@ def test_disabled_approver_signature_remains_verifiable_but_not_trusted(
 
 def test_approval_requires_assessment_approve_scope(client, monkeypatch):
     author_id, author_token = _operator("Scoped author")
-    approver_id, _ = _operator(
+    approver_id, approver_token = _operator(
         "Read-only approver",
         scopes={"assessment:read"},
     )
@@ -299,6 +296,7 @@ def test_approval_requires_assessment_approve_scope(client, monkeypatch):
     response = client.get(
         f"/sbom/decisions/{decision_id}/approval-payload",
         params={"key_id": key_id},
-        headers={"X-API-Key": _[0] if False else ""},
+        headers={"X-API-Key": approver_token},
     )
-    assert response.status_code == 401
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Insufficient API credential scope"
