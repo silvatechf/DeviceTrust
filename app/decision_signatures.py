@@ -5,9 +5,9 @@ import binascii
 import hashlib
 import hmac
 from datetime import timezone
+from uuid import uuid4
 
 import rfc8785
-from uuid import uuid4
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
@@ -57,7 +57,7 @@ def _registered_public_key(key: SigningKey) -> Ed25519PublicKey:
         raise ValueError("registered signing key algorithm is not supported")
     try:
         public_key = serialization.load_pem_public_key(key.public_key_pem.encode("ascii"))
-    except (ValueError, TypeError, UnicodeError):
+    except (ValueError, TypeError):
         raise ValueError("registered public key material is invalid") from None
     if not isinstance(public_key, Ed25519PublicKey):
         raise ValueError("registered signing key is not Ed25519")
