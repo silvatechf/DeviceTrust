@@ -331,7 +331,11 @@ class SigningKey(Base):
 class SignedDecision(Base):
     __tablename__ = "signed_decisions"
     __table_args__ = (
-        UniqueConstraint("decision_id", name="uq_signed_decision_decision"),
+        UniqueConstraint(
+            "decision_id",
+            "signing_key_id",
+            name="uq_signed_decision_decision_key",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
