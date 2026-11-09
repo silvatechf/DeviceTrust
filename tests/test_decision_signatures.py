@@ -59,6 +59,17 @@ def _register(principal_id, public_pem):
     return key_id, fingerprint
 
 
+def test_signing_envelope_is_domain_separated_and_deterministic(client, monkeypatch):
+    principal_id, token = _operator()
+    decision_id = _decision(client, monkeypatch, principal_id, token)
+    with SessionLocal() as db:
+        decision = db.get(VulnerabilityDecision, decision_id)
+        first = decision_signatures.signing_envelope(decision)
+        second = decision_signatures.signing_envelope(decision)
+    assert first == second
+    assert first.startswith(decision_signatures.DOMAIN_SEPARATOR)
+    assert b'"envelope_version":"devicetrust.decision-signature.v1"' in first
+
 def test_ed25519_signature_is_verified_and_persisted(client, monkeypatch):
     principal_id, token = _operator()
     decision_id = _decision(client, monkeypatch, principal_id, token)
@@ -86,6 +97,7 @@ def test_ed25519_signature_is_verified_and_persisted(client, monkeypatch):
     verified = client.get(f"/sbom/decisions/{decision_id}/signature", headers={"X-API-Key": token})
     assert verified.status_code == 200
     assert verified.json()["signature_valid"] is True
+    assert verified.json()["trust_valid"] is True
     assert verified.json()["current_key_status"] == "active"
 
     with SessionLocal() as db:
@@ -148,6 +160,7 @@ def test_revoked_key_remains_verifiable_but_is_not_trusted_for_new_signatures(cl
 
     verified = client.get(f"/sbom/decisions/{decision_id}/signature", headers={"X-API-Key": token})
     assert verified.json()["signature_valid"] is True
+    assert verified.json()["trust_valid"] is False
     assert verified.json()["current_key_status"] == "revoked"
 
 
