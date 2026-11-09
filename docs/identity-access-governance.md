@@ -38,11 +38,11 @@ The route-to-scope policy is explicit in app/identity.py. A protected route with
 - inventory:read, inventory:write
 - evidence:read, evidence:write
 - sbom:read, sbom:write
-- assessment:read, assessment:write
+- assessment:read, assessment:write, assessment:review
 - audit:read
 - credentials:manage (reserved for future API-based credential administration)
 
-Reports require inventory:read, assessment:read and audit:read. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
+Reports require inventory:read, assessment:read and audit:read. Human review routes require the dedicated assessment:review scope and an active operator principal; service principals and legacy shared-key actors are rejected. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
 
 ## Offline administration
 
