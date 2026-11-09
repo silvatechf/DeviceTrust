@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import os
 import re
 import secrets
 from dataclasses import dataclass
@@ -26,6 +27,24 @@ ALLOWED_SCOPES = frozenset(
     }
 )
 _TOKEN_PATTERN = re.compile(r"\Adtk_([0-9a-f]{12})_([A-Za-z0-9_-]{43})\Z")
+
+
+class IdentityConfigurationError(RuntimeError):
+    """Raised when managed identity cannot safely verify credentials."""
+
+
+def _credential_digest(raw_token: str) -> str:
+    pepper = os.getenv("DEVICETRUST_CREDENTIAL_PEPPER", "").strip()
+    if re.fullmatch(r"[0-9a-fA-F]{64}", pepper) is None:
+        raise IdentityConfigurationError(
+            "DEVICETRUST_CREDENTIAL_PEPPER must be a 32-byte hex secret"
+        )
+    return hmac.new(
+        bytes.fromhex(pepper),
+        raw_token.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+
 
 # Route authorization is intentionally explicit. A new protected route must be
 # added here; unknown routes fail closed rather than inheriting broad access.
@@ -111,7 +130,7 @@ def create_principal(
         id=str(uuid4()),
         principal_id=principal.id,
         prefix=prefix,
-        token_digest=hashlib.sha256(raw_token.encode("ascii")).hexdigest(),
+        token_digest=_credential_digest(raw_token),
         scopes=normalized_scopes,
         created_at=now,
         expires_at=expires_at,
@@ -130,13 +149,13 @@ def authenticate(db: Session, raw_token: str) -> AuthenticatedPrincipal | None:
     if match is None:
         return None
 
+    candidate_digest = _credential_digest(raw_token)
     credential = db.scalar(
         select(APICredential).where(APICredential.prefix == match.group(1))
     )
     if credential is None:
         return None
 
-    candidate_digest = hashlib.sha256(raw_token.encode("ascii")).hexdigest()
     if not hmac.compare_digest(candidate_digest, credential.token_digest):
         return None
 
@@ -206,7 +225,7 @@ def issue_credential(
         id=str(uuid4()),
         principal_id=principal.id,
         prefix=prefix,
-        token_digest=hashlib.sha256(raw_token.encode("ascii")).hexdigest(),
+        token_digest=_credential_digest(raw_token),
         scopes=normalized_scopes,
         created_at=now,
         expires_at=expires_at,
