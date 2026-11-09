@@ -194,13 +194,13 @@ Capture genuine screenshots from the running application at desktop and mobile w
 
 ### Reassess a stored product SBOM import (proposed in PR #45)
 
-After PR #45 is merged and the local database has been migrated with `alembic upgrade head`, request a new assessment for the accepted import:
+After the local database has been migrated with `alembic upgrade head`, request a new assessment for the accepted import:
 
 ```bash
 curl -sS -X POST "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments" -H "X-API-Key: $API_KEY" -H "Idempotency-Key: demo-assessment-001"
 ```
 
-The request returns an assessment ID, the component/finding counts, timestamps, source fingerprint, and OSV enrichment coverage. Repeating the same request with the same key and source configuration returns the existing assessment. Use a new key to deliberately append another assessment run.
+The request returns an assessment ID, component/finding counts, timestamps, source fingerprint, aggregate coverage status and provider-specific enrichment metadata under `enrichment_metadata.osv` and `enrichment_metadata.intelligence`. Repeating the same request with the same key and source configuration returns the existing assessment. Use a new key to deliberately append another assessment run.
 
 List the assessment history:
 
@@ -216,4 +216,39 @@ curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments/ASSESSMENT_ID
 
 Assessment findings are separate from the original import-time findings and their human triage fields. A new assessment does not inherit or overwrite prior triage decisions. An OSV status of `disabled` means OSV enrichment was not run; it does not mean that the import has no vulnerabilities. `incomplete` means the available intelligence did not cover the entire requested assessment.
 
-This workflow is under review in PR #45 and must not be presented as available on `main` until it is merged. OSV is best-effort and does not provide a globally consistent feed snapshot.
+Versioned reassessment history is implemented through PR #45. KEV/EPSS enrichment is implemented in PR #47 and remains unavailable on `main` until PR #47 is merged. OSV is best-effort and does not provide a globally consistent feed snapshot.
+
+
+### Optional KEV and EPSS enrichment (proposed in the follow-up branch)
+
+After the KEV/EPSS implementation is merged and the database has been upgraded with `alembic upgrade head`, enable either provider independently for a local assessment.
+
+**Windows PowerShell**
+```powershell
+$env:DEVICETRUST_KEV = "1"
+$env:DEVICETRUST_EPSS = "1"
+```
+
+**macOS / Linux**
+```bash
+export DEVICETRUST_KEV=1
+export DEVICETRUST_EPSS=1
+```
+
+Create a new assessment with a new idempotency key:
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments" -H "X-API-Key: $API_KEY" -H "Idempotency-Key: kev-epss-demo-001"
+```
+
+Inspect the findings for that assessment:
+
+```bash
+curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments/ASSESSMENT_ID/findings" -H "X-API-Key: $API_KEY"
+```
+
+The response records per-finding KEV and EPSS states and provider provenance. KEV membership includes the CISA catalog version/release date and entry details. The assessment-level `status` aggregates OSV, KEV and EPSS coverage: any incomplete enabled provider makes the run incomplete; at least one complete provider with no incomplete provider makes it complete; all disabled/not-applicable providers produce disabled. EPSS includes score, percentile and score date. Both are CVE-level signals: they do not prove that a specific product component is affected.
+
+Provider states such as `disabled`, `not_checked`, `not_applicable`, `not_found`, `unavailable` and `incomplete` are intentionally distinct. A missing EPSS record or absent KEV membership is not proof that a vulnerability is harmless. Enrichment is bounded to 100 unique CVEs per assessment; provider failures do not erase the local or OSV findings.
+
+Do not interpret KEV membership or EPSS scores as an automatic affected/not-affected decision, CRA reporting trigger or VEX statement. Those decisions require product-version applicability analysis and attributable human review. See [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).

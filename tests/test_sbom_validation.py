@@ -1,6 +1,6 @@
 import pytest
 
-from app.sbom import parse_cyclonedx, scan_local
+from app.sbom import parse_cyclonedx, parse_cyclonedx_document, scan_local
 
 
 def _document(components, spec_version="1.5"):
@@ -82,3 +82,131 @@ def test_parser_preserves_original_name_and_version_for_provenance():
     assert parsed[0]["source_version"] == "  1.1.1  "
     assert parsed[0]["name"] == "openssl"
     assert parsed[0]["version"] == "1.1.1"
+
+
+def test_parser_preserves_bom_and_component_references():
+    document = _document([
+        {
+            **_component(),
+            "bom-ref": "component-openssl-1",
+        }
+    ])
+    document["serialNumber"] = "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79"
+    document["version"] = 2
+    document["metadata"] = {
+        "component": {
+            "type": "application",
+            "bom-ref": "product-sensor-x",
+            "name": "Sensor X",
+            "version": "1.2.3",
+            "purl": "pkg:generic/sensor-x@1.2.3",
+        }
+    }
+
+    parsed = parse_cyclonedx_document(document)
+
+    assert parsed["serial_number"] == document["serialNumber"]
+    assert parsed["version"] == 2
+    assert parsed["version_explicit"] is True
+    assert parsed["metadata_component"] == {
+        "bom_ref": "product-sensor-x",
+        "type": "application",
+        "name": "Sensor X",
+        "version": "1.2.3",
+        "purl": "pkg:generic/sensor-x@1.2.3",
+    }
+    assert parsed["components"][0]["bom_ref"] == "component-openssl-1"
+    assert parse_cyclonedx(document)[0]["bom_ref"] == "component-openssl-1"
+
+
+def test_parser_rejects_duplicate_bom_refs_across_metadata_and_components():
+    document = _document([
+        {**_component(), "bom-ref": "shared-reference"}
+    ])
+    document["metadata"] = {
+        "component": {
+            "type": "application",
+            "bom-ref": "shared-reference",
+            "name": "Sensor X",
+        }
+    }
+
+    with pytest.raises(ValueError, match="Duplicate CycloneDX bom-ref"):
+        parse_cyclonedx_document(document)
+
+
+def test_parser_rejects_duplicate_component_bom_refs():
+    document = _document([
+        {**_component(), "bom-ref": "duplicate"},
+        {**_component(name="other"), "bom-ref": "duplicate"},
+    ])
+
+    with pytest.raises(ValueError, match="Duplicate CycloneDX bom-ref"):
+        parse_cyclonedx_document(document)
+
+
+@pytest.mark.parametrize(
+    "serial_number",
+    ["not-a-uuid", "urn:uuid:not-a-uuid", 123],
+)
+def test_parser_rejects_invalid_bom_serial_number(serial_number):
+    document = _document([])
+    document["serialNumber"] = serial_number
+
+    with pytest.raises(ValueError, match="serialNumber must be a URN UUID"):
+        parse_cyclonedx_document(document)
+
+
+@pytest.mark.parametrize("version", [0, -1, True, "2", 1.5])
+def test_parser_rejects_invalid_bom_version(version):
+    document = _document([])
+    document["version"] = version
+
+    with pytest.raises(ValueError, match="BOM version must be a positive integer"):
+        parse_cyclonedx_document(document)
+
+
+def test_parser_rejects_invalid_component_bom_ref():
+    document = _document([{**_component(), "bom-ref": " " * 3}])
+
+    with pytest.raises(ValueError, match="invalid bom-ref"):
+        parse_cyclonedx_document(document)
+
+
+def test_parser_keeps_bom_metadata_optional_for_legacy_documents():
+    parsed = parse_cyclonedx_document(_document([_component()]))
+
+    assert parsed["serial_number"] is None
+    assert parsed["version"] == 1
+    assert parsed["version_explicit"] is False
+    assert parsed["metadata_component"] is None
+    assert parsed["components"][0]["bom_ref"] is None
+
+
+def test_parser_rejects_metadata_component_without_required_identity():
+    document = _document([])
+    document["metadata"] = {
+        "component": {
+            "type": "application",
+            "bom-ref": "product-ref",
+        }
+    }
+
+    with pytest.raises(ValueError, match="requires a valid type and name"):
+        parse_cyclonedx_document(document)
+
+
+def test_parser_rejects_metadata_component_purl_version_mismatch():
+    document = _document([])
+    document["metadata"] = {
+        "component": {
+            "type": "application",
+            "bom-ref": "product-ref",
+            "name": "Sensor X",
+            "version": "1.2.3",
+            "purl": "pkg:generic/sensor-x@9.9.9",
+        }
+    }
+
+    with pytest.raises(ValueError, match="purl/version mismatch"):
+        parse_cyclonedx_document(document)

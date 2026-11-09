@@ -47,12 +47,13 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Persist accepted CycloneDX JSON 1.5 SBOM imports with format, spec version, source, timestamp, SHA-256 digest and parser version.
 - [x] Persist component occurrences and link them to a specific product release and SBOM import.
 - [x] Preserve source component name/version values and supported PURLs without inventing identifiers.
+- [x] Preserve CycloneDX serialNumber, BOM version, metadata.component identity and supplied top-level component bom-ref values for future VEX linkage. See [DEC-011](decisions/DEC-011-cyclonedx-reference-preservation.md).
 - [x] Add duplicate detection and idempotent re-import behavior for the same release, format and content digest.
 - [x] Link synthetic vulnerability findings to exact component occurrences.
 - [x] Compare accepted SBOM imports and explain additions, removals and matched-component changes using PURL identity that excludes only the version segment while preserving qualifiers and subpath; report ambiguous and unidentified occurrences without speculative matching.
 - [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
 
-**Implementation under review:** PR #45 adds append-only assessment runs and findings for an accepted SBOM import, reuses the bounded local/OSV scanner, records enrichment coverage, and persists the run with its audit event after external I/O. It is not complete until review, CI/CodeQL, merge and release documentation are finished.
+**Implemented:** PR #45 added append-only assessment runs and findings for accepted SBOM imports, reuses the bounded local/OSV scanner, records enrichment coverage, and persists each run with its audit event after external I/O.
 - [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
 **Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped synthetic findings. It now includes read-only comparison of accepted imports for the same release. Duplicate identities and components without usable PURLs remain unresolved. Comparison does not re-evaluate vulnerability intelligence.
@@ -63,10 +64,11 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Goal:** provide explainable product-version impact assessments, not automatic compliance conclusions.
 
-- [ ] Add CISA KEV enrichment with source, retrieval timestamp and catalog metadata.
-- [ ] Add FIRST EPSS enrichment with score, model/date metadata and retrieval timestamp.
-- [ ] Preserve feed provenance, freshness and lookup failures; missing intelligence must not mean no risk.
-- [ ] Match findings against product/component versions with ecosystem-aware semantics and explicit uncertainty.
+- [x] Add CISA KEV enrichment with source, retrieval timestamp and catalog metadata. See implemented [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
+- [x] Add FIRST EPSS enrichment with score, model/date metadata and retrieval timestamp. See implemented [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
+- [x] Preserve feed provenance, freshness and lookup failures; missing intelligence must not mean no risk.
+- [x] Preserve source-aware applicability evidence for OSV package/version matches and synthetic demo candidates, with explicit uncertainty. See [DEC-010](decisions/DEC-010-source-aware-applicability.md) and PR #53.
+- [ ] Expand ecosystem-specific version semantics, vendor backport handling and source/binary package relationships beyond OSV provider matching.
 - [ ] Add human-reviewed affected/not-affected decisions with evidence and rationale.
 - [ ] Implement CycloneDX VEX export only after product/version/component relationships and review controls exist.
 - [ ] Map internal workflow states explicitly to the selected VEX vocabulary; never equate operational triage states directly with VEX statements.
@@ -90,20 +92,28 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Exit criteria:** CLI and API produce consistent assessments; pipeline results distinguish policy findings from assessment/runtime errors and incomplete intelligence.
 
-## Milestone 6 — Identity, governance and audit assurance (P4)
+## Milestone 6 — Identity, governance and audit assurance (P2)
 
-**Goal:** prepare for attributable multi-user and controlled customer evaluation.
+**Goal:** establish attributable API access and least-privilege operator workflows before reviewed VEX decisions or credential-exposure evidence are introduced.
 
-- [ ] Implement individual identities, credential lifecycle, revocation and scoped authorization.
+**Architecture and implementation:** [Identity and Access Governance](identity-access-governance.md) documents the implemented managed API credential foundation and its remaining boundaries. Managed mode is opt-in; legacy shared-key mode remains the backwards-compatible default.
+
+- [x] Add operator/service principals and independently revocable API credentials with bounded expiry.
+- [x] Store only keyed HMAC-SHA256 verifiers for high-entropy machine tokens using an external pepper; show raw tokens once through the offline CLI.
+- [x] Enforce explicit route-level scopes and fail closed when a protected route has no policy.
+- [x] Add offline principal creation, credential issuance/rotation/revocation and principal disablement.
+- [x] Attribute managed API requests to stable principal IDs while preserving historical audit hashes and actor values.
+- [ ] Migrate deployments from legacy shared-key mode to managed mode using documented client/deployment evidence.
+- [ ] Add human identity proof, MFA/SSO only when operator/customer requirements justify it.
 - [ ] Add RBAC and tenant isolation before multi-customer operation.
-- [ ] Record actor identity, decision, rationale and evidence references for every security decision.
+- [ ] Record actor identity, decision, rationale and evidence references for every reviewed security decision.
 - [ ] Add a durable audit checkpoint design with protected signing keys and independently stored checkpoints. Transactional writer serialization does not replace this independent trust boundary.
 - [x] Serialize concurrent audit-chain updates and test tampering, deletion and transaction rollback scenarios.
 - [ ] Define retention, backup/restore, operational monitoring, rate limits and deployment hardening.
 - [ ] Create an exportable Product Security File as a product concept, with clear provenance and limitations.
 - [ ] Prepare reviewed CRA reporting data only where a manufacturer has established the applicable reporting condition and authorised the action.
 
-**Exit criteria:** no shared credential for multi-user operation; decisions are attributable; audit checkpoints have an independent trust boundary; tenant isolation and operational recovery are tested.
+**Exit criteria:** managed credentials are individually revocable and scoped; mutating managed API actions are attributable; historical audit hashes remain valid; legacy shared-key mode is retired before multi-user operation; tenant isolation and operational recovery are tested before multi-customer use.
 
 ## Parallel product discovery
 

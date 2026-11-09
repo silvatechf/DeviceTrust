@@ -129,12 +129,14 @@ class SBOMImport(Base):
     status: Mapped[str] = mapped_column(String(16), default="accepted")
     component_count: Mapped[int] = mapped_column(Integer)
     validation_summary: Mapped[dict] = mapped_column(JSON, default=dict)
+    bom_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class SBOMComponent(Base):
     __tablename__ = "sbom_components"
     __table_args__ = (
         UniqueConstraint("sbom_import_id", "ordinal", name="uq_sbom_component_import_ordinal"),
+        UniqueConstraint("sbom_import_id", "bom_ref", name="uq_sbom_component_import_bom_ref"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -143,6 +145,7 @@ class SBOMComponent(Base):
     name: Mapped[str] = mapped_column(String(200))
     version: Mapped[str] = mapped_column(String(100))
     purl: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    bom_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class ProductFinding(Base):
@@ -212,3 +215,37 @@ class SBOMAssessmentFinding(Base):
     severity: Mapped[str] = mapped_column(String(20))
     fixed_in: Mapped[str | None] = mapped_column(String(100), nullable=True)
     source: Mapped[str] = mapped_column(String(20))
+    intelligence: Mapped[dict] = mapped_column(JSON, default=dict)
+    applicability: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class Principal(Base):
+    __tablename__ = "principals"
+    __table_args__ = (
+        CheckConstraint("kind IN ('operator', 'service')", name="ck_principal_kind"),
+        CheckConstraint("status IN ('active', 'disabled')", name="ck_principal_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class APICredential(Base):
+    __tablename__ = "api_credentials"
+    __table_args__ = (
+        UniqueConstraint("prefix", name="uq_api_credential_prefix"),
+        UniqueConstraint("token_digest", name="uq_api_credential_token_digest"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    principal_id: Mapped[str] = mapped_column(ForeignKey("principals.id"), nullable=False, index=True)
+    prefix: Mapped[str] = mapped_column(String(12), nullable=False)
+    token_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    scopes: Mapped[list] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

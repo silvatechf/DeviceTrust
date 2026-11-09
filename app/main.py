@@ -8,10 +8,10 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import or_, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import audit, posture, product_sbom, sbom
+from . import audit, identity, posture, product_sbom, sbom
 from .db import (
     AuditEntry,
     Device,
@@ -70,13 +70,38 @@ def get_db():
         yield db
 
 
-def auth(x_api_key: str = Header(default="")) -> str:
-    expected = os.getenv("DEVICETRUST_API_KEY")
-    if not expected:
-        raise HTTPException(503, "API key not configured")
-    if not hmac.compare_digest(x_api_key.encode(), expected.encode()):
-        raise HTTPException(401, "Invalid API key")
-    return "api-key"
+def auth(request: Request, x_api_key: str = Header(default="", alias="X-API-Key")) -> str:
+    mode = os.getenv("DEVICETRUST_AUTH_MODE", "legacy").strip().lower()
+    required = identity.required_scopes(request.method, request.url.path)
+    if required is None:
+        raise HTTPException(403, "No authorization policy is defined for this route")
+
+    if mode == "legacy":
+        expected = os.getenv("DEVICETRUST_API_KEY")
+        if not expected:
+            raise HTTPException(503, "Legacy API key is not configured")
+        if not hmac.compare_digest(x_api_key.encode(), expected.encode()):
+            raise HTTPException(401, "Invalid API credential")
+        return "api-key"
+
+    if mode != "managed":
+        raise HTTPException(503, "Unsupported authentication mode")
+    if not x_api_key:
+        raise HTTPException(401, "Missing API credential")
+
+    try:
+        with SessionLocal() as db:
+            principal = identity.authenticate(db, x_api_key)
+    except identity.IdentityConfigurationError:
+        raise HTTPException(503, "Managed authentication configuration is unavailable") from None
+    except SQLAlchemyError:
+        raise HTTPException(503, "Managed authentication is unavailable") from None
+
+    if principal is None:
+        raise HTTPException(401, "Invalid API credential")
+    if not required.issubset(principal.scopes):
+        raise HTTPException(403, "Insufficient API credential scope")
+    return f"principal:{principal.principal_id}"
 
 
 def get_write_db(_: str = Depends(auth)):
@@ -206,7 +231,7 @@ async def import_product_sbom(
         raise HTTPException(422, "SBOM document must be a JSON object")
 
     try:
-        imported, created = await product_sbom.import_cyclonedx(
+        imported, created, metadata_reprocessed = await product_sbom.import_cyclonedx(
             db, actor, release_id, bytes(raw), document, source_type, source_reference
         )
     except LookupError:
@@ -219,7 +244,8 @@ async def import_product_sbom(
     return {"id": imported.id, "product_release_id": imported.product_release_id, "format": imported.format,
             "spec_version": imported.spec_version, "content_sha256": imported.content_sha256,
             "status": imported.status, "component_count": imported.component_count,
-            "validation_summary": imported.validation_summary, "created": created}
+            "validation_summary": imported.validation_summary, "bom_metadata": imported.bom_metadata,
+            "created": created, "metadata_reprocessed": metadata_reprocessed}
 
 
 @app.get("/product-releases/{release_id}/sbom")
@@ -231,7 +257,8 @@ def list_product_sbom_imports(release_id: int, db: Session = Depends(get_db), _:
     return [{"id": item.id, "format": item.format, "spec_version": item.spec_version,
              "content_sha256": item.content_sha256, "imported_at": item.imported_at,
              "component_count": item.component_count, "status": item.status,
-             "validation_summary": item.validation_summary} for item in imports]
+             "validation_summary": item.validation_summary, "bom_metadata": item.bom_metadata}
+            for item in imports]
 
 
 @app.get("/product-releases/{release_id}/sbom/diff")
@@ -303,8 +330,17 @@ def list_sbom_components(import_id: int, db: Session = Depends(get_db), _: str =
         raise HTTPException(404, "SBOM import not found")
     rows = db.scalars(select(SBOMComponent).where(SBOMComponent.sbom_import_id == import_id)
                       .order_by(SBOMComponent.ordinal)).all()
-    return [{"id": row.id, "ordinal": row.ordinal, "name": row.name, "version": row.version, "purl": row.purl}
-            for row in rows]
+    return [
+        {
+            "id": row.id,
+            "ordinal": row.ordinal,
+            "name": row.name,
+            "version": row.version,
+            "purl": row.purl,
+            "bom_ref": row.bom_ref,
+        }
+        for row in rows
+    ]
 
 
 @app.get("/sbom/components/{component_id}/findings")

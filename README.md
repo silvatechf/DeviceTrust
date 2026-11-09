@@ -39,7 +39,12 @@ Implemented prototype workflows:
 6. Generate JSON/Markdown reports and verify a SHA-256-linked audit history.
 7. Persist accepted product-release SBOM imports, component occurrences and product-scoped findings through the authenticated product SBOM API.
 8. Compare accepted SBOM imports for a product release using version-independent PURL identity.
-9. Use a same-origin local operator console.
+9. Reassess stored imports through append-only, idempotent assessment runs with component-scoped findings.
+10. Optionally enrich CVE-backed assessment findings with CISA KEV and FIRST EPSS signals (implemented in PR #47, pending merge).
+11. Use a same-origin local operator console.
+12. Authenticate API clients through legacy shared-key mode or individually revocable, expiring, scoped managed tokens (implemented in PR #50, pending merge).
+13. Preserve source-aware applicability signals for versioned findings (implemented in PR #53, pending merge).
+14. Preserve original CycloneDX BOM and component references for future VEX linkage (implemented in the SBOM reference-preservation branch, pending review).
 
 Evidence observations are currently stored separately from posture inputs. Ingestion does not prove a claim, identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. The corresponding pull-request head passed CI and CodeQL before merge; no post-merge workflow run is currently recorded for the merge commit. PostgreSQL integration and API-flow tests are included in the automated test suite, while a clean local Compose walkthrough remains part of the release gate.
 
@@ -62,16 +67,18 @@ The import digest is calculated from the exact request bytes. A repeated digest 
 
 The comparison reports additions, removals and matched-component changes. Matching excludes only the PURL version; qualifiers and subpath remain identity boundaries. Duplicate identities are marked ambiguous, and components without usable PURLs remain unidentified rather than being matched by name or ordinal. The comparison is read-only and does not re-evaluate vulnerability findings. PURL identity is a conservative heuristic, not proof of artifact or supplier equivalence.
 
-A versioned reassessment workflow is under review in [PR #45](https://github.com/silvatechf/DeviceTrust/pull/45). It introduces separate assessment runs and findings for stored imports, preserves the original SBOM evidence and legacy findings, and exposes authenticated history. Treat this workflow as proposed until the pull request is merged and its checks pass.
+Versioned reassessment history was merged through [PR #45](https://github.com/silvatechf/DeviceTrust/pull/45). It appends assessment runs and component-scoped findings without mutating the imported SBOM or legacy triage records. Requests require an idempotency key; a new key deliberately creates a new historical run.
 
-The product SBOM persistence API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). Comparison is implemented in the current prototype; see the PR history and test matrix for exact validation evidence. Neither workflow makes DeviceTrust a production-ready service.
+Optional CISA KEV and FIRST EPSS enrichment is implemented in [PR #47](https://github.com/silvatechf/DeviceTrust/pull/47). Provider observations are stored in the assessment snapshot with explicit coverage states and source/date provenance. These CVE-level signals do not establish product impact or produce VEX/CRA decisions. PR #53 adds separate source-aware applicability evidence for versioned findings; neither provider observations nor applicability signals constitute a reviewed VEX decision.
+
+The product SBOM persistence API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). Comparison and versioned reassessment are implemented in the current prototype; see the PR history and test matrix for exact validation evidence. None of these workflows makes DeviceTrust a production-ready service.
 
 ## What is not implemented
 
 - Product-to-device relationship inference.
 - SPDX ingestion or CycloneDX VEX generation.
-- KEV/EPSS enrichment and contextual product-version assessment.
-- Individual operator accounts, RBAC, tenant isolation or production browser sessions.
+- Human-reviewed affected/not-affected decisions, VEX generation and vendor-specific backport analysis. Source-aware applicability is implemented in PR #53; original BOM reference preservation is being introduced separately. Neither is a reviewed VEX statement.
+- Human login, MFA, SSO, tenant isolation and web-based credential administration. Managed API principals and route scopes are implemented in the identity implementation branch; offline CLI administration is required.
 - Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
 - Active LAN discovery, packet capture, device agents or independent firmware/hardware attestation.
 - Immutable/WORM audit storage, external audit checkpoints or independent audit anchoring.
@@ -86,17 +93,18 @@ DeviceTrust is a **modular monolith**, not a set of microservices. FastAPI handl
 ```mermaid
 flowchart LR
     CLIENT[API client / local console] --> API[FastAPI]
-    API --> AUTH[Shared API key]
-    AUTH --> ROUTES[Route handlers]
+    API --> AUTH[Legacy key or managed scoped token]
+    AUTH --> ROUTES[Route handlers + scope enforcement]
     ROUTES --> POSTURE[Posture service]
     ROUTES --> EVIDENCE[Evidence + normalizer]
-    ROUTES --> SBOM[SBOM + advisory lookup]
+    ROUTES --> SBOM[SBOM import + reassessment]
+    SBOM --> INTEL[Local advisories / OSV / KEV / EPSS]
     ROUTES --> TRIAGE[Vulnerability triage]
     ROUTES --> REPORT[Reports]
     ROUTES --> AUDIT[Audit service]
-    POSTURE --> DB[(SQLAlchemy / SQLite or PostgreSQL)]
+    INTEL --> DB[(SQLAlchemy / SQLite or PostgreSQL)]
+    POSTURE --> DB
     EVIDENCE --> DB
-    SBOM --> DB
     TRIAGE --> DB
     AUDIT --> DB
 ```
@@ -137,7 +145,17 @@ Schema changes are managed through Alembic. The application does not create or m
 - Operator console: http://127.0.0.1:8000/
 - Interactive API documentation: http://127.0.0.1:8000/docs
 
-The console receives the shared API key in browser memory. Use it only with a trusted local instance. Do not expose the service or key to the public internet.
+The console keeps the supplied API credential in page memory only. The default local authentication mode is legacy; managed mode accepts individually revocable scoped tokens. Use the console only with a trusted local instance and do not expose this prototype to the public internet.
+
+#### Optional managed API credentials
+
+After applying migrations, generate a 32-byte random verifier pepper (`python -c "import secrets; print(secrets.token_hex(32))"`), store it as `DEVICETRUST_CREDENTIAL_PEPPER` for both the API and CLI, create an operator credential through the offline CLI, and set `DEVICETRUST_AUTH_MODE=managed` in the API process:
+
+```bash
+python -m app.identity_cli create-principal --name "Local operator" --kind operator --scope inventory:read --scope inventory:write --scope evidence:read --scope evidence:write --scope sbom:read --scope sbom:write --scope assessment:read --scope assessment:write --scope audit:read
+```
+
+The token is displayed once and is accepted through the existing `X-API-Key` header. The pepper must be kept outside the database and shared by all API instances. Additional credentials can be issued for an existing principal before revoking an older token. Managed mode ignores `DEVICETRUST_API_KEY`; it never falls back to the shared key. See [Identity and Access Governance](docs/identity-access-governance.md) for rotation, revocation, disablement and the complete scope list.
 
 ### 3. Load synthetic demo data (optional)
 
