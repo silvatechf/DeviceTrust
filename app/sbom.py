@@ -111,7 +111,7 @@ def scan_local(
     return hits
 
 
-def _osv_query_purl(purl: str) -> str:
+def normalize_osv_query_purl(purl: str) -> str:
     """Return an unversioned PURL for OSV's separate top-level version field."""
     parsed = PackageURL.from_string(purl)
     return PackageURL(
@@ -153,7 +153,7 @@ def scan_osv_with_status(
             skipped_no_purl += 1
             continue
         try:
-            query_purl = _osv_query_purl(purl)
+            query_purl = normalize_osv_query_purl(purl)
         except (TypeError, ValueError):
             skipped_invalid_purl += 1
             continue
@@ -281,7 +281,7 @@ async def scan_osv_with_status_async(
                     skipped_no_purl += 1
                     continue
                 try:
-                    query_purl = _osv_query_purl(purl)
+                    query_purl = normalize_osv_query_purl(purl)
                 except (TypeError, ValueError):
                     skipped_invalid_purl += 1
                     continue
