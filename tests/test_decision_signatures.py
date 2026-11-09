@@ -143,11 +143,7 @@ def test_revoked_key_remains_verifiable_but_is_not_trusted_for_new_signatures(cl
     private_key, public_pem = _keypair()
     key_id, _ = _register(principal_id, public_pem)
 
-    with SessionLocal() as db:
-        decision = db.get(VulnerabilityDecision, decision_id)
-        signature = base64.b64encode(
-            private_key.sign(decision_signatures.signing_envelope(decision))
-        ).decode("ascii")
+    signature = _signature_for(client, token, decision_id, key_id, private_key)
 
     signed = client.post(
         f"/sbom/decisions/{decision_id}/signature",
@@ -173,11 +169,7 @@ def test_signature_rejects_wrong_key_payload_and_cross_principal_key(client, mon
     private_key, public_pem = _keypair()
     key_id, _ = _register(other_principal_id, public_pem)
 
-    with SessionLocal() as db:
-        decision = db.get(VulnerabilityDecision, decision_id)
-        signature = base64.b64encode(
-            private_key.sign(decision_signatures.signing_envelope(decision))
-        ).decode("ascii")
+    signature = base64.b64encode(b"x" * 64).decode("ascii")
 
     response = client.post(
         f"/sbom/decisions/{decision_id}/signature",
