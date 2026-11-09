@@ -95,6 +95,13 @@ def test_ed25519_signature_is_verified_and_persisted(client, monkeypatch):
     )
     assert response.status_code == 201, response.text
     result = response.json()
+    retry = client.post(
+        f"/sbom/decisions/{decision_id}/signature",
+        headers={"X-API-Key": token},
+        json={"key_id": key_id, "signature": signature},
+    )
+    assert retry.status_code == 200
+    assert retry.json()["id"] == result["id"]
     assert result["decision_id"] == decision_id
     assert result["key_fingerprint"] == fingerprint
     assert result["algorithm"] == "Ed25519"
