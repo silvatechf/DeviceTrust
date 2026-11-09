@@ -226,7 +226,12 @@ def sign_decision(
     except (InvalidSignature, TypeError):
         raise ValueError("detached signature does not match the decision envelope") from None
 
-    existing = db.scalar(select(SignedDecision).where(SignedDecision.decision_id == decision_id))
+    existing = db.scalar(
+        select(SignedDecision).where(
+            SignedDecision.decision_id == decision_id,
+            SignedDecision.signing_key_id == key_id,
+        )
+    )
     if existing is not None:
         if (
             existing.signing_key_id == key_id
@@ -281,47 +286,71 @@ def _signature_dict(item: SignedDecision, key: SigningKey) -> dict:
 
 
 def get_decision_signature(db: Session, decision_id: int) -> dict | None:
-    item = db.scalar(select(SignedDecision).where(SignedDecision.decision_id == decision_id))
-    if item is None:
+    items = db.scalars(
+        select(SignedDecision)
+        .where(SignedDecision.decision_id == decision_id)
+        .order_by(SignedDecision.id)
+    ).all()
+    if not items:
         return None
-    key = db.get(SigningKey, item.signing_key_id)
     decision = db.get(VulnerabilityDecision, decision_id)
-    if key is None or decision is None:
-        return {
-            "id": item.id,
-            "decision_id": item.decision_id,
-            "key_id": item.signing_key_id,
-            "envelope_version": item.envelope_version,
-            "envelope_sha256": item.envelope_sha256,
-            "signature": item.signature_b64,
-            "verified_at": item.verified_at,
-            "signature_valid": False,
-            "trust_valid": False,
-            "current_key_status": "missing",
-        }
+    signatures = []
+    for item in items:
+        key = db.get(SigningKey, item.signing_key_id)
+        if key is None or decision is None:
+            signatures.append(
+                {
+                    "id": item.id,
+                    "decision_id": item.decision_id,
+                    "key_id": item.signing_key_id,
+                    "envelope_version": item.envelope_version,
+                    "envelope_sha256": item.envelope_sha256,
+                    "signature": item.signature_b64,
+                    "verified_at": item.verified_at,
+                    "signature_valid": False,
+                    "trust_valid": False,
+                    "current_key_status": "missing",
+                }
+            )
+            continue
 
-    current_envelope = signing_envelope(decision)
-    current_digest = hashlib.sha256(current_envelope).hexdigest()
-    signature_valid = current_digest == item.envelope_sha256
-    if signature_valid:
-        try:
-            signature = _decode_signature(item.signature_b64)
-            public_key = _registered_public_key(key)
-            public_key.verify(signature, current_envelope)
-        except (ValueError, InvalidSignature, TypeError):
-            signature_valid = False
+        current_envelope = signing_envelope(decision)
+        current_digest = hashlib.sha256(current_envelope).hexdigest()
+        signature_valid = current_digest == item.envelope_sha256
+        if signature_valid:
+            try:
+                signature = _decode_signature(item.signature_b64)
+                public_key = _registered_public_key(key)
+                public_key.verify(signature, current_envelope)
+            except (ValueError, InvalidSignature, TypeError):
+                signature_valid = False
 
-    key_status = "revoked" if key.revoked_at else "active"
-    if key.expires_at is not None:
-        expiry = key.expires_at
-        if expiry.tzinfo is None:
-            expiry = expiry.replace(tzinfo=timezone.utc)
-        if expiry <= utcnow():
-            key_status = "expired"
+        key_status = "revoked" if key.revoked_at else "active"
+        if key.expires_at is not None:
+            expiry = key.expires_at
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            if expiry <= utcnow():
+                key_status = "expired"
+        principal = db.get(Principal, key.principal_id)
+        principal_status = (
+            "active"
+            if principal is not None and principal.status == "active" and principal.kind == "operator"
+            else "disabled_or_invalid"
+        )
+        signatures.append(
+            {
+                **_signature_dict(item, key),
+                "signature_valid": signature_valid,
+                "trust_valid": signature_valid and key_status == "active" and principal_status == "active",
+                "current_key_status": key_status,
+                "current_principal_status": principal_status,
+            }
+        )
 
     return {
-        **_signature_dict(item, key),
-        "signature_valid": signature_valid,
-        "trust_valid": signature_valid and key_status == "active",
-        "current_key_status": key_status,
+        "decision_id": decision_id,
+        "signatures": signatures,
+        "signature_valid": any(item["signature_valid"] for item in signatures),
+        "trust_valid": any(item["trust_valid"] for item in signatures),
     }
