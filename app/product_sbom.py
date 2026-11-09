@@ -5,8 +5,8 @@ import json
 import os
 from datetime import datetime, timezone
 
-from sqlalchemy import select
 from packaging.version import InvalidVersion, Version
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -117,6 +117,9 @@ def _reprocess_existing_import_references(
             )
 
     previous_parser_version = existing.parser_version
+    bom_ref_count = sum(
+        component["bom_ref"] is not None for component in components
+    )
     existing.bom_metadata = bom_metadata
     existing.parser_version = PARSER_VERSION
     for row, component in zip(rows, components):
@@ -132,7 +135,7 @@ def _reprocess_existing_import_references(
             "previous_parser_version": previous_parser_version,
             "parser_version": PARSER_VERSION,
             "component_count": len(components),
-            "bom_ref_count": sum(component["bom_ref"] is not None for component in components),
+            "bom_ref_count": bom_ref_count,
             "serial_number_present": bom_metadata["serial_number"] is not None,
         },
     )
