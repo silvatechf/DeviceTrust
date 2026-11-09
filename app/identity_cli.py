@@ -35,6 +35,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     register_key.add_argument("--principal-id", required=True)
     register_key.add_argument("--public-key-file", required=True)
+    register_key.add_argument(
+        "--purpose",
+        choices=("decision-signing", "decision-approval"),
+        default="decision-signing",
+    )
     register_key.add_argument("--expires-in-days", type=int, default=365)
 
     revoke_key = commands.add_parser("revoke-signing-key", help="Revoke an operator signing public key.")
@@ -132,6 +137,7 @@ def main() -> None:
                     db,
                     principal_id=args.principal_id,
                     public_key_pem=public_key_pem,
+                    purpose=args.purpose,
                     expires_at=utcnow() + timedelta(days=args.expires_in_days),
                 )
             except (OSError, LookupError, PermissionError, ValueError) as exc:
