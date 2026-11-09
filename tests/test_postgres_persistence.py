@@ -213,6 +213,11 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert inspect(target_engine).has_table("principals")
         assert inspect(target_engine).has_table("api_credentials")
         assert inspect(target_engine).has_table("vulnerability_decisions")
+        decision_columns = {
+            column["name"]
+            for column in inspect(target_engine).get_columns("vulnerability_decisions")
+        }
+        assert {"request_key_hash", "request_fingerprint"}.issubset(decision_columns)
         assessment_finding_columns = {
             column["name"]: column
             for column in inspect(target_engine).get_columns(
