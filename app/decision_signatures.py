@@ -4,6 +4,7 @@ import base64
 import binascii
 import hashlib
 import hmac
+import re
 from datetime import timezone
 from uuid import uuid4
 
@@ -54,6 +55,10 @@ def signing_envelope(decision: VulnerabilityDecision) -> bytes:
 def _registered_public_key(key: SigningKey) -> Ed25519PublicKey:
     if key.algorithm != "Ed25519":
         raise ValueError("registered signing key algorithm is not supported")
+    if not isinstance(key.public_key_pem, str) or not isinstance(key.fingerprint, str):
+        raise ValueError("registered public key metadata is invalid")
+    if re.fullmatch(r"[0-9a-f]{64}", key.fingerprint) is None:
+        raise ValueError("registered public key fingerprint is invalid")
     try:
         public_key = serialization.load_pem_public_key(key.public_key_pem.encode("ascii"))
     except (ValueError, TypeError, UnsupportedAlgorithm):
