@@ -135,6 +135,12 @@ def test_scope_matrix_is_explicit_and_least_privilege():
         "GET", "/sbom/decisions/42/approval-payload"
     ) == frozenset({"assessment:approve"})
     assert identity.required_scopes(
+        "POST", "/sbom/decisions/42/evidence-manifest"
+    ) == frozenset({"assessment:review"})
+    assert identity.required_scopes(
+        "GET", "/sbom/decisions/42/evidence-manifest"
+    ) == frozenset({"assessment:read"})
+    assert identity.required_scopes(
         "POST", "/sbom/decisions/42/approval"
     ) == frozenset({"assessment:approve"})
     assert identity.required_scopes(
