@@ -307,3 +307,39 @@ class APICredential(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SigningKey(Base):
+    __tablename__ = "signing_keys"
+    __table_args__ = (
+        UniqueConstraint("fingerprint", name="uq_signing_key_fingerprint"),
+        CheckConstraint("purpose IN ('decision-signing')", name="ck_signing_key_purpose"),
+        CheckConstraint("algorithm = 'Ed25519'", name="ck_signing_key_algorithm"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    principal_id: Mapped[str] = mapped_column(ForeignKey("principals.id"), nullable=False, index=True)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    algorithm: Mapped[str] = mapped_column(String(16), nullable=False)
+    public_key_pem: Mapped[str] = mapped_column(String(512), nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SignedDecision(Base):
+    __tablename__ = "signed_decisions"
+    __table_args__ = (
+        UniqueConstraint("decision_id", name="uq_signed_decision_decision"),
+        ForeignKeyConstraint(["decision_id"], ["vulnerability_decisions.id"]),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    decision_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    signing_key_id: Mapped[str] = mapped_column(ForeignKey("signing_keys.id"), nullable=False, index=True)
+    principal_id: Mapped[str] = mapped_column(ForeignKey("principals.id"), nullable=False, index=True)
+    envelope_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    envelope_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    signature_b64: Mapped[str] = mapped_column(String(128), nullable=False)
+    verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
