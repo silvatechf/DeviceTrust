@@ -87,7 +87,8 @@ jobs:
           print(f"Gitleaks detected {len(findings)} finding(s). Secret values are intentionally omitted.")
           for finding in findings:
               print(
-                  "rule={rule} file={file} commit={commit} line={line} description={description}".format(
+                  "fingerprint={fingerprint} rule={rule} file={file} commit={commit} line={line} description={description}".format(
+                      fingerprint=finding.get("Fingerprint", "unknown"),
                       rule=finding.get("RuleID", "unknown"),
                       file=finding.get("File", "unknown"),
                       commit=finding.get("Commit", "unknown"),
