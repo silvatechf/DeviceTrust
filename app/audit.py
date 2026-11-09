@@ -12,9 +12,10 @@ GENESIS = "0" * 64
 def acquire_chain_lock(db: Session) -> None:
     """Serialize audit appends within the caller's domain transaction.
 
-    SQLite requires an IMMEDIATE transaction before any request reads. PostgreSQL
-    serializes writers by updating the singleton state row, whose row lock is held
-    until the surrounding transaction commits or rolls back.
+    SQLite takes an IMMEDIATE transaction before the first read when possible.
+    If a caller has already read, updating the singleton state row acquires the
+    writer lock in the existing transaction. PostgreSQL serializes writers through
+    the same row update, held until the surrounding transaction commits or rolls back.
     """
     transaction = db.get_transaction()
     if transaction is not None and db.info.get("audit_chain_locked_tx") is transaction:
