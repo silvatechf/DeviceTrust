@@ -413,7 +413,7 @@ def create_decision_signature(
         raise HTTPException(403, "Decision signatures require a managed operator principal")
     principal_id = actor.removeprefix("principal:")
     try:
-        result = decision_signatures.sign_decision(
+        result, created = decision_signatures.sign_decision(
             db,
             decision_id=decision_id,
             principal_id=principal_id,
@@ -421,7 +421,7 @@ def create_decision_signature(
             signature_b64=body.signature,
         )
         db.commit()
-        response.status_code = 201
+        response.status_code = 201 if created else 200
         return result
     except LookupError as error:
         db.rollback()
