@@ -10,7 +10,7 @@ from cryptography.exceptions import InvalidSignature
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import audit, decision_signatures
+from . import audit, decision_evidence, decision_signatures
 from .db import DecisionApproval, Principal, SigningKey, VulnerabilityDecision, utcnow
 
 POLICY_VERSION = "devicetrust.approval-policy.v1"
@@ -133,7 +133,14 @@ def get_approval_payload(
     if not _trusted_author_signature(db, decision_id):
         raise PermissionError("A currently trusted author signature is required before approval")
 
-    decision_digest = hashlib.sha256(decision_signatures.signing_envelope(decision)).hexdigest()
+    decision_digest = hashlib.sha256(
+        decision_signatures.signing_envelope(
+            decision,
+            evidence_manifest_sha256=decision_evidence.current_manifest_digest(
+                db, decision.id
+            ),
+        )
+    ).hexdigest()
     approved_at = utcnow()
     envelope = approval_envelope(
         decision,
