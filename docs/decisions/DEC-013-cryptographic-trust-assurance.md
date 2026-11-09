@@ -19,7 +19,7 @@ Implement trust assurance as four separate, composable controls. They must not b
 ### 1. Detached Ed25519 signatures for review decisions
 
 - Use Ed25519 detached signatures over a versioned, domain-separated signing envelope. Canonicalize the envelope with RFC 8785 JSON Canonicalization Scheme (JCS), UTF-8 bytes and the fixed binary domain prefix `DeviceTrust` + NUL + `DecisionSignature` + NUL + `v1` + NUL.
-- The envelope binds at minimum: schema/version identifier, decision ID, exact assessment finding ID, revision, predecessor decision ID, principal ID, decision state, justification, responses, evidence manifest digest and creation timestamp.
+- The current v1 envelope binds: schema/version identifier, decision ID, exact assessment finding ID, revision, predecessor decision ID, principal ID, decision state, justification, reviewer detail, evidence references, responses and creation timestamp. A later envelope version must add an evidence-manifest digest once the evidence-manifest capability exists.
 - Canonicalization uses RFC 8785 JCS and is tested for deterministic output. Do not sign arbitrary API JSON, database serialization, or a representation that can change between runtimes.
 - The server exposes the exact canonical signing bytes to the decision author, verifies submitted signatures using registered public keys and persists the signature, key ID/fingerprint, algorithm, signing-envelope version and envelope digest.
 - Private keys are generated and retained by the operator or their approved key-management system. DeviceTrust must never store private keys or expose a server-side signing endpoint.
