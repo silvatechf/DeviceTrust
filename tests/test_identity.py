@@ -1,9 +1,9 @@
-from datetime import timedelta
 import re
+from datetime import timedelta
 
 import pytest
-from sqlalchemy import select
 from fastapi.routing import APIRoute
+from sqlalchemy import select
 
 from app import identity
 from app.db import APICredential, SessionLocal, utcnow
@@ -19,7 +19,7 @@ def _issue(scopes):
             kind="service",
             scopes=set(scopes),
         )
-        principal_id = principal.id
+        principal_id = _principal.id
         credential_id = credential.id
         db.commit()
     return principal_id, credential_id, token
@@ -73,7 +73,7 @@ def test_disabled_principal_invalidates_all_credentials(client, monkeypatch):
 
 def test_expired_credential_is_rejected(client, monkeypatch):
     with SessionLocal() as db:
-        principal, credential, token = identity.create_principal(
+        _principal, credential, token = identity.create_principal(
             db,
             name="Expired principal",
             kind="operator",
@@ -89,7 +89,7 @@ def test_expired_credential_is_rejected(client, monkeypatch):
 
 def test_raw_token_is_not_persisted_and_scopes_are_allow_listed():
     with SessionLocal() as db:
-        principal, credential, token = identity.create_principal(
+        _principal, credential, token = identity.create_principal(
             db,
             name="Secret handling test",
             kind="service",
