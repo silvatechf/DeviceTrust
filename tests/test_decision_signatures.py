@@ -1,4 +1,5 @@
 import base64
+import hashlib
 from datetime import timedelta
 
 import pytest
