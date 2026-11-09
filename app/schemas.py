@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Literal
 from urllib.parse import parse_qsl, urlsplit
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -200,12 +201,13 @@ class DecisionEvidenceManifestIn(BaseModel):
     @field_validator("artifact_ids")
     @classmethod
     def artifact_ids_must_be_unique_uuids(cls, values: list[str]) -> list[str]:
-        import re
-
         if len(values) != len(set(values)):
             raise ValueError("artifact IDs must be unique")
-        if any(re.fullmatch(r"[0-9a-fA-F-]{36}", value) is None for value in values):
-            raise ValueError("artifact IDs must be UUIDs")
+        try:
+            for value in values:
+                UUID(value)
+        except ValueError:
+            raise ValueError("artifact IDs must be UUIDs") from None
         return values
 
 
