@@ -332,11 +332,10 @@ class SignedDecision(Base):
     __tablename__ = "signed_decisions"
     __table_args__ = (
         UniqueConstraint("decision_id", name="uq_signed_decision_decision"),
-        ForeignKeyConstraint(["decision_id"], ["vulnerability_decisions.id"]),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    decision_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    decision_id: Mapped[int] = mapped_column(ForeignKey("vulnerability_decisions.id"), nullable=False, index=True)
     signing_key_id: Mapped[str] = mapped_column(ForeignKey("signing_keys.id"), nullable=False, index=True)
     principal_id: Mapped[str] = mapped_column(ForeignKey("principals.id"), nullable=False, index=True)
     envelope_version: Mapped[str] = mapped_column(String(64), nullable=False)
