@@ -189,3 +189,11 @@ class VulnerabilityDecisionIn(BaseModel):
         if self.state == "resolved_with_pedigree" and not self.evidence_references:
             raise ValueError("resolved_with_pedigree requires a pedigree evidence reference")
         return self
+
+
+class DecisionSignatureIn(BaseModel):
+    """A detached Ed25519 signature; private key material is never accepted."""
+
+    model_config = ConfigDict(extra="forbid")
+    key_id: str = Field(min_length=36, max_length=36)
+    signature: str = Field(pattern=r"^[A-Za-z0-9+/]{86}==$")

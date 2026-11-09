@@ -21,6 +21,8 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
         assert inspect(engine).has_table("principals")
         assert inspect(engine).has_table("api_credentials")
         assert inspect(engine).has_table("vulnerability_decisions")
+        assert inspect(engine).has_table("signing_keys")
+        assert inspect(engine).has_table("signed_decisions")
         decision_columns = {
             column["name"]: column
             for column in inspect(engine).get_columns("vulnerability_decisions")
@@ -68,8 +70,12 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip(tmp_path: Path, monk
 
         command.downgrade(config, "0008_sbom_reference_preservation")
         assert not inspect(engine).has_table("vulnerability_decisions")
+        assert not inspect(engine).has_table("signing_keys")
+        assert not inspect(engine).has_table("signed_decisions")
         command.upgrade(config, "head")
         assert inspect(engine).has_table("vulnerability_decisions")
+        assert inspect(engine).has_table("signing_keys")
+        assert inspect(engine).has_table("signed_decisions")
 
         command.downgrade(config, "0007_sbom_finding_applicability")
         assert not inspect(engine).has_table("vulnerability_decisions")

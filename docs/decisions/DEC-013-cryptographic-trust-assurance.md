@@ -1,6 +1,6 @@
 # DEC-013: Cryptographic trust, independent approval and audit anchoring
 
-- Status: Partially implemented in PR #57; Ed25519 key registry and detached decision-signature verification implemented, approval/evidence/anchoring pending
+- Status: Partially implemented in PR #58; Ed25519 key registry and detached decision-signature verification implemented, approval/evidence/anchoring pending
 - Date: 2026-11-09
 - Scope: Attributable vulnerability decisions, evidence provenance and audit integrity
 
@@ -19,7 +19,7 @@ Implement trust assurance as four separate, composable controls. They must not b
 ### 1. Detached Ed25519 signatures for review decisions
 
 - Use Ed25519 detached signatures over a versioned, domain-separated signing envelope. Canonicalize the envelope with RFC 8785 JSON Canonicalization Scheme (JCS), UTF-8 bytes and the fixed binary domain prefix `DeviceTrust` + NUL + `DecisionSignature` + NUL + `v1` + NUL.
-- The envelope binds at minimum: schema/version identifier, decision ID, exact assessment finding ID, revision, predecessor decision ID, principal ID, decision state, justification, responses, evidence manifest digest and creation timestamp.
+- The current v1 envelope binds: schema/version identifier, decision ID, exact assessment finding ID, revision, predecessor decision ID, principal ID, decision state, justification, reviewer detail, evidence references, responses and creation timestamp. A later envelope version must add an evidence-manifest digest once the evidence-manifest capability exists.
 - Canonicalization uses RFC 8785 JCS and is tested for deterministic output. Do not sign arbitrary API JSON, database serialization, or a representation that can change between runtimes.
 - The server exposes the exact canonical signing bytes to the decision author, verifies submitted signatures using registered public keys and persists the signature, key ID/fingerprint, algorithm, signing-envelope version and envelope digest.
 - Private keys are generated and retained by the operator or their approved key-management system. DeviceTrust must never store private keys or expose a server-side signing endpoint.
@@ -65,8 +65,8 @@ Implement trust assurance as four separate, composable controls. They must not b
 
 ## Rollout sequence
 
-1. **Signature foundation (implemented in PR #57):** canonical domain-separated envelope, Ed25519 verification, operator-bound public-key registry, offline registration/revocation and signature re-verification. The implementation uses `cryptography` and keeps private keys outside DeviceTrust. RFC 8785 canonicalization is used by the implementation; independent cross-language test vectors and a formal key-custody runbook remain follow-up work.
-2. **Decision signing (initial implementation in PR #57):** an author can attach one verified detached signature to an immutable decision revision; historical unsigned records remain explicitly unsigned. Making a signature mandatory for every new decision is not yet enforced.
+1. **Signature foundation (implemented in PR #58):** canonical domain-separated envelope, Ed25519 verification, operator-bound public-key registry, offline registration/revocation and signature re-verification. The implementation uses `cryptography` and keeps private keys outside DeviceTrust. RFC 8785 canonicalization is used by the implementation; independent cross-language test vectors and a formal key-custody runbook remain follow-up work.
+2. **Decision signing (initial implementation in PR #58):** an author can attach one verified detached signature to an immutable decision revision; historical unsigned records remain explicitly unsigned. Making a signature mandatory for every new decision is not yet enforced.
 3. **Second-person approval:** separate approver identity and signature; export eligibility bound to the exact current revision and policy.
 4. **Evidence verification:** bounded artifact manifest and digest/signature verification with separate trust states.
 5. **Audit anchoring:** signed checkpoint format, independent verifier, then one explicitly supported external immutable-storage integration.

@@ -7,3 +7,5 @@ httpx>=0.27
 packaging>=24.0
 psycopg[binary]>=3.2
 packageurl-python>=0.16
+cryptography>=44.0.1
+rfc8785>=0.1.4

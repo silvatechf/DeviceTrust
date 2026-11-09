@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented prototype capability in PR #50; pending merge. Managed authentication is opt-in through DEVICETRUST_AUTH_MODE=managed; the backwards-compatible default remains legacy. This is not a production identity provider or a multi-tenant access system.
+Implemented prototype capability; PR #50 was merged into main. Managed authentication is opt-in through DEVICETRUST_AUTH_MODE=managed; the backwards-compatible default remains legacy. This is not a production identity provider or a multi-tenant access system.
 
 ## Principal and credential model
 
@@ -38,11 +38,11 @@ The route-to-scope policy is explicit in app/identity.py. A protected route with
 - inventory:read, inventory:write
 - evidence:read, evidence:write
 - sbom:read, sbom:write
-- assessment:read, assessment:write, assessment:review
+- assessment:read, assessment:write, assessment:review, assessment:sign
 - audit:read
 - credentials:manage (reserved for future API-based credential administration)
 
-Reports require inventory:read, assessment:read and audit:read. Human review routes require the dedicated assessment:review scope and an active operator principal; service principals and legacy shared-key actors are rejected. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
+Decision-signature submission requires the separate assessment:sign scope and the same active operator principal that authored the decision. The signing key must be registered to that principal and use the decision-signing purpose. Signature reads require assessment:read. Reports require inventory:read, assessment:read and audit:read. Human review routes require the dedicated assessment:review scope and an active operator principal; service principals and legacy shared-key actors are rejected. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
 
 ## Offline administration
 
@@ -58,9 +58,14 @@ Create a principal and credential. Repeat --scope for each allowed scope:
 
 The command prints the raw token once. Store it in an approved secret manager or local secret store; do not commit it or place it in shell history. To issue a separate reviewer credential to an existing operator, grant the review scope explicitly:
 
-    python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope assessment:read --scope assessment:review
+    python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope assessment:read --scope assessment:review --scope assessment:sign
 
-Only active operator principals can create human review decisions; service principals and legacy shared-key requests are rejected. The CLI also supports:
+Only active operator principals can create human review decisions; service principals and legacy shared-key requests are rejected. The CLI also supports offline Ed25519 public-key registration and revocation. Supply a PEM public key file only; private keys must never be passed to DeviceTrust:
+
+    python -m app.identity_cli register-signing-key --principal-id PRINCIPAL_UUID --public-key-file operator-ed25519-public.pem --expires-in-days 365
+    python -m app.identity_cli revoke-signing-key --key-id SIGNING_KEY_UUID
+
+The CLI also supports:
 
     python -m app.identity_cli issue-credential --principal-id PRINCIPAL_UUID --scope inventory:read --scope audit:read
     python -m app.identity_cli revoke-credential --credential-id CREDENTIAL_UUID
@@ -69,6 +74,30 @@ Only active operator principals can create human review decisions; service princ
 Principal creation, credential issuance/revocation and principal disablement append audit events in the same database transaction as the identity change. The actor for offline administration is the fixed value offline-admin; it does not prove the OS user's identity.
 
 For managed mode, configure DEVICETRUST_AUTH_MODE=managed in the API process and submit the generated token using X-API-Key. The console keeps the token in page memory only.
+
+## Detached decision-signature workflow
+
+1. Generate an encrypted Ed25519 private key and public key on the operator-controlled workstation. For example, OpenSSL prompts for a private-key passphrase:
+   
+       openssl genpkey -algorithm ED25519 -aes-256-cbc -out operator-ed25519-private.pem
+       openssl pkey -in operator-ed25519-private.pem -pubout -out operator-ed25519-public.pem
+
+   Keep the private key outside DeviceTrust and register only the PEM public key with the offline CLI. Protect and back up the private key using the organization's approved key-custody process.
+2. Retrieve the exact canonical signing bytes from GET /sbom/decisions/{decision_id}/signing-payload?key_id=... using a managed credential with assessment:sign. Only the decision author can retrieve this payload. The response contains signing_payload_base64.
+3. Decode and sign the payload locally. Example shell workflow:
+
+       curl --fail --silent --show-error -H "X-API-Key: $DTK" --get --data-urlencode "key_id=$KEY_ID" "$DEVICETRUST_URL/sbom/decisions/$DECISION_ID/signing-payload" -o signing-payload.json
+       python -c "import base64,json; p=json.load(open('signing-payload.json', encoding='utf-8')); open('decision-envelope.bin','wb').write(base64.b64decode(p['signing_payload_base64'], validate=True))"
+       openssl pkeyutl -sign -rawin -inkey operator-ed25519-private.pem -in decision-envelope.bin -out decision-signature.bin
+       SIGNATURE=$(python -c "import base64; print(base64.b64encode(open('decision-signature.bin','rb').read()).decode('ascii'))")
+
+   DeviceTrust never receives the private key.
+4. Submit the Base64 detached signature and key ID to POST /sbom/decisions/{decision_id}/signature. The request body contains only key_id and signature; never submit a private key.
+5. Read GET /sbom/decisions/{decision_id}/signature to re-verify the stored signature against the current decision bytes. The response exposes the append-only signature history, each public key and the current canonical signing payload for independent verification. The top-level signature_valid and trust_valid fields summarize whether any recorded signature is cryptographically valid and currently trusted; each item also reports its key and principal status.
+
+The signed envelope uses RFC 8785 JCS, UTF-8 and a domain separator. It binds the exact decision revision, reviewer principal, finding, state, rationale, evidence references, responses and timestamp. The signature endpoint is idempotent for an identical signature from the same key. Each key can sign a decision once; a rotated key can add another immutable signature without deleting historical signatures. A new decision revision is a separate unsigned record and must be signed separately.
+
+The API token authenticates the request; the detached signature proves possession of the registered private key. Neither is legal identity proof or manufacturer authority.
 
 ## Audit attribution and data handling
 
@@ -90,4 +119,5 @@ CI must pass SQLite migration/tests and PostgreSQL migration/persistence tests b
 - No human password, MFA, SSO/OIDC, session management, tenant isolation or customer-facing role hierarchy.
 - No last-used tracking; adding per-request writes would create avoidable contention on the current audit/database transaction path.
 - API tokens identify a configured principal, not a legally verified human.
+- Ed25519 signatures prove possession of a registered private key over the canonical decision envelope, not civil identity, manufacturer authority or claim truth. Key revocation changes current trust status but does not erase historical cryptographic verifiability.
 - Audit hash chaining remains tamper-evident, not immutable; independent external checkpoints are not implemented.
