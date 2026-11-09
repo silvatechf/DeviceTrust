@@ -1,6 +1,6 @@
 # DEC-010: Source-aware product-component applicability signals
 
-- Status: Implemented prototype in the product applicability branch; pending review and merge
+- Status: Implemented prototype in PR #53; pending merge
 - Date: 2026-11-09
 - Scope: Versioned product SBOM assessment findings
 
