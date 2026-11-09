@@ -294,6 +294,8 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
     if not items:
         return None
     decision = db.get(VulnerabilityDecision, decision_id)
+    current_envelope = signing_envelope(decision) if decision is not None else None
+    current_digest = hashlib.sha256(current_envelope).hexdigest() if current_envelope is not None else None
     signatures = []
     for item in items:
         key = db.get(SigningKey, item.signing_key_id)
@@ -314,8 +316,6 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
             )
             continue
 
-        current_envelope = signing_envelope(decision)
-        current_digest = hashlib.sha256(current_envelope).hexdigest()
         signature_valid = current_digest == item.envelope_sha256
         if signature_valid:
             try:
@@ -351,6 +351,12 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
     return {
         "decision_id": decision_id,
         "signatures": signatures,
+        "current_envelope_sha256": current_digest,
+        "signing_payload_base64": (
+            base64.b64encode(current_envelope).decode("ascii")
+            if current_envelope is not None
+            else None
+        ),
         "signature_valid": any(item["signature_valid"] for item in signatures),
         "trust_valid": any(item["trust_valid"] for item in signatures),
     }
