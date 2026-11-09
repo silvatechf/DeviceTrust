@@ -184,3 +184,13 @@ def test_disabled_principal_cannot_receive_a_new_credential():
                 principal_id=principal_id,
                 scopes={"inventory:read"},
             )
+
+
+def test_managed_auth_fails_closed_without_credential_pepper(client, monkeypatch):
+    _, _, token = _issue({"inventory:read"})
+    monkeypatch.setenv("DEVICETRUST_AUTH_MODE", "managed")
+    monkeypatch.delenv("DEVICETRUST_CREDENTIAL_PEPPER", raising=False)
+
+    response = client.get("/devices", headers={"X-API-Key": token})
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Managed authentication configuration is unavailable"
