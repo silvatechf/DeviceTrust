@@ -231,7 +231,7 @@ def test_manifest_artifact_tampering_invalidates_manifest_and_signing_payload(cl
         json={"artifact_ids": [artifact_id]},
     )
     assert created.status_code == 201
-    private_key, public_pem = _keypair()
+    _private_key, public_pem = _keypair()
     key_id, _ = _register(principal_id, public_pem)
 
     with SessionLocal() as db:
