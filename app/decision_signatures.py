@@ -32,10 +32,9 @@ def _utc_iso(value):
     return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
-def signing_envelope(decision: VulnerabilityDecision) -> bytes:
-    """Return canonical, domain-separated bytes for one immutable decision."""
-    payload = {
-        "envelope_version": ENVELOPE_VERSION,
+def _decision_payload(decision: VulnerabilityDecision, envelope_version: str) -> dict:
+    return {
+        "envelope_version": envelope_version,
         "decision_id": decision.id,
         "assessment_finding_id": decision.assessment_finding_id,
         "principal_id": decision.principal_id,
@@ -48,8 +47,22 @@ def signing_envelope(decision: VulnerabilityDecision) -> bytes:
         "responses": list(decision.responses or []),
         "created_at": _utc_iso(decision.created_at),
     }
-    canonical = rfc8785.dumps(payload)
-    return DOMAIN_SEPARATOR + canonical
+
+
+def legacy_signing_envelope(decision: VulnerabilityDecision) -> bytes:
+    """Reconstruct v1 bytes solely for historical signature verification."""
+    return LEGACY_DOMAIN_SEPARATOR + rfc8785.dumps(
+        _decision_payload(decision, LEGACY_ENVELOPE_VERSION)
+    )
+
+
+def signing_envelope(
+    decision: VulnerabilityDecision, *, evidence_manifest_sha256: str | None = None
+) -> bytes:
+    """Return v2 canonical bytes binding the exact evidence-manifest digest."""
+    payload = _decision_payload(decision, ENVELOPE_VERSION)
+    payload["evidence_manifest_sha256"] = evidence_manifest_sha256
+    return DOMAIN_SEPARATOR + rfc8785.dumps(payload)
 
 
 def _registered_public_key(key: SigningKey) -> Ed25519PublicKey:
@@ -192,7 +205,10 @@ def get_signing_payload(db: Session, *, decision_id: int, principal_id: str, key
     if principal is None or principal.status != "active" or principal.kind != "operator":
         raise PermissionError("An active operator principal is required")
     _registered_public_key(key)
-    envelope = signing_envelope(decision)
+    manifest_digest = decision_evidence.current_manifest_digest(db, decision_id)
+    envelope = signing_envelope(
+        decision, evidence_manifest_sha256=manifest_digest
+    )
     return {
         "decision_id": decision_id,
         "key_id": key.id,
@@ -229,7 +245,10 @@ def sign_decision(
         if expiry <= utcnow():
             raise PermissionError("Signing key has expired")
     signature = _decode_signature(signature_b64)
-    envelope = signing_envelope(decision)
+    manifest_digest = decision_evidence.current_manifest_digest(db, decision_id)
+    envelope = signing_envelope(
+        decision, evidence_manifest_sha256=manifest_digest
+    )
     envelope_digest = hashlib.sha256(envelope).hexdigest()
     public_key = _registered_public_key(key)
     try:
@@ -305,8 +324,21 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
     if not items:
         return None
     decision = db.get(VulnerabilityDecision, decision_id)
-    current_envelope = signing_envelope(decision) if decision is not None else None
-    current_digest = hashlib.sha256(current_envelope).hexdigest() if current_envelope is not None else None
+    manifest_digest = (
+        decision_evidence.current_manifest_digest(db, decision_id)
+        if decision is not None
+        else None
+    )
+    current_envelope = (
+        signing_envelope(decision, evidence_manifest_sha256=manifest_digest)
+        if decision is not None
+        else None
+    )
+    current_digest = (
+        hashlib.sha256(current_envelope).hexdigest()
+        if current_envelope is not None
+        else None
+    )
     signatures = []
     for item in items:
         key = db.get(SigningKey, item.signing_key_id)
@@ -327,15 +359,26 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
             )
             continue
 
+        if item.envelope_version == LEGACY_ENVELOPE_VERSION:
+            historical_envelope = legacy_signing_envelope(decision)
+        elif item.envelope_version == ENVELOPE_VERSION:
+            historical_envelope = current_envelope
+        else:
+            historical_envelope = None
+        historical_digest = (
+            hashlib.sha256(historical_envelope).hexdigest()
+            if historical_envelope is not None
+            else None
+        )
         signature_valid = (
-            item.envelope_version == ENVELOPE_VERSION
-            and current_digest == item.envelope_sha256
+            historical_envelope is not None
+            and historical_digest == item.envelope_sha256
         )
         if signature_valid:
             try:
                 signature = _decode_signature(item.signature_b64)
                 public_key = _registered_public_key(key)
-                public_key.verify(signature, current_envelope)
+                public_key.verify(signature, historical_envelope)
             except (ValueError, InvalidSignature, TypeError):
                 signature_valid = False
 
