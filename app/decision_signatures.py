@@ -152,7 +152,7 @@ def revoke_public_key(db: Session, key_id: str) -> SigningKey:
     return item
 
 
-def get_signing_payload(db: Session, *, decision_id: int, principal_id: str, key_id: str) -> tuple[dict, bool]:
+def get_signing_payload(db: Session, *, decision_id: int, principal_id: str, key_id: str) -> dict:
     decision = db.get(VulnerabilityDecision, decision_id)
     if decision is None:
         raise LookupError("Decision not found")
@@ -189,7 +189,7 @@ def get_signing_payload(db: Session, *, decision_id: int, principal_id: str, key
 
 def sign_decision(
     db: Session, *, decision_id: int, principal_id: str, key_id: str, signature_b64: str
-) -> dict:
+) -> tuple[dict, bool]:
     decision = db.get(VulnerabilityDecision, decision_id)
     if decision is None:
         raise LookupError("Decision not found")
