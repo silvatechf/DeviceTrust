@@ -446,6 +446,7 @@ async def reassess_import(
         "osv": {
             "enabled": osv_enabled,
             "endpoint": "https://api.osv.dev/v1/query",
+            "query_contract_version": sbom.OSV_QUERY_CONTRACT_VERSION,
             "query_limit": sbom.MAX_OSV_QUERIES_PER_IMPORT,
             "deadline_seconds": sbom.OSV_ENRICHMENT_DEADLINE_SECONDS,
             "connect_timeout_seconds": sbom.OSV_CONNECT_TIMEOUT_SECONDS,
