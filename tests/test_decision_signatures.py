@@ -357,3 +357,22 @@ def test_only_ed25519_public_keys_can_be_registered():
         with pytest.raises(ValueError, match="only Ed25519"):
             decision_signatures.register_public_key(db, principal_id=principal_id, public_key_pem=pem)
         db.rollback()
+
+def test_corrupted_registered_key_fails_closed_when_requesting_signing_payload(client, monkeypatch):
+    principal_id, token = _operator()
+    decision_id = _decision(client, monkeypatch, principal_id, token)
+    _, public_pem = _keypair()
+    key_id, _ = _register(principal_id, public_pem)
+
+    with SessionLocal() as db:
+        key = db.get(SigningKey, key_id)
+        key.fingerprint = "0" * 64
+        db.commit()
+
+    response = client.get(
+        f"/sbom/decisions/{decision_id}/signing-payload",
+        params={"key_id": key_id},
+        headers={"X-API-Key": token},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Registered signing key integrity validation failed"
