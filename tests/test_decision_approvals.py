@@ -7,7 +7,16 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app import decision_approvals, decision_signatures, identity
-from app.db import AuditChainState, AuditEntry, DecisionApproval, SessionLocal, SigningKey, utcnow
+from app.db import (
+    AuditChainState,
+    AuditEntry,
+    DecisionApproval,
+    SessionLocal,
+    SignedDecision,
+    SigningKey,
+    VulnerabilityDecision,
+    utcnow,
+)
 
 from .test_vulnerability_decisions import _finding
 
@@ -455,3 +464,78 @@ def test_approval_and_audit_event_roll_back_together(client, monkeypatch):
         assert db.query(DecisionApproval).count() == approval_count_before
         assert db.query(AuditEntry).count() == audit_count_before
         assert db.get(AuditChainState, 1).version == chain_version_before
+
+
+def test_historical_v1_approval_remains_eligible_without_evidence_manifest(
+    client, monkeypatch
+):
+    author_id, author_token = _operator("Historical v1 author")
+    approver_id, approver_token = _operator("Historical v1 approver")
+    _finding_id, decision_id = _decision(
+        client, monkeypatch, author_id, author_token
+    )
+    author_private, author_public = _keypair()
+    author_key_id = _register(author_id, author_public, "decision-signing")
+    approver_private, approver_public = _keypair()
+    approver_key_id = _register(
+        approver_id, approver_public, "decision-approval"
+    )
+
+    with SessionLocal() as db:
+        decision = db.get(VulnerabilityDecision, decision_id)
+        author_key = db.get(SigningKey, author_key_id)
+        legacy_decision_envelope = decision_signatures.legacy_signing_envelope(
+            decision
+        )
+        legacy_decision_digest = hashlib.sha256(
+            legacy_decision_envelope
+        ).hexdigest()
+        db.add(
+            SignedDecision(
+                decision_id=decision_id,
+                signing_key_id=author_key_id,
+                principal_id=author_id,
+                envelope_version=decision_signatures.LEGACY_ENVELOPE_VERSION,
+                envelope_sha256=legacy_decision_digest,
+                signature_b64=base64.b64encode(
+                    author_private.sign(legacy_decision_envelope)
+                ).decode("ascii"),
+                verified_at=utcnow(),
+            )
+        )
+        approver_key = db.get(SigningKey, approver_key_id)
+        approved_at = utcnow()
+        approval_bytes = decision_approvals.approval_envelope(
+            decision,
+            decision_digest=legacy_decision_digest,
+            approver_principal_id=approver_id,
+            key_id=approver_key.id,
+            key_fingerprint=approver_key.fingerprint,
+            approved_at=approved_at,
+        )
+        db.add(
+            DecisionApproval(
+                decision_id=decision_id,
+                signing_key_id=approver_key_id,
+                principal_id=approver_id,
+                policy_version=decision_approvals.POLICY_VERSION,
+                envelope_version=decision_approvals.ENVELOPE_VERSION,
+                decision_envelope_sha256=legacy_decision_digest,
+                envelope_sha256=hashlib.sha256(approval_bytes).hexdigest(),
+                signature_b64=base64.b64encode(
+                    approver_private.sign(approval_bytes)
+                ).decode("ascii"),
+                approved_at=approved_at,
+                recorded_at=utcnow(),
+            )
+        )
+        db.commit()
+
+    status = client.get(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers={"X-API-Key": author_token},
+    )
+    assert status.status_code == 200, status.text
+    assert status.json()["author_signature_trusted"] is True
+    assert status.json()["approval_policy_satisfied"] is True
+    assert status.json()["approvals"][0]["signature_valid"] is True
