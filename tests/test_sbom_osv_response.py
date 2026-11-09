@@ -287,7 +287,7 @@ def test_osv_query_uses_unversioned_purl_and_preserves_qualifiers(monkeypatch):
     assert status["status"] == "complete"
     assert client.calls[0][1] == {
         "package": {
-            "purl": "pkg:npm/%40scope/package?repository_url=https%3A%2F%2Fregistry.npmjs.org"
+            "purl": "pkg:npm/%40scope/package?repository_url=https://registry.npmjs.org"
         },
         "version": "1.2.3",
     }
