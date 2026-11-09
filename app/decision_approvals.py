@@ -29,9 +29,12 @@ class ApprovalTrustStoreError(RuntimeError):
     """Raised when registered approval key material cannot be trusted."""
 
 
-def _utc(value: datetime) -> datetime:
+def _utc(value: datetime, *, require_aware: bool = False) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("approval timestamp must be timezone-aware")
+        if require_aware:
+            raise ValueError("approval timestamp must be timezone-aware")
+        # SQLite does not preserve timezone metadata for DateTime columns.
+        value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
 
 
@@ -177,7 +180,7 @@ def approve_decision(
     if not _trusted_author_signature(db, decision_id):
         raise PermissionError("A currently trusted author signature is required before approval")
 
-    approved_at = _utc(approved_at)
+    approved_at = _utc(approved_at, require_aware=True)
     now = utcnow()
     if approved_at > now + FUTURE_CLOCK_SKEW or approved_at < now - APPROVAL_WINDOW:
         raise ValueError("approval payload has expired; request a new approval payload")
@@ -209,7 +212,7 @@ def approve_decision(
         if (
             existing.signature_b64 == signature_b64
             and existing.envelope_sha256 == envelope_digest
-            and existing.approved_at == approved_at
+            and _utc_iso(existing.approved_at) == _utc_iso(approved_at)
         ):
             return _approval_dict(existing, key), False
         raise ApprovalConflict("decision already has an immutable approval from this key")
@@ -261,8 +264,8 @@ def _approval_dict(item: DecisionApproval, key: SigningKey) -> dict:
         "envelope_sha256": item.envelope_sha256,
         "signature": item.signature_b64,
         "public_key_pem": key.public_key_pem,
-        "approved_at": item.approved_at,
-        "recorded_at": item.recorded_at,
+        "approved_at": _utc_iso(item.approved_at),
+        "recorded_at": _utc_iso(item.recorded_at),
     }
 
 
