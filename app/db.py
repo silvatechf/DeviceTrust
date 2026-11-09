@@ -243,6 +243,11 @@ class VulnerabilityDecision(Base):
             name="uq_vulnerability_decision_finding_revision",
         ),
         UniqueConstraint(
+            "assessment_finding_id",
+            "request_key_hash",
+            name="uq_vulnerability_decision_finding_request_key",
+        ),
+        UniqueConstraint(
             "supersedes_id",
             name="uq_vulnerability_decision_supersedes",
         ),
@@ -274,6 +279,8 @@ class VulnerabilityDecision(Base):
         ForeignKey("principals.id"), nullable=False, index=True
     )
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    request_key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     supersedes_id: Mapped[int | None] = mapped_column(
         ForeignKey("vulnerability_decisions.id"), nullable=True
     )
