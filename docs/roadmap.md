@@ -52,7 +52,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Compare accepted SBOM imports and explain additions, removals and matched-component changes using PURL identity that excludes only the version segment while preserving qualifiers and subpath; report ambiguous and unidentified occurrences without speculative matching.
 - [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
 
-**Implementation under review:** PR #45 adds append-only assessment runs and findings for an accepted SBOM import, reuses the bounded local/OSV scanner, records enrichment coverage, and persists the run with its audit event after external I/O. It is not complete until review, CI/CodeQL, merge and release documentation are finished.
+**Implemented:** PR #45 added append-only assessment runs and findings for accepted SBOM imports, reuses the bounded local/OSV scanner, records enrichment coverage, and persists each run with its audit event after external I/O.
 - [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
 **Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped synthetic findings. It now includes read-only comparison of accepted imports for the same release. Duplicate identities and components without usable PURLs remain unresolved. Comparison does not re-evaluate vulnerability intelligence.
@@ -63,10 +63,10 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Goal:** provide explainable product-version impact assessments, not automatic compliance conclusions.
 
-- [ ] Add CISA KEV enrichment with source, retrieval timestamp and catalog metadata. See proposed [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
-- [ ] Add FIRST EPSS enrichment with score, model/date metadata and retrieval timestamp. See proposed [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
-- [ ] Preserve feed provenance, freshness and lookup failures; missing intelligence must not mean no risk.
-- [ ] Match findings against product/component versions with ecosystem-aware semantics and explicit uncertainty.
+- [x] Add CISA KEV enrichment with source, retrieval timestamp and catalog metadata. See implemented [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
+- [x] Add FIRST EPSS enrichment with score, model/date metadata and retrieval timestamp. See implemented [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
+- [x] Preserve feed provenance, freshness and lookup failures; missing intelligence must not mean no risk.
+- [ ] Match findings against product/component versions with ecosystem-aware semantics and explicit uncertainty. OSV positive results are queried against a versionless PURL plus the exact component version; a provider match is evidence of an OSV-reported affected version, not a vendor-confirmed product impact decision.
 - [ ] Add human-reviewed affected/not-affected decisions with evidence and rationale.
 - [ ] Implement CycloneDX VEX export only after product/version/component relationships and review controls exist.
 - [ ] Map internal workflow states explicitly to the selected VEX vocabulary; never equate operational triage states directly with VEX statements.
@@ -97,7 +97,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 **Architecture and implementation:** [Identity and Access Governance](identity-access-governance.md) documents the implemented managed API credential foundation and its remaining boundaries. Managed mode is opt-in; legacy shared-key mode remains the backwards-compatible default.
 
 - [x] Add operator/service principals and independently revocable API credentials with bounded expiry.
-- [x] Store only SHA-256 verifiers for high-entropy machine tokens; show raw tokens once through the offline CLI.
+- [x] Store only keyed HMAC-SHA256 verifiers for high-entropy machine tokens using an external pepper; show raw tokens once through the offline CLI.
 - [x] Enforce explicit route-level scopes and fail closed when a protected route has no policy.
 - [x] Add offline principal creation, credential issuance/rotation/revocation and principal disablement.
 - [x] Attribute managed API requests to stable principal IDs while preserving historical audit hashes and actor values.

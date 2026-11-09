@@ -27,7 +27,7 @@ For normal typed endpoints, Pydantic validates request models. The SBOM route re
 |---|---|
 | `app/main.py` | FastAPI app, routes, authentication dependency, request orchestration and response serialization |
 | `app/identity.py` | Principal/credential verification, route-scope policy and credential lifecycle operations |
-| `app/identity_cli.py` | Offline principal creation, credential revocation and principal disablement |
+| `app/identity_cli.py` | Offline principal creation, credential issuance/rotation/revocation and principal disablement |
 | `app/schemas.py` | Pydantic request contracts and field constraints |
 | `app/db.py` | SQLAlchemy models, engine/session setup and database access |
 | `app/posture.py` | Rules that assess the declared device security profile |
@@ -65,7 +65,7 @@ The normalized endpoint is a read-only projection. It preserves the raw value an
 
 ### SBOM and vulnerability findings
 
-The API caps the request body at 2 MiB. The parser accepts a bounded CycloneDX JSON subset, validates component names/versions and PURLs, then checks the local synthetic advisory set. If `DEVICETRUST_OSV=1`, product-scoped imports also perform best-effort OSV enrichment, deduplicated by exact PURL/version and bounded to 50 unique queries and one absolute, cancellable 10-second wall-clock deadline covering query preparation and awaited OSV I/O. Cancellation is cooperative and cannot pre-empt synchronous CPU work. The persisted import summary records source, timestamp, counts and `complete`/`incomplete`/`disabled` status. Failures, malformed responses, deadline/query-budget exhaustion and components without PURLs are explicitly incomplete; a missing finding is not proof that a component is safe.
+The API caps the request body at 2 MiB. The parser accepts a bounded CycloneDX JSON subset, validates component names/versions and PURLs, then checks the local synthetic advisory set. If `DEVICETRUST_OSV=1`, product-scoped imports also perform best-effort OSV enrichment, deduplicated by versionless PURL plus the exact component version and bounded to 50 unique queries and one absolute, cancellable 10-second wall-clock deadline covering query preparation and awaited OSV I/O. Cancellation is cooperative and cannot pre-empt synchronous CPU work. The OSV request uses a versionless PURL and a separate top-level version, preserving qualifiers and subpath. The persisted import summary records source, timestamp, counts and `complete`/`incomplete`/`disabled` status. Failures, malformed responses, deadline/query-budget exhaustion and components without PURLs are explicitly incomplete; a missing finding is not proof that a component is safe.
 
 ### Product SBOM comparison
 
@@ -106,7 +106,7 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 | Evidence-driven posture | Not implemented |
 | Bounded CycloneDX ingestion | Implemented prototype |
 | Synthetic local advisory matching | Implemented demo behavior |
-| Optional OSV lookup | Best-effort integration |
+| Optional OSV lookup | Best-effort integration; versionless PURL plus separate version query contract |
 | Justified vulnerability triage | Implemented prototype |
 | JSON/Markdown reports | Implemented prototype |
 | Hash-chain verification | Implemented with limitations |

@@ -67,7 +67,7 @@ The comparison reports additions, removals and matched-component changes. Matchi
 
 Versioned reassessment history was merged through [PR #45](https://github.com/silvatechf/DeviceTrust/pull/45). It appends assessment runs and component-scoped findings without mutating the imported SBOM or legacy triage records. Requests require an idempotency key; a new key deliberately creates a new historical run.
 
-Optional CISA KEV and FIRST EPSS enrichment is implemented in [PR #47](https://github.com/silvatechf/DeviceTrust/pull/47). Provider observations are stored in the assessment snapshot with explicit coverage states and source/date provenance. These CVE-level signals do not establish product applicability or produce VEX/CRA decisions. Treat this enrichment as unavailable on `main` until PR #47 is merged and validated.
+Optional CISA KEV and FIRST EPSS enrichment is implemented in [PR #47](https://github.com/silvatechf/DeviceTrust/pull/47). Provider observations are stored in the assessment snapshot with explicit coverage states and source/date provenance. These CVE-level signals do not establish product impact or produce VEX/CRA decisions. PR #51 adds separate source-aware applicability evidence for versioned findings; neither provider observations nor applicability signals constitute a reviewed VEX decision.
 
 The product SBOM persistence API was merged through [PR #22](https://github.com/silvatechf/DeviceTrust/pull/22). Comparison and versioned reassessment are implemented in the current prototype; see the PR history and test matrix for exact validation evidence. None of these workflows makes DeviceTrust a production-ready service.
 

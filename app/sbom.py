@@ -15,6 +15,7 @@ MAX_COMPONENT_VERSION = 100
 MAX_PURL_LENGTH = 512
 SUPPORTED_CYCLONEDX_SPEC_VERSION = "1.5"
 MAX_OSV_QUERIES_PER_IMPORT = 50
+OSV_QUERY_CONTRACT_VERSION = "2"
 OSV_ENRICHMENT_DEADLINE_SECONDS = 10.0
 OSV_CONNECT_TIMEOUT_SECONDS = 2.0
 OSV_READ_TIMEOUT_SECONDS = 3.0
@@ -109,6 +110,19 @@ def scan_local(
     return hits
 
 
+def _osv_query_purl(purl: str) -> str:
+    """Return an unversioned PURL for OSV's separate top-level version field."""
+    parsed = PackageURL.from_string(purl)
+    return PackageURL(
+        type=parsed.type,
+        namespace=parsed.namespace,
+        name=parsed.name,
+        version=None,
+        qualifiers=parsed.qualifiers,
+        subpath=parsed.subpath,
+    ).to_string()
+
+
 def _osv_timeout(remaining: float) -> httpx.Timeout:
     return httpx.Timeout(
         timeout=max(0.001, remaining),
@@ -131,12 +145,18 @@ def scan_osv_with_status(
     deadline = started + OSV_ENRICHMENT_DEADLINE_SECONDS
     unique_queries: dict[tuple[str, str], list[int]] = {}
     skipped_no_purl = 0
+    skipped_invalid_purl = 0
     for index, component in enumerate(components):
         purl = component.get("purl")
         if not purl:
             skipped_no_purl += 1
             continue
-        key = (purl, component["version"])
+        try:
+            query_purl = _osv_query_purl(purl)
+        except (TypeError, ValueError):
+            skipped_invalid_purl += 1
+            continue
+        key = (query_purl, component["version"])
         unique_queries.setdefault(key, []).append(index)
 
     hits = []
@@ -204,7 +224,10 @@ def scan_osv_with_status(
         failed = True
 
     deduplicated = sum(len(indexes) - 1 for indexes in unique_queries.values())
-    incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0
+    incomplete = (
+        failed or budget_exhausted or deadline_exhausted
+        or skipped_no_purl > 0 or skipped_invalid_purl > 0
+    )
     status = {
         "status": "incomplete" if incomplete else "complete",
         "source": "osv",
@@ -212,6 +235,7 @@ def scan_osv_with_status(
         "query_candidates": len(unique_queries),
         "deduplicated_occurrences": deduplicated,
         "skipped_without_purl": skipped_no_purl,
+        "skipped_invalid_purl": skipped_invalid_purl,
         "query_limit": MAX_OSV_QUERIES_PER_IMPORT,
         "deadline_seconds": OSV_ENRICHMENT_DEADLINE_SECONDS,
         "budget_exhausted": budget_exhausted,
@@ -233,6 +257,7 @@ async def scan_osv_with_status_async(
     deadline = loop.time() + OSV_ENRICHMENT_DEADLINE_SECONDS
     unique_queries: dict[tuple[str, str], list[int]] = {}
     skipped_no_purl = 0
+    skipped_invalid_purl = 0
     hits = []
     queried = 0
     failed = False
@@ -246,7 +271,14 @@ async def scan_osv_with_status_async(
                 if not purl:
                     skipped_no_purl += 1
                     continue
-                unique_queries.setdefault((purl, component["version"]), []).append(index)
+                try:
+                    query_purl = _osv_query_purl(purl)
+                except (TypeError, ValueError):
+                    skipped_invalid_purl += 1
+                    continue
+                unique_queries.setdefault(
+                    (query_purl, component["version"]), []
+                ).append(index)
 
             async with httpx.AsyncClient() as client:
                 for (purl, version), indexes in unique_queries.items():
@@ -307,7 +339,10 @@ async def scan_osv_with_status_async(
         failed = True
 
     deduplicated = sum(len(indexes) - 1 for indexes in unique_queries.values())
-    incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0
+    incomplete = (
+        failed or budget_exhausted or deadline_exhausted
+        or skipped_no_purl > 0 or skipped_invalid_purl > 0
+    )
     return hits, {
         "status": "incomplete" if incomplete else "complete",
         "source": "osv",
@@ -315,6 +350,7 @@ async def scan_osv_with_status_async(
         "query_candidates": len(unique_queries),
         "deduplicated_occurrences": deduplicated,
         "skipped_without_purl": skipped_no_purl,
+        "skipped_invalid_purl": skipped_invalid_purl,
         "query_limit": MAX_OSV_QUERIES_PER_IMPORT,
         "deadline_seconds": OSV_ENRICHMENT_DEADLINE_SECONDS,
         "budget_exhausted": budget_exhausted,
