@@ -90,20 +90,28 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Exit criteria:** CLI and API produce consistent assessments; pipeline results distinguish policy findings from assessment/runtime errors and incomplete intelligence.
 
-## Milestone 6 — Identity, governance and audit assurance (P4)
+## Milestone 6 — Identity, governance and audit assurance (P2)
 
-**Goal:** prepare for attributable multi-user and controlled customer evaluation.
+**Goal:** establish attributable API access and least-privilege operator workflows before reviewed VEX decisions or credential-exposure evidence are introduced.
 
-- [ ] Implement individual identities, credential lifecycle, revocation and scoped authorization.
+**Architecture and implementation:** [Identity and Access Governance](identity-access-governance.md) documents the implemented managed API credential foundation and its remaining boundaries. Managed mode is opt-in; legacy shared-key mode remains the backwards-compatible default.
+
+- [x] Add operator/service principals and independently revocable API credentials with bounded expiry.
+- [x] Store only SHA-256 verifiers for high-entropy machine tokens; show raw tokens once through the offline CLI.
+- [x] Enforce explicit route-level scopes and fail closed when a protected route has no policy.
+- [x] Add offline principal creation, credential issuance/rotation/revocation and principal disablement.
+- [x] Attribute managed API requests to stable principal IDs while preserving historical audit hashes and actor values.
+- [ ] Migrate deployments from legacy shared-key mode to managed mode using documented client/deployment evidence.
+- [ ] Add human identity proof, MFA/SSO only when operator/customer requirements justify it.
 - [ ] Add RBAC and tenant isolation before multi-customer operation.
-- [ ] Record actor identity, decision, rationale and evidence references for every security decision.
+- [ ] Record actor identity, decision, rationale and evidence references for every reviewed security decision.
 - [ ] Add a durable audit checkpoint design with protected signing keys and independently stored checkpoints. Transactional writer serialization does not replace this independent trust boundary.
 - [x] Serialize concurrent audit-chain updates and test tampering, deletion and transaction rollback scenarios.
 - [ ] Define retention, backup/restore, operational monitoring, rate limits and deployment hardening.
 - [ ] Create an exportable Product Security File as a product concept, with clear provenance and limitations.
 - [ ] Prepare reviewed CRA reporting data only where a manufacturer has established the applicable reporting condition and authorised the action.
 
-**Exit criteria:** no shared credential for multi-user operation; decisions are attributable; audit checkpoints have an independent trust boundary; tenant isolation and operational recovery are tested.
+**Exit criteria:** managed credentials are individually revocable and scoped; mutating managed API actions are attributable; historical audit hashes remain valid; legacy shared-key mode is retired before multi-user operation; tenant isolation and operational recovery are tested before multi-customer use.
 
 ## Parallel product discovery
 
