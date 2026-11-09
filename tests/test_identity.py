@@ -1,16 +1,19 @@
 from datetime import timedelta
+import re
 
 import pytest
 from sqlalchemy import select
+from fastapi.routing import APIRoute
 
 from app import identity
-from app.db import APICredential, Principal, SessionLocal, utcnow
+from app.db import APICredential, SessionLocal, utcnow
+from app.main import app, auth
 from .conftest import H
 
 
 def _issue(scopes):
     with SessionLocal() as db:
-        principal, credential, token = identity.create_principal(
+        _principal, credential, token = identity.create_principal(
             db,
             name="Identity test principal",
             kind="service",
@@ -119,3 +122,25 @@ def test_scope_matrix_is_explicit_and_least_privilege():
         {"inventory:read", "assessment:read", "audit:read"}
     )
     assert identity.required_scopes("DELETE", "/devices/EDGE-1") is None
+
+
+def test_every_authenticated_route_has_an_explicit_scope_policy():
+    def includes_auth(dependant):
+        if dependant.call is auth:
+            return True
+        return any(includes_auth(child) for child in dependant.dependencies)
+
+    protected_routes = []
+    for route in app.routes:
+        if not isinstance(route, APIRoute) or not includes_auth(route.dependant):
+            continue
+        path = re.sub(r"\{[^}]+\}", "placeholder", route.path)
+        for method in route.methods or set():
+            if method in {"HEAD", "OPTIONS"}:
+                continue
+            protected_routes.append((method, path))
+            assert identity.required_scopes(method, path) is not None, (
+                f"Missing scope policy for {method} {route.path}"
+            )
+
+    assert protected_routes
