@@ -59,6 +59,16 @@ def _register(principal_id, public_pem):
     return key_id, fingerprint
 
 
+def _signature_for(client, token, decision_id, key_id, private_key):
+    payload_response = client.get(
+        f"/sbom/decisions/{decision_id}/signing-payload",
+        params={"key_id": key_id},
+        headers={"X-API-Key": token},
+    )
+    assert payload_response.status_code == 200, payload_response.text
+    payload = base64.b64decode(payload_response.json()["signing_payload_base64"], validate=True)
+    return base64.b64encode(private_key.sign(payload)).decode("ascii")
+
 def test_signing_envelope_is_domain_separated_and_deterministic(client, monkeypatch):
     principal_id, token = _operator()
     decision_id = _decision(client, monkeypatch, principal_id, token)
@@ -76,11 +86,7 @@ def test_ed25519_signature_is_verified_and_persisted(client, monkeypatch):
     private_key, public_pem = _keypair()
     key_id, fingerprint = _register(principal_id, public_pem)
 
-    with SessionLocal() as db:
-        decision = db.get(VulnerabilityDecision, decision_id)
-        signature = base64.b64encode(
-            private_key.sign(decision_signatures.signing_envelope(decision))
-        ).decode("ascii")
+    signature = _signature_for(client, token, decision_id, key_id, private_key)
 
     response = client.post(
         f"/sbom/decisions/{decision_id}/signature",
@@ -112,11 +118,7 @@ def test_tampered_decision_fails_signature_reverification(client, monkeypatch):
     private_key, public_pem = _keypair()
     key_id, _ = _register(principal_id, public_pem)
 
-    with SessionLocal() as db:
-        decision = db.get(VulnerabilityDecision, decision_id)
-        signature = base64.b64encode(
-            private_key.sign(decision_signatures.signing_envelope(decision))
-        ).decode("ascii")
+    signature = _signature_for(client, token, decision_id, key_id, private_key)
 
     signed = client.post(
         f"/sbom/decisions/{decision_id}/signature",
