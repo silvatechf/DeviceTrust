@@ -5,7 +5,7 @@ import rfc8785
 from sqlalchemy import update
 
 from app import decision_signatures, identity
-from app.db import DecisionEvidenceManifest, EvidenceArtifact, SessionLocal
+from app.db import DecisionEvidenceManifest, EvidenceArtifact, SessionLocal, VulnerabilityDecision
 
 from .conftest import H
 from .test_decision_signatures import _keypair, _register, _signature_for
@@ -321,3 +321,30 @@ def test_manifest_payload_tampering_fails_closed(client, monkeypatch):
         headers={"X-API-Key": token},
     )
     assert signing_payload.status_code == 503
+
+
+def test_manifest_cannot_be_bound_to_superseded_decision_revision(client, monkeypatch):
+    principal_id, token = _operator_with_scopes()
+    artifact_id, _ = _artifact(client)
+    first_decision_id = _decision(client, monkeypatch, principal_id, token, artifact_id)
+    with SessionLocal() as db:
+        first = db.get(VulnerabilityDecision, first_decision_id)
+        finding_id = first.assessment_finding_id
+    second = client.post(
+        f"/sbom/assessment-findings/{finding_id}/decisions",
+        headers={
+            "X-API-Key": token,
+            "Idempotency-Key": f"superseding-evidence-review-{finding_id}",
+        },
+        json={
+            "state": "in_triage",
+            "detail": "A newer review supersedes the previous assessment decision.",
+        },
+    )
+    assert second.status_code == 201, second.text
+    blocked = client.post(
+        f"/sbom/decisions/{first_decision_id}/evidence-manifest",
+        headers={"X-API-Key": token},
+        json={"artifact_ids": [artifact_id]},
+    )
+    assert blocked.status_code == 409
