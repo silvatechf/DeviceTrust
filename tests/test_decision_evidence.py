@@ -4,7 +4,7 @@ import hashlib
 import rfc8785
 from sqlalchemy import update
 
-from app import identity
+from app import decision_signatures, identity
 from app.db import EvidenceArtifact, SessionLocal
 from .conftest import H
 from .test_decision_signatures import _keypair, _register, _signature_for
@@ -118,6 +118,64 @@ def test_manifest_binds_verified_artifact_to_exact_decision_and_signature(client
     assert verified.status_code == 200
     assert verified.json()["signature_valid"] is True
     assert verified.json()["trust_valid"] is True
+
+    with SessionLocal() as db:
+        approver, _credential, approver_token = identity.create_principal(
+            db,
+            name="Independent evidence approver",
+            kind="operator",
+            scopes={"assessment:approve", "assessment:read"},
+        )
+        approver_id = approver.id
+        approval_key = decision_signatures.register_public_key(
+            db,
+            principal_id=approver_id,
+            public_key_pem=_keypair()[1],
+            purpose="decision-approval",
+        )
+        approval_key_id = approval_key.id
+        db.commit()
+    approval_private, _ = _keypair()
+    # Register the public half corresponding to the private key used below.
+    approval_private, approval_public = _keypair()
+    with SessionLocal() as db:
+        decision_signatures.revoke_public_key(db, approval_key_id)
+        approval_key = decision_signatures.register_public_key(
+            db,
+            principal_id=approver_id,
+            public_key_pem=approval_public,
+            purpose="decision-approval",
+        )
+        approval_key_id = approval_key.id
+        db.commit()
+    approval_payload = client.get(
+        f"/sbom/decisions/{decision_id}/approval-payload",
+        params={"key_id": approval_key_id},
+        headers={"X-API-Key": approver_token},
+    )
+    assert approval_payload.status_code == 200, approval_payload.text
+    approval_bytes = base64.b64decode(
+        approval_payload.json()["signing_payload_base64"], validate=True
+    )
+    assert result["manifest_sha256"].encode() in approval_bytes
+    approved = client.post(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers={"X-API-Key": approver_token},
+        json={
+            "key_id": approval_key_id,
+            "approved_at": approval_payload.json()["approved_at"],
+            "signature": base64.b64encode(
+                approval_private.sign(approval_bytes)
+            ).decode("ascii"),
+        },
+    )
+    assert approved.status_code == 201, approved.text
+    approval_status = client.get(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers={"X-API-Key": token},
+    )
+    assert approval_status.status_code == 200
+    assert approval_status.json()["approval_policy_satisfied"] is True
 
 
 def test_manifest_requires_artifact_id_in_original_decision_references(client, monkeypatch):
