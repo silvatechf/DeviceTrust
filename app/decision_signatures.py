@@ -85,8 +85,15 @@ def _decode_signature(value: str) -> bytes:
 
 
 def register_public_key(
-    db: Session, *, principal_id: str, public_key_pem: bytes, expires_at=None
+    db: Session,
+    *,
+    principal_id: str,
+    public_key_pem: bytes,
+    purpose: str = "decision-signing",
+    expires_at=None,
 ) -> SigningKey:
+    if purpose not in {"decision-signing", "decision-approval"}:
+        raise ValueError("unsupported signing key purpose")
     principal = db.get(Principal, principal_id)
     if principal is None or principal.status != "active":
         raise LookupError("Active principal not found")
@@ -106,7 +113,7 @@ def register_public_key(
     now = utcnow()
     existing = db.scalar(select(SigningKey).where(SigningKey.fingerprint == fingerprint))
     if existing is not None:
-        if existing.principal_id != principal_id or existing.purpose != "decision-signing":
+        if existing.principal_id != principal_id or existing.purpose != purpose:
             raise ValueError("public key fingerprint is already registered to another trust binding")
         if existing.revoked_at is not None:
             raise ValueError("revoked public keys cannot be reactivated")
@@ -125,7 +132,7 @@ def register_public_key(
     item = SigningKey(
         id=str(uuid4()),
         principal_id=principal_id,
-        purpose="decision-signing",
+        purpose=purpose,
         algorithm="Ed25519",
         public_key_pem=public_key_pem.decode("ascii"),
         fingerprint=fingerprint,
