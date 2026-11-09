@@ -109,6 +109,19 @@ def scan_local(
     return hits
 
 
+def _osv_query_purl(purl: str) -> str:
+    """Return an unversioned PURL for OSV's separate top-level version field."""
+    parsed = PackageURL.from_string(purl)
+    return PackageURL(
+        type=parsed.type,
+        namespace=parsed.namespace,
+        name=parsed.name,
+        version=None,
+        qualifiers=parsed.qualifiers,
+        subpath=parsed.subpath,
+    ).to_string()
+
+
 def _osv_timeout(remaining: float) -> httpx.Timeout:
     return httpx.Timeout(
         timeout=max(0.001, remaining),
@@ -131,12 +144,18 @@ def scan_osv_with_status(
     deadline = started + OSV_ENRICHMENT_DEADLINE_SECONDS
     unique_queries: dict[tuple[str, str], list[int]] = {}
     skipped_no_purl = 0
+    skipped_invalid_purl = 0
     for index, component in enumerate(components):
         purl = component.get("purl")
         if not purl:
             skipped_no_purl += 1
             continue
-        key = (purl, component["version"])
+        try:
+            query_purl = _osv_query_purl(purl)
+        except (TypeError, ValueError):
+            skipped_invalid_purl += 1
+            continue
+        key = (query_purl, component["version"])
         unique_queries.setdefault(key, []).append(index)
 
     hits = []
@@ -204,7 +223,7 @@ def scan_osv_with_status(
         failed = True
 
     deduplicated = sum(len(indexes) - 1 for indexes in unique_queries.values())
-    incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0
+    incomplete = failed or budget_exhausted or deadline_exhausted or skipped_no_purl > 0 or skipped_invalid_purl > 0
     status = {
         "status": "incomplete" if incomplete else "complete",
         "source": "osv",
@@ -212,6 +231,7 @@ def scan_osv_with_status(
         "query_candidates": len(unique_queries),
         "deduplicated_occurrences": deduplicated,
         "skipped_without_purl": skipped_no_purl,
+        "skipped_invalid_purl": skipped_invalid_purl,
         "query_limit": MAX_OSV_QUERIES_PER_IMPORT,
         "deadline_seconds": OSV_ENRICHMENT_DEADLINE_SECONDS,
         "budget_exhausted": budget_exhausted,
