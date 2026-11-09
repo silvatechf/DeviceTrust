@@ -15,7 +15,7 @@ from .db import DecisionApproval, Principal, SigningKey, VulnerabilityDecision, 
 
 POLICY_VERSION = "devicetrust.approval-policy.v1"
 ENVELOPE_VERSION = "devicetrust.decision-approval.v1"
-DOMAIN_SEPARATOR = b"DeviceTrust\\x00DecisionApproval\\x00v1\\x00"
+DOMAIN_SEPARATOR = b"DeviceTrust\x00DecisionApproval\x00v1\x00"
 APPROVAL_WINDOW = timedelta(minutes=30)
 FUTURE_CLOCK_SKEW = timedelta(minutes=1)
 REQUIRED_APPROVALS = 1
