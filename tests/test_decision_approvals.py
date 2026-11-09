@@ -483,7 +483,6 @@ def test_historical_v1_approval_remains_eligible_without_evidence_manifest(
 
     with SessionLocal() as db:
         decision = db.get(VulnerabilityDecision, decision_id)
-        author_key = db.get(SigningKey, author_key_id)
         legacy_decision_envelope = decision_signatures.legacy_signing_envelope(
             decision
         )
