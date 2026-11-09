@@ -21,6 +21,7 @@
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
       DEVICETRUST_AUTH_MODE: ${DEVICETRUST_AUTH_MODE:-legacy}
       DEVICETRUST_API_KEY: ${DEVICETRUST_API_KEY:-}
+      DEVICETRUST_CREDENTIAL_PEPPER: ${DEVICETRUST_CREDENTIAL_PEPPER:-}
     depends_on:
       db:
         condition: service_healthy
