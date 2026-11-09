@@ -327,7 +327,10 @@ def get_decision_signature(db: Session, decision_id: int) -> dict | None:
             )
             continue
 
-        signature_valid = current_digest == item.envelope_sha256
+        signature_valid = (
+            item.envelope_version == ENVELOPE_VERSION
+            and current_digest == item.envelope_sha256
+        )
         if signature_valid:
             try:
                 signature = _decode_signature(item.signature_b64)
