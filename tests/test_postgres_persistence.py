@@ -16,13 +16,15 @@ from sqlalchemy import create_engine, delete, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app import audit, product_sbom
+from app import audit, identity, product_sbom
 from app.audit import record, verify
 from app.db import (
     AuditChainState,
     AuditEntry,
     Device,
     Product,
+    APICredential,
+    Principal,
     ProductFinding,
     ProductRelease,
     SBOMAssessment,
@@ -207,6 +209,8 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert inspect(target_engine).has_table("audit_chain_state")
         assert inspect(target_engine).has_table("sbom_assessments")
         assert inspect(target_engine).has_table("sbom_assessment_findings")
+        assert inspect(target_engine).has_table("principals")
+        assert inspect(target_engine).has_table("api_credentials")
         assert "intelligence" in {
             column["name"] for column in inspect(target_engine).get_columns(
                 "sbom_assessment_findings"
@@ -225,9 +229,13 @@ def test_audit_chain_migration_upgrade_downgrade_round_trip_postgres(
         assert not inspect(target_engine).has_table("audit_chain_state")
         assert not inspect(target_engine).has_table("sbom_assessments")
         assert not inspect(target_engine).has_table("sbom_assessment_findings")
+        assert not inspect(target_engine).has_table("api_credentials")
+        assert not inspect(target_engine).has_table("principals")
 
         command.upgrade(config, "head")
         assert inspect(target_engine).has_table("audit_chain_state")
+        assert inspect(target_engine).has_table("principals")
+        assert inspect(target_engine).has_table("api_credentials")
         with target_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version FROM audit_chain_state WHERE id = 1")
@@ -570,3 +578,37 @@ def test_versioned_sbom_assessment_survives_postgres_engine_disposal(monkeypatch
             session.execute(delete(Product).where(Product.id == product_id))
             session.commit()
         verification_engine.dispose()
+
+
+def test_managed_api_credentials_authenticate_and_revoke_postgres():
+    with Session(application_engine) as session:
+        principal, credential, token = identity.create_principal(
+            session,
+            name="PostgreSQL identity integration",
+            kind="service",
+            scopes={"inventory:read"},
+        )
+        principal_id = principal.id
+        credential_id = credential.id
+        session.commit()
+
+    try:
+        with Session(application_engine) as session:
+            authenticated = identity.authenticate(session, token)
+            assert authenticated is not None
+            assert authenticated.principal_id == principal_id
+            assert authenticated.scopes == frozenset({"inventory:read"})
+            stored = session.get(APICredential, credential_id)
+            assert stored is not None
+            assert token not in stored.token_digest
+
+            identity.revoke_credential(session, credential_id)
+            session.commit()
+
+        with Session(application_engine) as session:
+            assert identity.authenticate(session, token) is None
+    finally:
+        with Session(application_engine) as session:
+            session.query(APICredential).filter_by(id=credential_id).delete()
+            session.query(Principal).filter_by(id=principal_id).delete()
+            session.commit()
