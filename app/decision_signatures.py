@@ -3,8 +3,9 @@
 import base64
 import binascii
 import hashlib
-import rfc8785
 from datetime import timezone
+
+import rfc8785
 from uuid import uuid4
 
 from cryptography.exceptions import InvalidSignature
