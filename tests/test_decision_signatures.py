@@ -111,6 +111,8 @@ def test_ed25519_signature_is_verified_and_persisted(client, monkeypatch):
     assert verified.status_code == 200
     assert verified.json()["signature_valid"] is True
     assert verified.json()["trust_valid"] is True
+    assert verified.json()["signature"] == signature
+    assert verified.json()["public_key_pem"].startswith("-----BEGIN PUBLIC KEY-----")
     assert verified.json()["current_key_status"] == "active"
 
     with SessionLocal() as db:
