@@ -1,6 +1,6 @@
 # DEC-013: Deterministic CycloneDX VEX export contract
 
-- Status: Accepted design; implementation not started
+- Status: Implemented prototype in PR #72; broader VEX workflows remain deferred
 - Date: 2026-11-10
 - Scope: Export reviewed product-release vulnerability decisions as a dedicated CycloneDX 1.5 VEX BOM
 
@@ -80,7 +80,7 @@ Any failed gate blocks that statement. The exporter must return a structured val
 - Decision signature and approval verification already expose trust state and bind to immutable decision revisions. The exporter must reuse these verification services rather than duplicate cryptographic logic.
 - Evidence manifest integrity must be rechecked at export time. A digest stored earlier is not sufficient if the underlying artifact bytes or trust binding no longer validate.
 - Current assessment findings store a component occurrence and vulnerability identifier. Optional vulnerability source metadata is not yet a complete normalized CycloneDX vulnerability object; do not fabricate absent fields.
-- A deterministic export provenance record may require a new persistence model and migration if stable document identifiers and reproducible retrieval are required.
+- The first slice returns a deterministic provenance record and derives the VEX serial number from canonical source and decision inputs; it does not persist export artifacts as a separate resource.
 
 ## Acceptance criteria
 
@@ -99,4 +99,4 @@ Any failed gate blocks that statement. The exporter must return a structured val
 
 This contract deliberately makes export conservative. It may block many current records until source BOM identity, component references, evidence, signatures and approvals are all present and trusted. That is preferable to emitting ambiguous or unsupported VEX statements.
 
-The first implementation will be a narrow export of reviewed decisions, not a general-purpose VEX authoring platform. Full SBOM round-tripping, source authenticity, vendor backport semantics, service targets, multiple CycloneDX versions, OpenVEX and external publication remain out of scope.
+The implemented first slice is a narrow export of reviewed decisions, not a general-purpose VEX authoring platform. It validates against the vendored CycloneDX 1.5 JSON schema and records an audit event for each export request. Full SBOM round-tripping, source authenticity, vendor backport semantics, service targets, multiple CycloneDX versions, OpenVEX and external publication remain out of scope.
