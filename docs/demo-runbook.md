@@ -124,6 +124,15 @@ curl -sS -X POST "http://127.0.0.1:8000/products/PRODUCT_ID/releases" -H "X-API-
 
 Copy the returned `id` as `RELEASE_ID`. Import the sample SBOM using the exact file bytes:
 
+The authenticated CLI can perform this import without placing the API key in command-line arguments. Configure `DEVICETRUST_API_URL` and `DEVICETRUST_API_KEY` as described in section 8, then run:
+
+```bash
+python -m app.cli import --release-id RELEASE_ID --file samples/cold_chain_gateway_sbom.json --source-reference local-demo-cli
+```
+
+The CLI marks this source as `pipeline`. It does not create the product or release; those records must already exist. The API remains responsible for CycloneDX validation, persistence and digest-based duplicate handling. Use either the CLI command above or the cURL example below for a single initial import; do not run both unless you intentionally want to demonstrate an idempotent repeat.
+
+
 ```bash
 curl -sS -X POST "http://127.0.0.1:8000/product-releases/RELEASE_ID/sbom?source_type=manual&source_reference=local-demo" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" --data-binary "@samples/cold_chain_gateway_sbom.json"
 ```
@@ -271,6 +280,8 @@ $env:DEVICETRUST_API_KEY = "your-local-api-key"
 export DEVICETRUST_API_URL="http://127.0.0.1:8000"
 export DEVICETRUST_API_KEY="your-local-api-key"
 ```
+
+If you have not imported the SBOM in section 4, first create the product and release there, then use the CLI import command shown in that section. Copy the import `id` from its JSON response.
 
 Run an assessment. The idempotency key is required; reusing it with unchanged source configuration returns the existing run, while a new key requests a new historical run.
 
