@@ -192,7 +192,7 @@ Capture genuine screenshots from the running application at desktop and mobile w
 
 
 
-### Reassess a stored product SBOM import (proposed in PR #45)
+### Reassess a stored product SBOM import
 
 After the local database has been migrated with `alembic upgrade head`, request a new assessment for the accepted import:
 
@@ -216,12 +216,12 @@ curl -sS "http://127.0.0.1:8000/sbom/imports/IMPORT_ID/assessments/ASSESSMENT_ID
 
 Assessment findings are separate from the original import-time findings and their human triage fields. A new assessment does not inherit or overwrite prior triage decisions. An OSV status of `disabled` means OSV enrichment was not run; it does not mean that the import has no vulnerabilities. `incomplete` means the available intelligence did not cover the entire requested assessment.
 
-Versioned reassessment history is implemented through PR #45. KEV/EPSS enrichment is implemented in PR #47 and remains unavailable on `main` until PR #47 is merged. OSV is best-effort and does not provide a globally consistent feed snapshot.
+Versioned reassessment history and KEV/EPSS enrichment are integrated into `main` through PRs #45 and #55. OSV and external intelligence feeds remain best-effort sources and do not provide a globally consistent snapshot.
 
 
-### Optional KEV and EPSS enrichment (proposed in the follow-up branch)
+### Optional KEV and EPSS enrichment
 
-After the KEV/EPSS implementation is merged and the database has been upgraded with `alembic upgrade head`, enable either provider independently for a local assessment.
+After the database has been upgraded with `alembic upgrade head`, enable either provider independently for a local assessment.
 
 **Windows PowerShell**
 ```powershell
@@ -252,3 +252,42 @@ The response records per-finding KEV and EPSS states and provider provenance. KE
 Provider states such as `disabled`, `not_checked`, `not_applicable`, `not_found`, `unavailable` and `incomplete` are intentionally distinct. A missing EPSS record or absent KEV membership is not proof that a vulnerability is harmless. Enrichment is bounded to 100 unique CVEs per assessment; provider failures do not erase the local or OSV findings.
 
 Do not interpret KEV membership or EPSS scores as an automatic affected/not-affected decision, CRA reporting trigger or VEX statement. Those decisions require product-version applicability analysis and attributable human review. See [DEC-009](decisions/DEC-009-kev-epss-enrichment.md).
+
+
+## 8. Use the assessment CLI
+
+The CLI is an authenticated HTTP client. It uses the same API routes, authentication mode and authorization policies as other clients; it does not connect directly to the database.
+
+Configure the API endpoint and credential in the shell. Keep the token out of command-line arguments and logs.
+
+**Windows PowerShell**
+```powershell
+$env:DEVICETRUST_API_URL = "http://127.0.0.1:8000"
+$env:DEVICETRUST_API_KEY = "your-local-api-key"
+```
+
+**macOS / Linux**
+```bash
+export DEVICETRUST_API_URL="http://127.0.0.1:8000"
+export DEVICETRUST_API_KEY="your-local-api-key"
+```
+
+Run an assessment. The idempotency key is required; reusing it with unchanged source configuration returns the existing run, while a new key requests a new historical run.
+
+```bash
+python -m app.cli assess --import-id IMPORT_ID --idempotency-key demo-assessment-001
+```
+
+List the assessment history:
+
+```bash
+python -m app.cli history --import-id IMPORT_ID
+```
+
+Inspect findings from a specific run:
+
+```bash
+python -m app.cli findings --import-id IMPORT_ID --assessment-id ASSESSMENT_ID
+```
+
+All successful responses are JSON on stdout. Errors are JSON on stderr. Exit codes: `0` success, `2` local configuration/usage, `3` network/timeout, `4` authentication/authorization, `5` API request rejection, and `6` API server/unexpected response. Non-loopback endpoints must use HTTPS. Use `python -m app.cli --help` for command options.

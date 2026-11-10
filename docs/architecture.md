@@ -27,7 +27,7 @@ For normal typed endpoints, Pydantic validates request models. The SBOM route re
 |---|---|
 | `app/main.py` | FastAPI app, routes, authentication dependency, request orchestration and response serialization |
 | `app/identity.py` | Principal/credential verification, route-scope policy and credential lifecycle operations |
-| `app/identity_cli.py` | Offline principal creation, credential issuance/rotation/revocation and principal disablement |
+| `app/identity_cli.py` | Offline principal creation, credential issuance/rotation/revocation and principal disablement |\n| `app/cli.py` | Authenticated HTTP client for versioned SBOM assessment, history and findings; preserves API authorization and emits machine-readable JSON |
 | `app/applicability.py` | Source-aware classification of versioned findings without inferring VEX or `not_affected` decisions |
 | `app/vulnerability_decisions.py` | Append-only, attributable human review history for immutable assessment findings |
 | `app/schemas.py` | Pydantic request contracts and field constraints |
@@ -116,7 +116,7 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 | Justified vulnerability triage | Implemented prototype |
 | JSON/Markdown reports | Implemented prototype |
 | Hash-chain verification | Implemented with limitations |
-| Individual managed API credentials and route scopes | Implemented prototype; offline CLI administration, legacy mode remains default |
+| Individual managed API credentials and route scopes | Implemented prototype; offline CLI administration, legacy mode remains default |\n| Assessment CLI | Implemented API client; assess/history/findings commands with JSON output and stable exit codes |
 | Human login/MFA/SSO and tenant isolation | Not implemented |
 | External audit anchoring and immutable retention | Not implemented; transactional writer serialization is not an external checkpoint |
 
