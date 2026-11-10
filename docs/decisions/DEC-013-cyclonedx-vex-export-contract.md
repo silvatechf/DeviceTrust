@@ -51,8 +51,8 @@ Any failed gate blocks that statement. The exporter must return a structured val
 
 ### 4. Vulnerability and component mapping
 
-1. Emit one CycloneDX vulnerability statement per unique vulnerability identifier and product-context target set, aggregating only eligible current decisions from the selected import.
-2. Map `VulnerabilityDecision.state` to `analysis.state`, `justification` to `analysis.justification`, `responses` to `analysis.response`, and `detail` to `analysis.detail`.
+1. Group statements by vulnerability identifier and identical analysis tuple (state, justification, response set and detail). If decisions for the same vulnerability identifier require conflicting analysis tuples in the same product release, block the export with an explicit conflict; do not merge incompatible states into one vulnerability object or emit duplicate ambiguous identifiers.
+2. Map `VulnerabilityDecision.state` to `analysis.state`, `justification` to `analysis.justification`, `responses` to `analysis.response`, and `detail` to `analysis.detail`. The selected CycloneDX 1.5 schema must validate the resulting object; no internal state may be translated heuristically.
 3. Set `analysis.firstIssued` from the earliest exported decision revision timestamp and `analysis.lastUpdated` from the current decision timestamp. Timestamps must be UTC.
 4. Emit `affects[].ref` only from the exact preserved component `bom-ref`. Never fall back to component name, PURL, ordinal, or version matching.
 5. Do not invent vulnerability source names, source URLs, ratings, descriptions, affected-version ranges, or recommendations. Include optional vulnerability metadata only when a trustworthy source field is explicitly persisted and validated.
