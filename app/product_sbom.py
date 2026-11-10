@@ -322,6 +322,53 @@ def _component_identity(component: SBOMComponent) -> str | None:
         return None
 
 
+def _compare_component_versions(
+    previous: SBOMComponent, current: SBOMComponent
+) -> dict:
+    """Compare versions only where the PURL ecosystem has known semantics.
+
+    PyPI versions follow PEP 440 via packaging. Other ecosystems remain
+    explicitly unknown until their native comparison rules are implemented.
+    Raw source versions are always preserved in the diff snapshots.
+    """
+    from packageurl import PackageURL
+
+    try:
+        previous_purl = PackageURL.from_string(previous.purl or "")
+        current_purl = PackageURL.from_string(current.purl or "")
+    except (TypeError, ValueError):
+        return {"status": "unknown", "reason": "invalid_purl"}
+
+    if previous_purl.type != current_purl.type:
+        return {"status": "unknown", "reason": "ecosystem_mismatch"}
+    if previous_purl.type != "pypi":
+        return {
+            "status": "unknown",
+            "reason": "unsupported_version_scheme",
+            "ecosystem": previous_purl.type,
+        }
+
+    try:
+        old_version = Version(previous.version)
+        new_version = Version(current.version)
+    except InvalidVersion:
+        return {
+            "status": "unknown",
+            "reason": "invalid_pep440_version",
+            "ecosystem": "pypi",
+        }
+
+    status = (
+        "equivalent" if new_version == old_version else
+        "newer" if new_version > old_version else "older"
+    )
+    return {
+        "status": status,
+        "ecosystem": "pypi",
+        "scheme": "PEP 440",
+    }
+
+
 def _component_snapshot(component: SBOMComponent) -> dict:
     return {
         "id": component.id,
@@ -431,6 +478,8 @@ def compare_imports(
                 "previous": _component_snapshot(old_item),
                 "current": _component_snapshot(new_item),
                 "changes": dimensions,
+                **({"version_comparison": _compare_component_versions(old_item, new_item)}
+                   if "version" in dimensions else {}),
             })
         else:
             unchanged += 1

@@ -376,3 +376,65 @@ def test_product_sbom_diff_requires_authentication_and_same_release(client):
         params={"from_import_id": 0, "to_import_id": first_import},
         headers=H,
     ).status_code == 422
+
+
+def test_product_sbom_diff_uses_pep440_for_pypi_and_preserves_raw_versions(client):
+    release_id = _release(client, "PyPI Version Semantics Fixture")
+    previous_id = _import(
+        client, release_id,
+        [_component("requests", "1.0", "pkg:pypi/requests@1.0")],
+    )
+    current_id = _import(
+        client, release_id,
+        [_component("requests", "1.0.0", "pkg:pypi/requests@1.0.0")],
+    )
+
+    body = _diff(client, release_id, previous_id, current_id).json()
+
+    assert body["summary"]["changed"] == 1
+    change = body["changed"][0]
+    assert change["previous"]["version"] == "1.0"
+    assert change["current"]["version"] == "1.0.0"
+    assert change["version_comparison"] == {
+        "status": "equivalent", "ecosystem": "pypi", "scheme": "PEP 440"
+    }
+
+
+def test_product_sbom_diff_marks_unsupported_ecosystem_version_order_unknown(client):
+    release_id = _release(client, "Unknown Version Semantics Fixture")
+    previous_id = _import(
+        client, release_id,
+        [_component("lib", "1.9", "pkg:generic/lib@1.9")],
+    )
+    current_id = _import(
+        client, release_id,
+        [_component("lib", "1.10", "pkg:generic/lib@1.10")],
+    )
+
+    body = _diff(client, release_id, previous_id, current_id).json()
+
+    assert body["changed"][0]["version_comparison"] == {
+        "status": "unknown",
+        "reason": "unsupported_version_scheme",
+        "ecosystem": "generic",
+    }
+
+
+def test_product_sbom_diff_marks_invalid_pypi_versions_unknown(client):
+    release_id = _release(client, "Invalid PyPI Version Fixture")
+    previous_id = _import(
+        client, release_id,
+        [_component("requests", "release-one", "pkg:pypi/requests@release-one")],
+    )
+    current_id = _import(
+        client, release_id,
+        [_component("requests", "release-two", "pkg:pypi/requests@release-two")],
+    )
+
+    body = _diff(client, release_id, previous_id, current_id).json()
+
+    assert body["changed"][0]["version_comparison"] == {
+        "status": "unknown",
+        "reason": "invalid_pep440_version",
+        "ecosystem": "pypi",
+    }
