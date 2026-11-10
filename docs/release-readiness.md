@@ -23,7 +23,7 @@ The project can be presented as an engineering prototype if its boundaries are s
 - [x] Test concurrent complete API/domain writes and transaction failure behavior on SQLite and PostgreSQL.
 - [x] Verify Alembic upgrade/downgrade paths on disposable SQLite and PostgreSQL databases in CI, including decision-signature and approval schema revisions.
 - [x] Verify evidence-artifact migration upgrade/downgrade and PostgreSQL BLOB persistence on PR #64 head `b7728ab` (CI passed).
-- [ ] Verify decision evidence manifest migration upgrade/downgrade and PostgreSQL manifest persistence on the exact PR #65 head.
+- [x] Verify decision evidence manifest migration upgrade/downgrade and PostgreSQL manifest persistence on the exact PR #65 head; CI passed on `495d70b` and the change was integrated through [PR #65](https://github.com/silvatechf/DeviceTrust/pull/65).
 - [x] Cover product-release SBOM comparison semantics (PURL identity boundaries, ambiguity, unidentified components, release isolation, authentication and read-only behavior) in automated tests; exact PR-head CI and CodeQL evidence is recorded in [PR #33](https://github.com/silvatechf/DeviceTrust/pull/33).
 - [ ] Demonstrate backup/restore and rollback.
 - [ ] Inspect exact-candidate CI results (pre-commit configuration, runtime and development dependency audits, Ruff, Bandit, tests, PostgreSQL and Compose), CodeQL and Gitleaks; record their URLs and manually triage findings. For the main candidate `27efc34`, post-merge CI and CodeQL Python/JavaScript passed. Keep a fresh check for every later candidate.
@@ -55,7 +55,7 @@ A checkbox must be marked only when the check has actually been performed and ev
 - The audit-chain state migration is additive. Its downgrade removes the required lock row; the new application then fails closed on writes until the migration is reapplied or the previous application version is restored. Automated downgrade tests use isolated disposable databases only; production rollback still requires coordinated application/database rollback and a preserved backup.
 - CycloneDX support is a bounded subset.
 - Local advisories are synthetic; optional OSV lookup is best-effort.
-- Evidence normalization covers selected attributes only; observations are not associated automatically or consumed by posture. Observation-linked artifact BLOBs and server-computed digest checks are under validation; source authentication, malware scanning and exact decision-revision binding are not implemented.
+- Evidence normalization covers selected attributes only; observations are not associated automatically or consumed by posture. Observation-linked artifact BLOBs and server-computed digest checks are integrated through PR #64. Exact decision-revision manifests and signature/approval envelope v2 binding are integrated through PR #65. Source authentication and malware scanning are not implemented.
 - No global rate limiting, concurrency quota or operational alerting.
 - PostgreSQL migration/persistence is covered by CI; backup/restore, rollback and production TLS have not been demonstrated.
 
@@ -63,8 +63,8 @@ A checkbox must be marked only when the check has actually been performed and ev
 
 - Built a Python/FastAPI modular-monolith prototype for IoT inventory and declared security-posture assessment.
 - Implemented bounded evidence ingestion and a read-only normalized projection for selected attributes.
-- PR #65 adds immutable decision evidence manifests and signature/approval envelope v2 binding; keep release readiness pending until exact-head CI, PostgreSQL persistence and review pass.
-- Implemented bounded observation-linked artifact storage with server-computed SHA-256, byte-length verification, fail-closed downloads and transactional audit metadata (pending CI/review/integration in the current branch).
+- Implemented immutable decision evidence manifests and signature/approval envelope v2 binding through PR #65; exact-head CI, PostgreSQL integration, CodeQL and secret scanning passed before merge.
+- Implemented bounded observation-linked artifact storage with server-computed SHA-256, byte-length verification, fail-closed downloads and transactional audit metadata through PR #64.
 - Implemented bounded CycloneDX JSON parsing and PURL-based matching against synthetic demo advisories, with optional best-effort OSV lookup.
 - Implemented authenticated product-release SBOM persistence for a bounded CycloneDX JSON 1.5 subset, including import provenance metadata, component occurrences, digest-based idempotency and component-scoped synthetic findings.
 - Implemented justified vulnerability triage, JSON/Markdown reports and SHA-256 audit-chain verification.
