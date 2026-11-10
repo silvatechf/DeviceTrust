@@ -254,6 +254,7 @@ Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Contributions 
 | [Test matrix](docs/test-matrix.md) | Control-to-test mapping and manual verification gaps |
 | [Release readiness](docs/release-readiness.md) | Evidence required before a release |
 | [Roadmap](docs/roadmap.md) | Implemented work and next steps |
+| [Project continuity](docs/project-continuity.md) | Verified project baseline, delivery status and handoff checklist |
 | [Interview guide](docs/interview-guide.md) | A clear way to explain the project and defend decisions |
 | [Changelog](CHANGELOG.md) | Development history |
 
