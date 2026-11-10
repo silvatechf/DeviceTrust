@@ -88,12 +88,12 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Define stable JSON output, structured errors and documented process exit codes (PR #67).
 - [x] Preserve explicit incomplete assessment states and distinguish API/runtime errors from successful findings (PR #67; existing assessment contract).
 - [ ] Add a GitHub Action after the CLI contract is stable.
-- [ ] Add bounded authenticated CycloneDX JSON import to the CLI through the existing product-release API (PR #75 work; rebased candidate pending validation).
+- [x] Add bounded authenticated CycloneDX JSON import to the CLI through the existing product-release API (PR #77; exact-head CI and CodeQL passed).
 - [ ] Evaluate SPDX ingestion after the canonical component model is established.
 - [ ] Test common embedded/Yocto SBOM cases and document identifier gaps, backports and vendor modifications.
 - [ ] Provide synthetic fixtures and integration tests for pipeline usage.
 
-**Current status:** the authenticated `import`, `assess`, `history` and `findings` CLI commands are implemented on a candidate branch as a thin HTTP client. Import uploads a bounded local CycloneDX JSON file to an existing product release; parsing, validation, persistence and duplicate handling remain API responsibilities. Candidate validation is pending.
+**Current status:** the authenticated `import`, `assess`, `history` and `findings` CLI commands are merged as a thin HTTP client. Import uploads a bounded local CycloneDX JSON file to an existing product release; parsing, validation, persistence and duplicate handling remain API responsibilities (PR #77).
 
 **Exit criteria:** CLI and API continue to share the same assessment contract; a future pipeline integration must distinguish policy findings from assessment/runtime errors and incomplete intelligence.
 
@@ -147,7 +147,7 @@ See [Release readiness](release-readiness.md) for evidence required before a pub
 The strategic direction and customer/problem hypotheses are maintained in [Product Vision](product-vision.md). This section prioritises delivery across the existing milestones; it does not mark planned work as implemented.
 
 ### P0 — Consolidate the current workflow
-- [ ] Complete and merge authenticated CLI SBOM import only after exact-head checks and review.
+- [x] Complete and merge authenticated CLI SBOM import after exact-head CI and CodeQL checks (PR #77).
 - [ ] Verify the full API sequence: product/release, SBOM import, assessment, findings, decision, evidence manifest, signature, independent approval, VEX and history.
 - [ ] Keep README, test matrix, API contracts and continuity record consistent with the verified implementation.
 - **Gate:** reproducible API/CLI walkthrough with known limitations and validation evidence.
