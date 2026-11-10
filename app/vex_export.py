@@ -162,6 +162,9 @@ def export_cyclonedx_vex(
         if decision.state not in vulnerability_decisions.VEX_STATES:
             blockers.append({"finding_id": finding.id, "decision_id": decision.id, "code": "analysis_state_unsupported"})
             continue
+        if decision.state == "resolved_with_pedigree":
+            blockers.append({"finding_id": finding.id, "decision_id": decision.id, "code": "pedigree_evidence_not_supported"})
+            continue
         if decision.justification is not None and decision.justification not in vulnerability_decisions.VEX_JUSTIFICATIONS:
             blockers.append({"finding_id": finding.id, "decision_id": decision.id, "code": "analysis_justification_unsupported"})
             continue
