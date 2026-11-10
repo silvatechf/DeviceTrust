@@ -234,7 +234,6 @@ def test_vex_export_end_to_end_with_evidence_signature_and_independent_approval(
     from .test_decision_approvals import (
         _approval_submission,
         _operator,
-        _register,
         _sign_author,
     )
     from .test_decision_evidence import _artifact
