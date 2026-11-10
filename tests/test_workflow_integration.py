@@ -94,6 +94,7 @@ def test_product_release_api_cli_review_and_vex_workflow(
             "sbom:write",
             "inventory:write",
             "assessment:write",
+            "audit:read",
             "vex:export",
         },
     )
