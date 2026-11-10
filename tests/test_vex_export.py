@@ -226,40 +226,28 @@ def test_vex_export_rejects_service_principals(client, monkeypatch):
 
 
 
+
+
 def test_vex_export_end_to_end_with_evidence_signature_and_independent_approval(
     client, monkeypatch
 ):
-    import base64
-
-    from app import decision_signatures
-    from .test_decision_signatures import _keypair, _register
+    from .test_decision_approvals import (
+        _approval_submission,
+        _operator,
+        _register,
+        _sign_author,
+    )
+    from .test_decision_evidence import _artifact
 
     release_id, import_id, assessment_id, finding_id = _release_with_import()
-    artifact_response = client.post(
-        "/evidence",
-        headers=H,
-        json={
-            "source_type": "manual",
-            "attribute": "firmware_note",
-            "value": "Synthetic evidence supporting the reviewed vulnerability decision.",
-        },
-    )
-    assert artifact_response.status_code == 201, artifact_response.text
-    observation_id = artifact_response.json()["id"]
-    artifact_response = client.post(
-        f"/evidence/{observation_id}/artifacts",
-        headers={**H, "Content-Type": "application/octet-stream"},
-        content=b"synthetic evidence artifact for VEX export integration test",
-    )
-    assert artifact_response.status_code == 201, artifact_response.text
-    artifact_id = artifact_response.json()["id"]
-
+    artifact_id, _artifact_digest = _artifact(client)
     author_id, author_token = _token(
         {
             "assessment:review",
             "assessment:sign",
             "assessment:read",
             "evidence:read",
+            "evidence:write",
             "vex:export",
         }
     )
@@ -288,71 +276,19 @@ def test_vex_export_end_to_end_with_evidence_signature_and_independent_approval(
     assert manifest_response.status_code == 201, manifest_response.text
     assert manifest_response.json()["integrity_valid"] is True
 
-    author_private, author_public = _keypair()
-    author_key_id, _ = _register(author_id, author_public)
-    signing_payload = client.get(
-        f"/sbom/decisions/{decision_id}/signing-payload",
-        params={"key_id": author_key_id},
-        headers=author_headers,
-    )
-    assert signing_payload.status_code == 200, signing_payload.text
-    signing_bytes = base64.b64decode(
-        signing_payload.json()["signing_payload_base64"], validate=True
-    )
-    signature_response = client.post(
-        f"/sbom/decisions/{decision_id}/signature",
-        headers=author_headers,
-        json={
-            "key_id": author_key_id,
-            "signature": base64.b64encode(author_private.sign(signing_bytes)).decode(
-                "ascii"
-            ),
-        },
-    )
-    assert signature_response.status_code == 201, signature_response.text
-    signature_status = client.get(
-        f"/sbom/decisions/{decision_id}/signature",
-        headers=author_headers,
-    )
-    assert signature_status.status_code == 200
-    assert signature_status.json()["trust_valid"] is True
+    _sign_author(client, author_token, decision_id, author_id)
 
-    approver_private, approver_public = _keypair()
-    with SessionLocal() as db:
-        approver, _credential, approver_token = identity.create_principal(
-            db,
-            name="Independent VEX integration approver",
-            kind="operator",
-            scopes={"assessment:approve", "assessment:read"},
-        )
-        approval_key = decision_signatures.register_public_key(
-            db,
-            principal_id=approver.id,
-            public_key_pem=approver_public,
-            purpose="decision-approval",
-        )
-        approval_key_id = approval_key.id
-        db.commit()
-    approver_headers = {"X-API-Key": approver_token}
-    approval_payload = client.get(
-        f"/sbom/decisions/{decision_id}/approval-payload",
-        params={"key_id": approval_key_id},
-        headers=approver_headers,
+    approver_id, approver_token = _operator(
+        "Independent VEX integration approver",
+        scopes={"assessment:approve", "assessment:read"},
     )
-    assert approval_payload.status_code == 200, approval_payload.text
-    approval_bytes = base64.b64decode(
-        approval_payload.json()["signing_payload_base64"], validate=True
+    approval_payload = _approval_submission(
+        client, decision_id, approver_id, approver_token
     )
     approval_response = client.post(
         f"/sbom/decisions/{decision_id}/approval",
-        headers=approver_headers,
-        json={
-            "key_id": approval_key_id,
-            "approved_at": approval_payload.json()["approved_at"],
-            "signature": base64.b64encode(
-                approver_private.sign(approval_bytes)
-            ).decode("ascii"),
-        },
+        headers={"X-API-Key": approver_token},
+        json=approval_payload,
     )
     assert approval_response.status_code == 201, approval_response.text
     approval_status = client.get(
