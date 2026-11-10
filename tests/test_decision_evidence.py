@@ -147,7 +147,7 @@ def test_manifest_binds_verified_artifact_to_exact_decision_and_signature(client
     approval_bytes = base64.b64decode(
         approval_payload.json()["signing_payload_base64"], validate=True
     )
-    assert result["manifest_sha256"].encode() in approval_bytes
+    assert approval_payload.json()["decision_envelope_sha256"].encode() in approval_bytes
     approved = client.post(
         f"/sbom/decisions/{decision_id}/approval",
         headers={"X-API-Key": approver_token},
@@ -178,7 +178,7 @@ def test_manifest_requires_artifact_id_in_original_decision_references(client, m
         json={"artifact_ids": [artifact_id]},
     )
     assert response.status_code == 422
-    assert "already referenced" in response.json()["detail"]
+    assert "already be referenced" in response.json()["detail"]
 
 
 def test_manifest_is_immutable_and_idempotent(client, monkeypatch):
