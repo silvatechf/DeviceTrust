@@ -58,7 +58,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped synthetic findings. It now includes read-only comparison of accepted imports for the same release. Duplicate identities and components without usable PURLs remain unresolved. Comparison does not re-evaluate vulnerability intelligence.
 
-**Remaining exit criteria:** broaden format/field coverage and implement ecosystem-aware version semantics. Release-wide reassessment is implemented, but scheduling and automatic triggers on feed changes are not.
+**Remaining exit criteria:** broaden format/field coverage and add native version semantics for ecosystems beyond the initial PyPI/PEP 440 adapter. Vendor backport handling and source/binary package relationships remain open. Release-wide reassessment is on-demand; scheduling and automatic triggers on feed changes are not implemented.
 
 ## Milestone 4 — Reviewed vulnerability decisions and intelligence (P2)
 
@@ -91,7 +91,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Test common embedded/Yocto SBOM cases and document identifier gaps, backports and vendor modifications.
 - [ ] Provide synthetic fixtures and integration tests for pipeline usage.
 
-**Exit criteria:** CLI and API produce consistent assessments; pipeline results distinguish policy findings from assessment/runtime errors and incomplete intelligence.
+**Current status:** the authenticated `assess`, `history` and `findings` CLI commands are implemented as a thin HTTP client; they do not open the database or duplicate assessment logic.\n\n**Exit criteria:** CLI and API continue to share the same assessment contract; a future pipeline integration must distinguish policy findings from assessment/runtime errors and incomplete intelligence.
 
 ## Milestone 6 — Identity, governance and audit assurance (P2)
 
