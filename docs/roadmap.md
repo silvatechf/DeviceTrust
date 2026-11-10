@@ -78,7 +78,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Treat KEV and EPSS as prioritisation signals, not automatic CRA Article 14 triggers.
 - [ ] Support reviewed reporting drafts only; no automatic legal timer or ENISA submission.
 
-**Exit criteria:** every exported VEX statement is product-version scoped, attributable and justified; no unsupported not_affected claim can be emitted. Review records, detached decision signatures, independent second-person approval, observation-linked artifact byte integrity and decision-revision manifest binding are integrated through PRs #56, #58, #62, #64 and #65. Source authentication, external audit anchoring and VEX export remain open.
+**Exit criteria:** every exported VEX statement is product-version scoped, attributable and justified; no unsupported not_affected claim can be emitted. Review records, detached decision signatures, independent second-person approval, observation-linked artifact byte integrity and decision-revision manifest binding are integrated through PRs #56, #58, #62, #64 and #65. Source authentication, external audit anchoring and VEX export implementation remain open. The VEX export contract is documented in DEC-013.
 
 ## Milestone 5 — Developer workflow and ecosystem support (P3)
 
