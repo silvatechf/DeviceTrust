@@ -49,11 +49,11 @@ Implemented prototype workflows:
 16. Register operator-controlled Ed25519 public keys and verify append-only detached signatures bound to exact immutable decision revisions, including key-rotation history (integrated through PR #58).
 17. Enforce a separate, policy-versioned second-person approval workflow with a distinct operator principal and approval-purpose key (integrated through PR #62).
 18. Attach bounded evidence artifacts to observations, compute SHA-256 server-side and verify stored bytes before download (integrated into `main` through PR #64).
-19. Bind immutable artifact manifests to exact decision revisions and include the manifest digest in v2 Ed25519 signature and approval envelopes (integrated into `main` through PR #65; exact-head CI, CodeQL and security checks passed).
+19. Bind immutable artifact manifests to exact decision revisions and include the manifest digest in v2 Ed25519 signature and approval envelopes (integrated into `main` through PR #65; exact-head CI, CodeQL and security checks passed).\n20. Run and inspect versioned SBOM assessments from an authenticated CLI client using the same API contracts and authorization boundary.
 
 Evidence observations are currently stored separately from posture inputs. Actual artifact bytes can be attached to observations with server-computed SHA-256 integrity checks, but this does not prove source authenticity or claim truth. Artifact-to-decision-revision binding was integrated into `main` through PR #65; exact-head CI, PostgreSQL integration, CodeQL and secret scanning passed. Ingestion does not identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. The merged implementation is covered by successful post-merge CI and CodeQL runs for the current main commit. PostgreSQL integration and API-flow tests are included in the automated test suite, while a clean local Compose walkthrough remains part of the release gate.
 
-### Product-scoped SBOM API
+### Assessment CLI\n\nThe CLI is an authenticated client of the DeviceTrust API; it does not open the database or bypass route authorization. Configure `DEVICETRUST_API_KEY` and optionally `DEVICETRUST_API_URL` (default: `http://127.0.0.1:8000`). Non-loopback endpoints require HTTPS. Run `python -m app.cli --help` for usage. The `assess`, `history` and `findings` commands emit stable JSON on stdout; errors are emitted as JSON on stderr with documented process exit codes.\n\n### Product-scoped SBOM API
 
 The persistent SBOM work introduces these authenticated endpoints:
 
