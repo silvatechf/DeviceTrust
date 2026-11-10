@@ -57,6 +57,7 @@ _ROUTE_SCOPES = (
     ("POST", re.compile(r"/product-releases/[^/]+/sbom"), frozenset({"sbom:write"})),
     ("GET", re.compile(r"/product-releases/[^/]+/sbom"), frozenset({"sbom:read"})),
     ("GET", re.compile(r"/product-releases/[^/]+/sbom/diff"), frozenset({"sbom:read"})),
+    ("POST", re.compile(r"/product-releases/[^/]+/assessments"), frozenset({"assessment:write"})),
     ("POST", re.compile(r"/sbom/imports/[^/]+/assessments"), frozenset({"assessment:write"})),
     ("GET", re.compile(r"/sbom/imports/[^/]+/assessments"), frozenset({"assessment:read"})),
     ("GET", re.compile(r"/sbom/imports/[^/]+/assessments/[^/]+/findings"), frozenset({"assessment:read"})),

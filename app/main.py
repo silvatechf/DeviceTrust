@@ -295,6 +295,23 @@ def compare_product_sbom_imports(
         raise HTTPException(404, str(error)) from None
 
 
+@app.post("/product-releases/{release_id}/assessments")
+async def reassess_product_release(
+    release_id: int,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    db: Session = Depends(get_db),
+    actor: str = Depends(auth),
+):
+    try:
+        return await product_sbom.reassess_release(
+            db, actor, release_id, idempotency_key
+        )
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from None
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from None
+
+
 @app.post("/sbom/imports/{import_id}/assessments")
 async def reassess_product_sbom(
     import_id: int,

@@ -51,14 +51,14 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Add duplicate detection and idempotent re-import behavior for the same release, format and content digest.
 - [x] Link synthetic vulnerability findings to exact component occurrences.
 - [x] Compare accepted SBOM imports and explain additions, removals and matched-component changes using PURL identity that excludes only the version segment while preserving qualifiers and subpath; report ambiguous and unidentified occurrences without speculative matching.
-- [ ] Re-evaluate stored product releases when vulnerability intelligence changes.
+- [x] Re-evaluate all accepted SBOM imports for a product release through an authenticated, resumable API workflow. Each import receives an independent append-only assessment run; repeated requests with the same idempotency key do not duplicate completed runs. See `POST /product-releases/{release_id}/assessments`.
 
 **Implemented:** PR #45 added append-only assessment runs and findings for accepted SBOM imports, reuses the bounded local/OSV scanner, records enrichment coverage, and persists each run with its audit event after external I/O.
 - [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
 **Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped synthetic findings. It now includes read-only comparison of accepted imports for the same release. Duplicate identities and components without usable PURLs remain unresolved. Comparison does not re-evaluate vulnerability intelligence.
 
-**Remaining exit criteria:** stored product releases can be re-evaluated when intelligence changes, with broader format/field coverage and ecosystem-aware version semantics implemented and tested.
+**Remaining exit criteria:** broaden format/field coverage and implement ecosystem-aware version semantics. Release-wide reassessment is implemented, but scheduling and automatic triggers on feed changes are not.
 
 ## Milestone 4 — Reviewed vulnerability decisions and intelligence (P2)
 

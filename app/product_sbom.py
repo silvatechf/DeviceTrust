@@ -727,3 +727,84 @@ async def reassess_import(
     except Exception:
         db.rollback()
         raise
+
+
+async def reassess_release(
+    db: Session,
+    actor: str,
+    release_id: int,
+    request_key: str,
+    *,
+    max_imports: int = 100,
+) -> dict:
+    """Reassess every accepted SBOM import for a release.
+
+    Each import is committed independently by reassess_import. A retry with
+    the same release request key safely retrieves completed runs and continues
+    imports that did not complete during the previous attempt.
+    """
+    if not request_key or not request_key.strip() or len(request_key) > 128:
+        raise ValueError("Idempotency-Key must contain between 1 and 128 non-whitespace characters.")
+
+    if db.get(ProductRelease, release_id) is None:
+        raise LookupError("Product release not found")
+
+    import_ids = db.scalars(
+        select(SBOMImport.id)
+        .where(
+            SBOMImport.product_release_id == release_id,
+            SBOMImport.status == "accepted",
+        )
+        .order_by(SBOMImport.imported_at, SBOMImport.id)
+        .limit(max_imports + 1)
+    ).all()
+    if len(import_ids) > max_imports:
+        raise ValueError(
+            f"Release contains more than {max_imports} accepted SBOM imports; assess imports individually."
+        )
+
+    # Release enumeration is read-only; end its transaction before each
+    # reassessment acquires the serialized audit writer lock (SQLite BEGIN IMMEDIATE).
+    db.rollback()
+
+    results = []
+    for import_id in import_ids:
+        per_import_key = hashlib.sha256(
+            f"release:{release_id}:{request_key}:{import_id}".encode("utf-8")
+        ).hexdigest()
+        try:
+            assessment, created = await reassess_import(
+                db, actor, import_id, per_import_key
+            )
+            results.append({
+                "sbom_import_id": import_id,
+                "assessment": assessment,
+                "created": created,
+            })
+        except (LookupError, ValueError) as error:
+            # Earlier imports may already have committed. Report a resumable
+            # partial result instead of implying the whole release rolled back.
+            results.append({
+                "sbom_import_id": import_id,
+                "error": str(error),
+            })
+
+    errors = sum("error" in item for item in results)
+    statuses = [
+        item["assessment"]["status"]
+        for item in results
+        if "assessment" in item
+    ]
+    return {
+        "product_release_id": release_id,
+        "status": "partial" if errors else (
+            "incomplete" if "incomplete" in statuses else
+            "disabled" if statuses and all(value == "disabled" for value in statuses) else
+            "complete" if statuses else "empty"
+        ),
+        "import_count": len(import_ids),
+        "assessment_count": len(statuses),
+        "created_count": sum(item.get("created", False) for item in results),
+        "error_count": errors,
+        "results": results,
+    }
