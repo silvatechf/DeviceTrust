@@ -9,3 +9,4 @@ psycopg[binary]>=3.2
 packageurl-python>=0.16
 cryptography>=44.0.1
 rfc8785>=0.1.4
+jsonschema>=4.22
