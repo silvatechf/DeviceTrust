@@ -55,7 +55,7 @@ The following capabilities are documented as implemented in the current prototyp
 - Independent second-person approval.
 - Immutable evidence manifests bound to decision revisions and signature/approval envelope v2.
 - Conservative CycloneDX 1.5 VEX export under DEC-013, with fail-closed eligibility and schema validation.
-- Authenticated CLI client for assessment, history and findings.
+- Authenticated CLI client for assessment, history and findings; CycloneDX import is under validation on a rebased candidate branch.
 - Managed API principals and scoped credentials, while legacy shared-key mode remains backwards-compatible default.
 - Audit hash-chain verification and transactional serialization of concurrent writers.
 
@@ -65,7 +65,7 @@ For endpoint details and exact limitations, use the README and relevant implemen
 
 **Workstream:** complete the CLI SBOM import increment, then deliver a coherent operator-facing vertical slice (see [Product Vision](product-vision.md) and [Roadmap](roadmap.md)).
 
-**Active PR:** #75 — authenticated CycloneDX SBOM import (`feat/cli-cyclonedx-import`). At reconciliation, PR #75 is open and unmerged; exact head `ecbc6ebfdd5c024de67b0d477589f5d1bd917e90`. The CI and CodeQL workflow runs queried for that exact SHA completed successfully. Re-check live PR state and exact-head checks before any merge; do not merge without explicit authorization. After this increment, verify the complete API/CLI walkthrough and proceed to the operator-facing vertical slice.
+**Active work:** authenticated CycloneDX SBOM import. Original PR #75 (`feat/cli-cyclonedx-import`) has successful CI and CodeQL runs on exact head `ecbc6ebfdd5c024de67b0d477589f5d1bd917e90`, but became non-mergeable after the product-vision/roadmap documentation merge changed overlapping files. A rebased candidate branch `feat/cli-cyclonedx-import-rebased` was created from current main (`e211d9636508e4edaaa66126d1d3fefdd9cd6717`) and includes a bounded-read hardening adjustment. Candidate tests and exact-head CI are pending. Do not treat either PR as merged. After validation, replace the stale PR with a focused PR and verify the complete API/CLI walkthrough.
 
 Why this order:
 - The existing CLI exposes `assess`, `history` and `findings`, but expects an existing `import_id`.
