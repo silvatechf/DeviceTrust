@@ -5,6 +5,95 @@ import httpx
 from app import cli
 
 
+def test_import_uploads_authenticated_sbom_to_product_release(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("DEVICETRUST_API_KEY", "test-token")
+    sbom = tmp_path / "bom.json"
+    sbom.write_text('{"bomFormat":"CycloneDX","specVersion":"1.5"}', encoding="utf-8")
+
+    def handler(request):
+        assert request.method == "POST"
+        assert request.url.path == "/product-releases/9/sbom"
+        assert request.url.params["source_type"] == "pipeline"
+        assert request.url.params["source_reference"] == "build-123"
+        assert request.headers["X-API-Key"] == "test-token"
+        assert request.headers["Content-Type"] == "application/json"
+        assert request.headers["Accept"] == "application/json"
+        assert request.content == b'{"bomFormat":"CycloneDX","specVersion":"1.5"}'
+        return httpx.Response(201, json={"id": 17, "created": True})
+
+    code = cli.main(
+        ["import", "--release-id", "9", "--file", str(sbom), "--source-reference", "build-123"],
+        transport=httpx.MockTransport(handler),
+    )
+
+    captured = capsys.readouterr()
+    assert code == cli.EXIT_OK
+    assert json.loads(captured.out) == {"id": 17, "created": True}
+    assert captured.err == ""
+
+
+def test_import_does_not_follow_redirects_or_forward_token(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("DEVICETRUST_API_KEY", "test-token")
+    sbom = tmp_path / "bom.json"
+    sbom.write_text("{}", encoding="utf-8")
+
+    def handler(request):
+        assert request.headers["X-API-Key"] == "test-token"
+        return httpx.Response(307, headers={"Location": "https://other.example/upload"})
+
+    code = cli.main(
+        ["import", "--release-id", "9", "--file", str(sbom)],
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert code == cli.EXIT_API
+    assert "307" in capsys.readouterr().err
+
+
+def test_import_rejects_missing_file_before_network(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("DEVICETRUST_API_KEY", "test-token")
+
+    code = cli.main(["import", "--release-id", "9", "--file", str(tmp_path / "missing.json")])
+
+    assert code == cli.EXIT_CONFIG
+    assert "existing regular file" in capsys.readouterr().err
+
+
+def test_import_rejects_oversized_file_before_network(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("DEVICETRUST_API_KEY", "test-token")
+    sbom = tmp_path / "large.json"
+    sbom.write_bytes(b"x" * (cli.MAX_SBOM_BYTES + 1))
+
+    code = cli.main(["import", "--release-id", "9", "--file", str(sbom)])
+
+    assert code == cli.EXIT_CONFIG
+    assert "2 MiB" in capsys.readouterr().err
+
+
+def test_import_rejects_non_positive_release_id(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("DEVICETRUST_API_KEY", "test-token")
+    sbom = tmp_path / "bom.json"
+    sbom.write_text("{}", encoding="utf-8")
+
+    code = cli.main(["import", "--release-id", "0", "--file", str(sbom)])
+
+    assert code == cli.EXIT_CONFIG
+    assert "positive integer" in capsys.readouterr().err
+
+
+def test_import_rejects_oversized_source_reference(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("DEVICETRUST_API_KEY", "test-token")
+    sbom = tmp_path / "bom.json"
+    sbom.write_text("{}", encoding="utf-8")
+
+    code = cli.main(
+        ["import", "--release-id", "9", "--file", str(sbom), "--source-reference", "x" * 501]
+    )
+
+    assert code == cli.EXIT_CONFIG
+    assert "500 characters" in capsys.readouterr().err
+
+
 def test_assess_sends_auth_and_idempotency_key_and_emits_json(monkeypatch, capsys):
     monkeypatch.setenv("DEVICETRUST_API_KEY", "test-token")
 
@@ -111,3 +200,22 @@ def test_non_positive_ids_are_rejected_before_request(monkeypatch, capsys):
 
     assert code == cli.EXIT_CONFIG
     assert "positive integer" in capsys.readouterr().err
+
+
+def test_import_network_failure_has_network_exit_code(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("DEVICETRUST_API_KEY", "test-token")
+    sbom = tmp_path / "bom.json"
+    sbom.write_text("{}", encoding="utf-8")
+
+    def handler(_request):
+        raise httpx.ConnectError("sensitive transport detail")
+
+    code = cli.main(
+        ["import", "--release-id", "9", "--file", str(sbom)],
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert code == cli.EXIT_NETWORK
+    error = capsys.readouterr().err
+    assert "could not be reached" in error
+    assert "sensitive transport detail" not in error
