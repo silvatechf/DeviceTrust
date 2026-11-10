@@ -75,7 +75,7 @@ Versioned assessment findings retain separate source-aware applicability signals
 
 The authenticated `GET /product-releases/{release_id}/sbom/diff` endpoint compares two accepted imports belonging to the same product release. It removes only the PURL version segment when constructing component identity; qualifiers and subpath remain identity boundaries. Additions and removals are reported separately. Matched components with changes appear once with a `changes` array containing `version`, `name`, or both. Duplicate identities are reported as ambiguous. Components without a usable PURL remain unidentified and are never matched by name or ordinal. The comparison is read-only and does not re-evaluate vulnerability findings. PURL identity does not prove artifact or supplier equivalence.
 
-### Triage and audit
+### Release-wide reassessment\n\nThe authenticated `POST /product-releases/{release_id}/assessments` endpoint enumerates up to 100 accepted SBOM imports for a release and invokes the existing versioned assessment workflow for each import. Each import commits independently and receives a deterministic idempotency key derived from the release request key and import ID. Repeating the same request retrieves completed runs without duplicating them; a partial response identifies imports that failed so the caller can retry safely. Assessment findings remain append-only. This is an on-demand API operation, not a scheduled feed-change watcher.\n\n### Triage and audit
 
 A triage update requires a justification. State-changing operations append audit entries in the same database transaction as the domain mutation. Authenticated write requests acquire the singleton audit-chain state row before database reads; PostgreSQL serializes through the row update lock, while SQLite starts an IMMEDIATE write transaction. Both backends use a 10-second lock wait bound. The lock is held until commit or rollback, so concurrent application writers sharing the same database cannot append from the same chain head. Each entry hashes its content and the previous entry hash. The chain has no external checkpoint and is not immutable storage.
 
@@ -116,7 +116,7 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 | Justified vulnerability triage | Implemented prototype |
 | JSON/Markdown reports | Implemented prototype |
 | Hash-chain verification | Implemented with limitations |
-| Individual managed API credentials and route scopes | Implemented prototype; offline CLI administration, legacy mode remains default |\n| Assessment CLI | Implemented API client; assess/history/findings commands with JSON output and stable exit codes |
+| Individual managed API credentials and route scopes | Implemented prototype; offline CLI administration, legacy mode remains default |\n| Assessment CLI | Implemented API client; assess/history/findings commands with JSON output and stable exit codes |\n| Release-wide reassessment | Implemented on-demand API workflow; accepted imports assessed independently with resumable idempotency |
 | Human login/MFA/SSO and tenant isolation | Not implemented |
 | External audit anchoring and immutable retention | Not implemented; transactional writer serialization is not an external checkpoint |
 
