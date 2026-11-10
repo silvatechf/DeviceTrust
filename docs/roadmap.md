@@ -85,7 +85,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 **Goal:** make the assessment workflow usable in engineering pipelines without duplicating business logic.
 
 - [x] Add an authenticated CLI client that calls the existing API and preserves its authorization boundary (PR #67).
-- [x] Add bounded authenticated CycloneDX JSON import to the CLI through the existing product-release API (CLI import implementation; PR pending).
+- [ ] Add bounded authenticated CycloneDX JSON import to the CLI through the existing product-release API (PR #75 open).
 - [x] Define stable JSON output, structured errors and documented process exit codes (PR #67).
 - [x] Preserve explicit incomplete assessment states and distinguish API/runtime errors from successful findings (PR #67; existing assessment contract).
 - [ ] Add a GitHub Action after the CLI contract is stable.
