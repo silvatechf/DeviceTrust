@@ -223,3 +223,162 @@ def test_vex_export_rejects_service_principals(client, monkeypatch):
         headers={"X-API-Key": token},
     )
     assert response.status_code == 403
+
+
+
+def test_vex_export_end_to_end_with_evidence_signature_and_independent_approval(
+    client, monkeypatch
+):
+    import base64
+
+    from app import decision_signatures
+    from .test_decision_signatures import _keypair, _register
+
+    release_id, import_id, assessment_id, finding_id = _release_with_import()
+    artifact_response = client.post(
+        "/evidence",
+        headers=H,
+        json={
+            "source_type": "manual",
+            "attribute": "firmware_note",
+            "value": "Synthetic evidence supporting the reviewed vulnerability decision.",
+        },
+    )
+    assert artifact_response.status_code == 201, artifact_response.text
+    observation_id = artifact_response.json()["id"]
+    artifact_response = client.post(
+        f"/evidence/{observation_id}/artifacts",
+        headers={**H, "Content-Type": "application/octet-stream"},
+        content=b"synthetic evidence artifact for VEX export integration test",
+    )
+    assert artifact_response.status_code == 201, artifact_response.text
+    artifact_id = artifact_response.json()["id"]
+
+    author_id, author_token = _token(
+        {
+            "assessment:review",
+            "assessment:sign",
+            "assessment:read",
+            "evidence:read",
+            "vex:export",
+        }
+    )
+    monkeypatch.setenv("DEVICETRUST_AUTH_MODE", "managed")
+    author_headers = {"X-API-Key": author_token}
+    decision_response = client.post(
+        f"/sbom/assessment-findings/{finding_id}/decisions",
+        headers={
+            **author_headers,
+            "Idempotency-Key": f"vex-e2e-{finding_id}",
+        },
+        json={
+            "state": "in_triage",
+            "detail": "Synthetic review completed for the end-to-end VEX export test.",
+            "evidence_references": [artifact_id],
+        },
+    )
+    assert decision_response.status_code == 201, decision_response.text
+    decision_id = decision_response.json()["id"]
+
+    manifest_response = client.post(
+        f"/sbom/decisions/{decision_id}/evidence-manifest",
+        headers=author_headers,
+        json={"artifact_ids": [artifact_id]},
+    )
+    assert manifest_response.status_code == 201, manifest_response.text
+    assert manifest_response.json()["integrity_valid"] is True
+
+    author_private, author_public = _keypair()
+    author_key_id, _ = _register(author_id, author_public)
+    signing_payload = client.get(
+        f"/sbom/decisions/{decision_id}/signing-payload",
+        params={"key_id": author_key_id},
+        headers=author_headers,
+    )
+    assert signing_payload.status_code == 200, signing_payload.text
+    signing_bytes = base64.b64decode(
+        signing_payload.json()["signing_payload_base64"], validate=True
+    )
+    signature_response = client.post(
+        f"/sbom/decisions/{decision_id}/signature",
+        headers=author_headers,
+        json={
+            "key_id": author_key_id,
+            "signature": base64.b64encode(author_private.sign(signing_bytes)).decode(
+                "ascii"
+            ),
+        },
+    )
+    assert signature_response.status_code == 201, signature_response.text
+    signature_status = client.get(
+        f"/sbom/decisions/{decision_id}/signature",
+        headers=author_headers,
+    )
+    assert signature_status.status_code == 200
+    assert signature_status.json()["trust_valid"] is True
+
+    approver_private, approver_public = _keypair()
+    with SessionLocal() as db:
+        approver, _credential, approver_token = identity.create_principal(
+            db,
+            name="Independent VEX integration approver",
+            kind="operator",
+            scopes={"assessment:approve", "assessment:read"},
+        )
+        approval_key = decision_signatures.register_public_key(
+            db,
+            principal_id=approver.id,
+            public_key_pem=approver_public,
+            purpose="decision-approval",
+        )
+        approval_key_id = approval_key.id
+        db.commit()
+    approver_headers = {"X-API-Key": approver_token}
+    approval_payload = client.get(
+        f"/sbom/decisions/{decision_id}/approval-payload",
+        params={"key_id": approval_key_id},
+        headers=approver_headers,
+    )
+    assert approval_payload.status_code == 200, approval_payload.text
+    approval_bytes = base64.b64decode(
+        approval_payload.json()["signing_payload_base64"], validate=True
+    )
+    approval_response = client.post(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers=approver_headers,
+        json={
+            "key_id": approval_key_id,
+            "approved_at": approval_payload.json()["approved_at"],
+            "signature": base64.b64encode(
+                approver_private.sign(approval_bytes)
+            ).decode("ascii"),
+        },
+    )
+    assert approval_response.status_code == 201, approval_response.text
+    approval_status = client.get(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers=author_headers,
+    )
+    assert approval_status.status_code == 200
+    assert approval_status.json()["approval_policy_satisfied"] is True
+
+    export_url = f"/product-releases/{release_id}/sbom/{import_id}/vex"
+    export_params = {"assessment_id": assessment_id}
+    first_export = client.post(
+        export_url, params=export_params, headers=author_headers
+    )
+    assert first_export.status_code == 200, first_export.text
+    exported = first_export.json()
+    assert exported["decision_count"] == 1
+    assert exported["vulnerability_count"] == 1
+    vulnerability = exported["bom"]["vulnerabilities"][0]
+    assert vulnerability["id"] == "CVE-2026-12345"
+    assert vulnerability["analysis"]["state"] == "in_triage"
+    assert vulnerability["affects"] == [{"ref": "openssl-3"}]
+
+    retry_export = client.post(
+        export_url, params=export_params, headers=author_headers
+    )
+    assert retry_export.status_code == 200, retry_export.text
+    assert retry_export.json()["bom"] == exported["bom"]
+    assert retry_export.json()["bom_sha256"] == exported["bom_sha256"]
