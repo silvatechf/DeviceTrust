@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 
-from app import audit, identity, vulnerability_decisions, vex_export
+from app import audit, identity, vex_export
 from app.db import (
     Product,
     ProductRelease,
