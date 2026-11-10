@@ -22,6 +22,7 @@ from . import (
     posture,
     product_sbom,
     sbom,
+    vex_export,
     vulnerability_decisions,
 )
 from .db import (
@@ -29,6 +30,7 @@ from .db import (
     Device,
     EvidenceArtifact,
     EvidenceObservation,
+    Principal,
     ProductFinding,
     ProductRelease,
     SBOMComponent,
@@ -293,6 +295,54 @@ def compare_product_sbom_imports(
         )
     except LookupError as error:
         raise HTTPException(404, str(error)) from None
+
+
+@app.post("/product-releases/{release_id}/sbom/{import_id}/vex")
+def export_product_release_vex(
+    release_id: int,
+    import_id: int,
+    assessment_id: int = Query(gt=0),
+    db: Session = Depends(get_write_db),
+    actor: str = Depends(auth),
+):
+    if not actor.startswith("principal:"):
+        raise HTTPException(403, "VEX export requires a managed operator principal")
+    principal = db.get(Principal, actor.removeprefix("principal:"))
+    if principal is None or principal.status != "active" or principal.kind != "operator":
+        raise HTTPException(403, "VEX export requires an active operator principal")
+    try:
+        result = vex_export.export_cyclonedx_vex(
+            db, release_id=release_id, import_id=import_id, assessment_id=assessment_id
+        )
+        audit.record(
+            db, actor, "product_sbom.vex.export", str(import_id),
+            {
+                "release_id": release_id,
+                "import_id": import_id,
+                "assessment_id": assessment_id,
+                "bom_sha256": result["bom_sha256"],
+                "decision_count": result["decision_count"],
+                "vulnerability_count": result["vulnerability_count"],
+            },
+        )
+        db.commit()
+        return result
+    except LookupError as error:
+        db.rollback()
+        raise HTTPException(404, str(error)) from None
+    except vex_export.VEXExportConflict as error:
+        db.rollback()
+        try:
+            detail = json.loads(str(error))
+        except (TypeError, ValueError):
+            detail = {"code": "vex_export_blocked"}
+        raise HTTPException(409, detail) from None
+    except vex_export.VEXSchemaUnavailable:
+        db.rollback()
+        raise HTTPException(503, "CycloneDX 1.5 validation schema is unavailable") from None
+    except decision_evidence.EvidenceManifestIntegrityError:
+        db.rollback()
+        raise HTTPException(409, {"code": "evidence_manifest_integrity_failed"}) from None
 
 
 @app.post("/product-releases/{release_id}/assessments")

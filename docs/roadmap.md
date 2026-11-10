@@ -72,13 +72,13 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Add conservative PEP 440 version comparison for matched PyPI PURLs; unsupported ecosystems and invalid versions remain explicitly unknown.
 - [ ] Add native Debian/RPM/npm/Maven/Go version semantics, vendor backport handling and source/binary package relationships beyond OSV provider matching.
 - [x] Add attributable, append-only human-reviewed vulnerability decisions linked to immutable assessment findings; require CycloneDX justification and evidence for not_affected. See [DEC-012](decisions/DEC-012-attributable-vulnerability-review.md).
-- [ ] Implement deterministic CycloneDX 1.5 VEX export under the conservative eligibility contract in [DEC-013](decisions/DEC-013-cyclonedx-vex-export-contract.md). The design is accepted; implementation has not started.
+- [x] Implement deterministic CycloneDX 1.5 VEX export for one completed assessment, with fail-closed eligibility, current signature/approval/manifest verification, dedicated managed scope and vendored-schema validation (PR #72).
 - [x] Define explicit mapping from reviewed decision states to CycloneDX 1.5 analysis vocabulary and prohibit mapping provider/applicability signals directly to VEX decisions (DEC-013).
 - [ ] Consider OpenVEX only after the CycloneDX workflow is stable.
 - [ ] Treat KEV and EPSS as prioritisation signals, not automatic CRA Article 14 triggers.
 - [ ] Support reviewed reporting drafts only; no automatic legal timer or ENISA submission.
 
-**Exit criteria:** every exported VEX statement is product-version scoped, attributable and justified; no unsupported not_affected claim can be emitted. Review records, detached decision signatures, independent second-person approval, observation-linked artifact byte integrity and decision-revision manifest binding are integrated through PRs #56, #58, #62, #64 and #65. Source authentication, external audit anchoring and VEX export implementation remain open. The VEX export contract is documented in DEC-013.
+**Exit criteria:** every exported VEX statement is product-version scoped, attributable and justified; no unsupported not_affected claim can be emitted. Review records, detached decision signatures, independent second-person approval, observation-linked artifact byte integrity and decision-revision manifest binding are integrated through PRs #56, #58, #62, #64 and #65. Source authentication and external audit anchoring remain open. The first conservative VEX export slice is implemented in PR #72; broader VEX workflows and external publication remain deferred.
 
 ## Milestone 5 — Developer workflow and ecosystem support (P3)
 
