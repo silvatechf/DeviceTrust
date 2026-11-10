@@ -48,7 +48,7 @@ Implemented prototype workflows:
 15. Record attributable, append-only vulnerability review decisions against immutable assessment findings (integrated through PR #56).
 16. Register operator-controlled Ed25519 public keys and verify append-only detached signatures bound to exact immutable decision revisions, including key-rotation history (integrated through PR #58).
 17. Enforce a separate, policy-versioned second-person approval workflow with a distinct operator principal and approval-purpose key (integrated through PR #62).
-18. Attach bounded evidence artifacts to observations, compute SHA-256 server-side and verify stored bytes before download (PR #64; pending integration).
+18. Attach bounded evidence artifacts to observations, compute SHA-256 server-side and verify stored bytes before download (integrated into `main` through PR #64).
 19. Bind immutable artifact manifests to exact decision revisions and include the manifest digest in v2 Ed25519 signature and approval envelopes (current stacked PR; pending CI/review/integration).
 
 Evidence observations are currently stored separately from posture inputs. Actual artifact bytes can be attached to observations with server-computed SHA-256 integrity checks, but this does not prove source authenticity or claim truth. Artifact-to-decision-revision binding is implemented in the current stacked PR and remains pending CI/review/integration. Ingestion does not identify a product or device, or change its posture result. The legacy device-scoped SBOM workflow remains available. The product-scoped SBOM persistence flow is merged into `main`. The merged implementation is covered by successful post-merge CI and CodeQL runs for the current main commit. PostgreSQL integration and API-flow tests are included in the automated test suite, while a clean local Compose walkthrough remains part of the release gate.
@@ -89,7 +89,7 @@ The product SBOM persistence API was merged through [PR #22](https://github.com/
 
 - Product-to-device relationship inference.
 - SPDX ingestion or CycloneDX VEX generation.
-- CycloneDX VEX generation, evidence source authentication, external audit anchoring and vendor-specific backport analysis. PR #64 adds observation-linked artifact byte-integrity storage; the current stacked PR adds immutable decision-revision manifests and binds their digest into signature/approval envelope v2. Both remain pending integration. Neither signatures nor digests establish legal identity, manufacturer authority or claim truth.
+- CycloneDX VEX generation, evidence source authentication, external audit anchoring and vendor-specific backport analysis. PR #64 adds observation-linked artifact byte-integrity storage; the current stacked PR adds immutable decision-revision manifests and binds their digest into signature/approval envelope v2. Artifact byte-integrity storage is integrated into `main`; decision-revision binding remains pending review and integration. Neither signatures nor digests establish legal identity, manufacturer authority or claim truth.
 - Human login, MFA, SSO, tenant isolation and web-based credential administration. Managed API principals, expiring/revocable credentials and route scopes are integrated in main; offline CLI administration is required.
 - Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
 - Active LAN discovery, packet capture, device agents or independent firmware/hardware attestation.
