@@ -85,6 +85,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 **Goal:** make the assessment workflow usable in engineering pipelines without duplicating business logic.
 
 - [x] Add an authenticated CLI client that calls the existing API and preserves its authorization boundary (PR #67).
+- [x] Add bounded authenticated CycloneDX JSON import to the CLI through the existing product-release API (CLI import implementation; PR pending).
 - [x] Define stable JSON output, structured errors and documented process exit codes (PR #67).
 - [x] Preserve explicit incomplete assessment states and distinguish API/runtime errors from successful findings (PR #67; existing assessment contract).
 - [ ] Add a GitHub Action after the CLI contract is stable.
@@ -92,7 +93,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Test common embedded/Yocto SBOM cases and document identifier gaps, backports and vendor modifications.
 - [ ] Provide synthetic fixtures and integration tests for pipeline usage.
 
-**Current status:** the authenticated `assess`, `history` and `findings` CLI commands are implemented as a thin HTTP client; they do not open the database or duplicate assessment logic.
+**Current status:** the authenticated `import`, `assess`, `history` and `findings` CLI commands are implemented as a thin HTTP client; import uploads a bounded local CycloneDX JSON file to an existing product release, while parsing, validation, persistence and duplicate handling remain API responsibilities. The CLI does not open the database or duplicate assessment logic.
 
 **Exit criteria:** CLI and API continue to share the same assessment contract; a future pipeline integration must distinguish policy findings from assessment/runtime errors and incomplete intelligence.
 
