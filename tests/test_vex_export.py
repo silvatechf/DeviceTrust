@@ -1,5 +1,3 @@
-import json
-
 import pytest
 from sqlalchemy import select
 
@@ -188,7 +186,7 @@ def test_vex_export_fails_closed_without_source_identity(
 
 def test_vex_export_blocks_review_without_evidence_manifest(client, monkeypatch):
     release_id, import_id, assessment_id, finding_id = _release_with_import()
-    principal_id, token = _token({"assessment:review", "vex:export"})
+    _principal_id, token = _token({"assessment:review", "vex:export"})
     monkeypatch.setenv("DEVICETRUST_AUTH_MODE", "managed")
     response = client.post(
         f"/sbom/assessment-findings/{finding_id}/decisions",
@@ -208,7 +206,6 @@ def test_vex_export_blocks_review_without_evidence_manifest(client, monkeypatch)
                 assessment_id=assessment_id,
             )
     assert "evidence_manifest_missing_or_invalid" in str(error.value)
-    assert principal_id
 
 def test_vex_export_rejects_service_principals(client, monkeypatch):
     release_id, import_id, assessment_id, _finding_id = _release_with_import()
