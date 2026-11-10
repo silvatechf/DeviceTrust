@@ -123,7 +123,8 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 | Hash-chain verification | Implemented with limitations |
 | Individual managed API credentials and route scopes | Implemented prototype; offline CLI administration, legacy mode remains default |
 | Assessment CLI | Implemented API client; assess/history/findings commands with JSON output and stable exit codes |
-| Release-wide reassessment | Implemented on-demand API workflow; accepted imports assessed independently with resumable idempotency |\n| CycloneDX 1.5 VEX export | Not implemented; conservative eligibility and mapping contract accepted in DEC-013 |
+| Release-wide reassessment | Implemented on-demand API workflow; accepted imports assessed independently with resumable idempotency |
+| CycloneDX 1.5 VEX export | Not implemented; conservative eligibility and mapping contract accepted in DEC-013 |
 | Human login/MFA/SSO and tenant isolation | Not implemented |
 | External audit anchoring and immutable retention | Not implemented; transactional writer serialization is not an external checkpoint |
 
