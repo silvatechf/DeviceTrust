@@ -72,8 +72,8 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Add conservative PEP 440 version comparison for matched PyPI PURLs; unsupported ecosystems and invalid versions remain explicitly unknown.
 - [ ] Add native Debian/RPM/npm/Maven/Go version semantics, vendor backport handling and source/binary package relationships beyond OSV provider matching.
 - [x] Add attributable, append-only human-reviewed vulnerability decisions linked to immutable assessment findings; require CycloneDX justification and evidence for not_affected. See [DEC-012](decisions/DEC-012-attributable-vulnerability-review.md).
-- [ ] Implement deterministic CycloneDX VEX export only after product/version/component relationships and review controls exist.
-- [ ] Map internal workflow states explicitly to the selected VEX vocabulary; never equate operational triage states directly with VEX statements.
+- [ ] Implement deterministic CycloneDX 1.5 VEX export under the conservative eligibility contract in [DEC-013](decisions/DEC-013-cyclonedx-vex-export-contract.md). The design is accepted; implementation has not started.
+- [x] Define explicit mapping from reviewed decision states to CycloneDX 1.5 analysis vocabulary and prohibit mapping provider/applicability signals directly to VEX decisions (DEC-013).
 - [ ] Consider OpenVEX only after the CycloneDX workflow is stable.
 - [ ] Treat KEV and EPSS as prioritisation signals, not automatic CRA Article 14 triggers.
 - [ ] Support reviewed reporting drafts only; no automatic legal timer or ENISA submission.
