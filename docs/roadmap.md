@@ -52,11 +52,12 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Link synthetic vulnerability findings to exact component occurrences.
 - [x] Compare accepted SBOM imports and explain additions, removals and matched-component changes using PURL identity that excludes only the version segment while preserving qualifiers and subpath; report ambiguous and unidentified occurrences without speculative matching.
 - [x] Re-evaluate all accepted SBOM imports for a product release through an authenticated, resumable API workflow. Each import receives an independent append-only assessment run; repeated requests with the same idempotency key do not duplicate completed runs. See `POST /product-releases/{release_id}/assessments`.
+- [x] Compare matched PyPI PURL versions with conservative PEP 440 semantics; unsupported ecosystems and invalid versions remain explicitly `unknown` (PR #69).
 
 **Implemented:** PR #45 added append-only assessment runs and findings for accepted SBOM imports, reuses the bounded local/OSV scanner, records enrichment coverage, and persists each run with its audit event after external I/O.
 - [ ] Expand beyond the currently supported CycloneDX JSON 1.5 subset and expose unsupported fields more comprehensively.
 
-**Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped synthetic findings. It now includes read-only comparison of accepted imports for the same release. Duplicate identities and components without usable PURLs remain unresolved. Comparison does not re-evaluate vulnerability intelligence.
+**Current status:** the initial persistence slice is implemented and merged in PR #22. It supports bounded CycloneDX JSON 1.5 imports, product-release association, component occurrences, source/digest/parser metadata, idempotent duplicate handling and component-scoped findings. PR #68 added resumable release-wide reassessment. PR #69 added a conservative PyPI/PEP 440 comparator. Duplicate identities and components without usable PURLs remain unresolved. Comparison does not re-evaluate vulnerability intelligence.
 
 **Remaining exit criteria:** broaden format/field coverage and add native version semantics for ecosystems beyond the initial PyPI/PEP 440 adapter. Vendor backport handling and source/binary package relationships remain open. Release-wide reassessment is on-demand; scheduling and automatic triggers on feed changes are not implemented.
 
@@ -91,7 +92,9 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Test common embedded/Yocto SBOM cases and document identifier gaps, backports and vendor modifications.
 - [ ] Provide synthetic fixtures and integration tests for pipeline usage.
 
-**Current status:** the authenticated `assess`, `history` and `findings` CLI commands are implemented as a thin HTTP client; they do not open the database or duplicate assessment logic.\n\n**Exit criteria:** CLI and API continue to share the same assessment contract; a future pipeline integration must distinguish policy findings from assessment/runtime errors and incomplete intelligence.
+**Current status:** the authenticated `assess`, `history` and `findings` CLI commands are implemented as a thin HTTP client; they do not open the database or duplicate assessment logic.
+
+**Exit criteria:** CLI and API continue to share the same assessment contract; a future pipeline integration must distinguish policy findings from assessment/runtime errors and incomplete intelligence.
 
 ## Milestone 6 — Identity, governance and audit assurance (P2)
 
