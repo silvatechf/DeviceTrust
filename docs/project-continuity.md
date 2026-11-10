@@ -30,6 +30,7 @@ At the time this record was reconciled:
 - Latest verified main commit at this reconciliation: `2f210663ab5e424795d4884e5febf8e398d09a1f`.
 - PR #74, `docs: add project continuity and handoff record`, was merged on 2026-11-10.
 - PR #77, `feat(cli): add authenticated CycloneDX SBOM import`, was merged on 2026-11-10; exact-head CI and CodeQL both completed successfully. Merge commit: `2f210663ab5e424795d4884e5febf8e398d09a1f`.
+- PR #80, `test: cover complete product SBOM review and VEX workflow`, was merged on 2026-11-10. Exact-head CI and CodeQL passed for head `3075e71e01ef259cb7894b66c13e716752ccef4f`; merge commit: `825e008312eca5fb16ffc64b3f4321bdd90b7da6`. The integration test exercises the product/release API, authenticated CLI import/assessment/history/findings, evidence, decision, manifest, author signature, independent approval, VEX export and audit history using synthetic fixtures and stubbed external enrichment.
 - PR #75 was closed as superseded by PR #77.
 - PR #73 added an API-level end-to-end test for evidence artifact upload, revision-bound evidence manifest, author Ed25519 signature, independent second-person approval and deterministic CycloneDX 1.5 VEX export.
 - PR #74 added this continuity record and its README link; its exact-head checks passed before merge.
@@ -58,6 +59,7 @@ The following capabilities are documented as implemented in the current prototyp
 - Immutable evidence manifests bound to decision revisions and signature/approval envelope v2.
 - Conservative CycloneDX 1.5 VEX export under DEC-013, with fail-closed eligibility and schema validation.
 - Authenticated CLI client for CycloneDX import, assessment, history and findings; import is a thin API client with a bounded 2 MiB file read and redirect following disabled.
+- Automated integrated API/CLI test for the product SBOM review-to-VEX path, including fail-closed manifest gating, signature, independent approval and audit verification (PR #80).
 - Managed API principals and scoped credentials, while legacy shared-key mode remains backwards-compatible default.
 - Audit hash-chain verification and transactional serialization of concurrent writers.
 
@@ -67,7 +69,7 @@ For endpoint details and exact limitations, use the README and relevant implemen
 
 **Workstream:** validate the complete API/CLI walkthrough, then deliver a coherent operator-facing vertical slice (see [Product Vision](product-vision.md) and [Roadmap](roadmap.md)).
 
-**Latest increment:** authenticated CycloneDX SBOM import is `MERGED` through PR #77. The candidate head `c58357d739a03818bd04f2aa1ab5abb11f7cb40f` passed CI and CodeQL; merge commit `2f210663ab5e424795d4884e5febf8e398d09a1f` is the verified baseline. Original PR #75 was closed as superseded. The CLI now uploads bounded local CycloneDX JSON to an existing product release through the authenticated API. Next: verify the full API/CLI walkthrough and then scope the minimal operator-facing vertical slice.
+**Latest increment:** the integrated product SBOM review-to-VEX workflow test is `MERGED` through PR #80. Exact-head CI and CodeQL passed for `3075e71e01ef259cb7894b66c13e716752ccef4f`; merge commit `825e008312eca5fb16ffc64b3f4321bdd90b7da6` is the verified baseline. The test exercises product/release creation, authenticated CLI import/assessment/history/findings, evidence artifact upload, attributable decision, fail-closed manifest precondition, revision-bound evidence manifest, author signature, independent approval, deterministic VEX export and audit history. It uses FastAPI TestClient, synthetic local advisory data and stubbed external enrichment; it is not a manual/browser/production walkthrough. Next: perform and record a reproducible operator walkthrough, then reassess the P0 gate before scoping the minimal operator-facing vertical slice.
 
 Why this order:
 - The existing CLI exposes `assess`, `history` and `findings`, but expects an existing `import_id`.
