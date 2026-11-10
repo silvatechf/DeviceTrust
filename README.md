@@ -81,6 +81,7 @@ The persistent SBOM work introduces these authenticated endpoints:
 - `POST /sbom/decisions/{decision_id}/signature` and `GET /sbom/decisions/{decision_id}/signature` — persist and re-verify detached decision signatures; envelope v2 includes the evidence-manifest digest when one exists.
 - `GET /sbom/decisions/{decision_id}/approval-payload?key_id=...` — retrieve a server-timestamped approval envelope for a distinct operator.
 - `POST /sbom/decisions/{decision_id}/approval` and `GET /sbom/decisions/{decision_id}/approval` — persist and inspect independent approval history and policy status.
+- `POST /product-releases/{release_id}/sbom/{import_id}/vex?assessment_id=...` — export a deterministic CycloneDX 1.5 VEX BOM for one completed assessment. Requires a managed operator credential with `vex:export`; current decisions must have a trusted author signature, independent approval and a valid evidence manifest. The export is audited and validates against the vendored upstream schema.
 
 The import digest is calculated from the exact request bytes. A repeated digest for the same release and format returns the existing import. Only fully validated imports are persisted. The API does not store raw SBOM documents or infer a relationship between a product and a device.
 
@@ -95,7 +96,7 @@ The product SBOM persistence API was merged through [PR #22](https://github.com/
 ## What is not implemented
 
 - Product-to-device relationship inference.
-- SPDX ingestion and CycloneDX VEX generation (the conservative export contract is documented in [DEC-013](docs/decisions/DEC-013-cyclonedx-vex-export-contract.md); implementation remains open).
+- SPDX ingestion and broader VEX workflows. A conservative CycloneDX 1.5 export slice is implemented in PR #72 under [DEC-013](docs/decisions/DEC-013-cyclonedx-vex-export-contract.md); it is not a general-purpose VEX authoring or publication service.
 - Evidence source authentication, external audit anchoring and vendor-specific backport analysis. PR #64 adds observation-linked artifact byte-integrity storage; PR #65 adds immutable decision-revision manifests and binds their digest into signature/approval envelope v2. Exact-head automated validation passed; decision-revision binding is integrated into `main`. Neither signatures nor digests establish legal identity, manufacturer authority or claim truth.
 - Human login, MFA, SSO, tenant isolation and web-based credential administration. Managed API principals, expiring/revocable credentials and route scopes are integrated in main; offline CLI administration is required.
 - Automated CRA reporting, ENISA Single Reporting Platform integration or conformity assessment.
