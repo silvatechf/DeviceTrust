@@ -117,13 +117,13 @@ The static console is served from the same FastAPI origin. It avoids a separate 
 | Synthetic local advisory matching | Implemented demo behavior |
 | Optional OSV lookup | Best-effort integration; versionless PURL plus separate version query contract |
 | Source-aware assessment applicability | Implemented prototype in PR #53; separate from human review decisions |
-| Attributable vulnerability review history | Implemented prototype in the reviewed-decision branch; no VEX export |
+| Attributable vulnerability review history | Implemented prototype; append-only revisions linked to immutable assessment findings |
 | Justified vulnerability triage | Implemented prototype |
 | JSON/Markdown reports | Implemented prototype |
 | Hash-chain verification | Implemented with limitations |
 | Individual managed API credentials and route scopes | Implemented prototype; offline CLI administration, legacy mode remains default |
 | Assessment CLI | Implemented API client; assess/history/findings commands with JSON output and stable exit codes |
-| Release-wide reassessment | Implemented on-demand API workflow; accepted imports assessed independently with resumable idempotency |
+| Release-wide reassessment | Implemented on-demand API workflow; accepted imports assessed independently with resumable idempotency |\n| CycloneDX 1.5 VEX export | Not implemented; conservative eligibility and mapping contract accepted in DEC-013 |
 | Human login/MFA/SSO and tenant isolation | Not implemented |
 | External audit anchoring and immutable retention | Not implemented; transactional writer serialization is not an external checkpoint |
 
