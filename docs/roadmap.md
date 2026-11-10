@@ -88,11 +88,12 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [x] Define stable JSON output, structured errors and documented process exit codes (PR #67).
 - [x] Preserve explicit incomplete assessment states and distinguish API/runtime errors from successful findings (PR #67; existing assessment contract).
 - [ ] Add a GitHub Action after the CLI contract is stable.
+- [ ] Add bounded authenticated CycloneDX JSON import to the CLI through the existing product-release API (PR #75 work; rebased candidate pending validation).
 - [ ] Evaluate SPDX ingestion after the canonical component model is established.
 - [ ] Test common embedded/Yocto SBOM cases and document identifier gaps, backports and vendor modifications.
 - [ ] Provide synthetic fixtures and integration tests for pipeline usage.
 
-**Current status:** the authenticated `assess`, `history` and `findings` CLI commands are implemented as a thin HTTP client; they do not open the database or duplicate assessment logic.
+**Current status:** the authenticated `import`, `assess`, `history` and `findings` CLI commands are implemented on a candidate branch as a thin HTTP client. Import uploads a bounded local CycloneDX JSON file to an existing product release; parsing, validation, persistence and duplicate handling remain API responsibilities. Candidate validation is pending.
 
 **Exit criteria:** CLI and API continue to share the same assessment contract; a future pipeline integration must distinguish policy findings from assessment/runtime errors and incomplete intelligence.
 

@@ -1,4 +1,4 @@
-"""Authenticated command-line client for versioned SBOM assessments."""
+"""Authenticated command-line client for DeviceTrust SBOM workflows."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
@@ -16,12 +17,13 @@ EXIT_NETWORK = 3
 EXIT_AUTH = 4
 EXIT_API = 5
 EXIT_SERVER = 6
+MAX_SBOM_BYTES = 2 * 1024 * 1024
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="devicetrust",
-        description="Run and inspect versioned SBOM assessments through the DeviceTrust API.",
+        description="Import CycloneDX SBOMs and run or inspect assessments through the DeviceTrust API.",
     )
     parser.add_argument(
         "--api-url",
@@ -29,6 +31,14 @@ def _parser() -> argparse.ArgumentParser:
         help="DeviceTrust API base URL (default: DEVICETRUST_API_URL or localhost).",
     )
     commands = parser.add_subparsers(dest="command", required=True)
+
+    import_command = commands.add_parser("import", help="Import a CycloneDX JSON SBOM for a product release.")
+    import_command.add_argument("--release-id", type=int, required=True)
+    import_command.add_argument("--file", required=True, help="Path to a local CycloneDX JSON file.")
+    import_command.add_argument(
+        "--source-reference",
+        help="Optional pipeline/build reference recorded by the API (maximum 500 characters).",
+    )
 
     assess = commands.add_parser("assess", help="Create or retrieve an idempotent assessment run.")
     assess.add_argument("--import-id", type=int, required=True)
@@ -87,6 +97,24 @@ def _request_path(args: argparse.Namespace) -> tuple[str, str, dict[str, str]]:
     )
 
 
+def _read_sbom_file(value: str) -> bytes:
+    path = Path(value)
+    try:
+        if not path.is_file():
+            raise ValueError("SBOM file must be an existing regular file.")
+        if path.stat().st_size > MAX_SBOM_BYTES:
+            raise ValueError("SBOM file exceeds the 2 MiB limit.")
+        with path.open("rb") as sbom_file:
+            content = sbom_file.read(MAX_SBOM_BYTES + 1)
+    except OSError:
+        raise ValueError("SBOM file could not be read.") from None
+    if len(content) > MAX_SBOM_BYTES:
+        raise ValueError("SBOM file exceeds the 2 MiB limit.")
+    if not content:
+        raise ValueError("SBOM file must not be empty.")
+    return content
+
+
 def _emit_error(code: int, message: str) -> int:
     print(json.dumps({"error": message, "exit_code": code}, sort_keys=True), file=sys.stderr)
     return code
@@ -100,7 +128,21 @@ def main(argv: list[str] | None = None, *, transport: httpx.BaseTransport | None
 
     try:
         base_url = _validate_base_url(args.api_url)
-        method, path, extra_headers = _request_path(args)
+        if args.command == "import":
+            _positive_id(args.release_id, "release-id")
+            if args.source_reference is not None and len(args.source_reference) > 500:
+                raise ValueError("source-reference must not exceed 500 characters.")
+            body = _read_sbom_file(args.file)
+            method = "POST"
+            path = f"/product-releases/{args.release_id}/sbom"
+            extra_headers = {"Content-Type": "application/json"}
+            params = {"source_type": "pipeline"}
+            if args.source_reference is not None:
+                params["source_reference"] = args.source_reference
+        else:
+            method, path, extra_headers = _request_path(args)
+            body = None
+            params = None
     except ValueError as error:
         return _emit_error(EXIT_CONFIG, str(error))
 
@@ -110,8 +152,9 @@ def main(argv: list[str] | None = None, *, transport: httpx.BaseTransport | None
             headers={"X-API-Key": token, **extra_headers, "Accept": "application/json"},
             timeout=httpx.Timeout(10.0, connect=3.0),
             transport=transport,
+            follow_redirects=False,
         ) as client:
-            response = client.request(method, path)
+            response = client.request(method, path, content=body, params=params)
     except httpx.TimeoutException:
         return _emit_error(EXIT_NETWORK, "DeviceTrust API request timed out.")
     except httpx.HTTPError:
@@ -119,6 +162,8 @@ def main(argv: list[str] | None = None, *, transport: httpx.BaseTransport | None
 
     if response.status_code in {401, 403}:
         return _emit_error(EXIT_AUTH, f"DeviceTrust API rejected the request (HTTP {response.status_code}).")
+    if response.is_redirect:
+        return _emit_error(EXIT_API, f"DeviceTrust API returned an unexpected redirect (HTTP {response.status_code}).")
     if response.status_code >= 500:
         return _emit_error(EXIT_SERVER, f"DeviceTrust API failed (HTTP {response.status_code}).")
     if response.is_error:
