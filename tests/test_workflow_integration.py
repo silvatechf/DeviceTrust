@@ -218,7 +218,12 @@ def test_product_release_api_cli_review_and_vex_workflow(
         headers={"X-API-Key": author_token},
     )
     assert blocked.status_code == 409
-    assert blocked.json()["detail"]["code"] == "evidence_manifest_missing_or_invalid"
+    blocked_detail = blocked.json()["detail"]
+    assert blocked_detail["code"] == "vex_export_blocked"
+    assert any(
+        blocker["code"] == "evidence_manifest_missing_or_invalid"
+        for blocker in blocked_detail["blockers"]
+    )
 
     manifest = client.post(
         f"/sbom/decisions/{decision_id}/evidence-manifest",
