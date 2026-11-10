@@ -139,3 +139,51 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - No microservices split without demonstrated scaling or ownership pressure.
 
 See [Release readiness](release-readiness.md) for evidence required before a public versioned release.
+
+
+## Product delivery sequence — phase gates
+
+The strategic direction and customer/problem hypotheses are maintained in [Product Vision](product-vision.md). This section prioritises delivery across the existing milestones; it does not mark planned work as implemented.
+
+### P0 — Consolidate the current workflow
+- [ ] Complete and merge authenticated CLI SBOM import only after exact-head checks and review.
+- [ ] Verify the full API sequence: product/release, SBOM import, assessment, findings, decision, evidence manifest, signature, independent approval, VEX and history.
+- [ ] Keep README, test matrix, API contracts and continuity record consistent with the verified implementation.
+- **Gate:** reproducible API/CLI walkthrough with known limitations and validation evidence.
+
+### P1 — Demonstrable operator workflow
+- [ ] Build one synthetic product/release vertical slice on existing API contracts.
+- [ ] Implement a minimal operator UI; avoid dashboards and broad administration.
+- [ ] Cover import through VEX/history, including fail-closed negative cases.
+- [ ] Add end-to-end coverage and a clean runbook.
+- **Gate:** operator completes the core demonstration without manually composing HTTP requests; critical transitions are tested.
+
+### P2 — Intelligence quality
+- [ ] Add representative real-world (authorised) and synthetic SBOM fixtures.
+- [ ] Expand ecosystem-specific PURL/version semantics only where fixtures and user evidence justify it.
+- [ ] Document coverage, unsupported cases, vendor backports and source/binary limitations.
+- [ ] Evaluate additional intelligence sources and SPDX after canonical component semantics are stable.
+- **Gate:** tested version edge cases and transparent coverage; no speculative matching.
+
+### P3 — Interoperability and independent trust
+- [ ] Evaluate OpenVEX after the CycloneDX workflow is stable.
+- [ ] Evaluate upstream VEX/CSAF only against a concrete integration need.
+- [ ] Select at most one first external audit checkpoint design (e.g. RFC 3161 or Merkle-based checkpoint).
+- [ ] Evaluate DSSE only when a named consumer or ecosystem requires it.
+- **Gate:** independently verifiable exchange/checkpoint with documented trust and operational ownership.
+
+### P4 — Multi-team operations
+- [ ] Define reassessment scheduling, decision expiry/review and notification semantics.
+- [ ] Add human identity, MFA/SSO, RBAC and tenant isolation before multi-customer operation.
+- [ ] Evidence backup/restore, monitoring, rate limiting, incident response and deployment rollback.
+- [ ] Keep firmware SBOM discovery as a separate research track.
+- **Gate:** security and operational controls tested in the intended deployment model.
+
+### Parallel discovery and success measures
+- [ ] Complete 5–10 interviews with target manufacturers; include consultancies/integrators as complementary perspectives.
+- [ ] Identify a recurring workflow, a budget owner and a credible bounded-pilot path before broadening scope.
+- [ ] Target a reproducible end-to-end demo under 10 minutes.
+- [ ] Ensure every VEX export is tied to a release, assessment and reviewed decision; required approval/evidence gates must fail closed.
+- [ ] Record coverage and unknown states explicitly.
+
+Phases are acceptance-gated, not date-driven. Do not interpret these targets as achieved results. CRA compliance, conformity assessment, automatic regulatory reporting, active discovery, IDS/IPS, autonomous remediation and premature multi-tenancy remain explicit non-goals.

@@ -15,6 +15,7 @@ The prototype connects product/release context, declared SBOM data, vulnerabilit
 
 See:
 - [README](../README.md) — public product and capability summary.
+- [Product vision](product-vision.md) — product direction, target users, principles and delivery phase gates.
 - [Market positioning](market-positioning.md) — target users, buyer hypotheses and claims boundaries.
 - [Architecture](architecture.md) — modules, data flow and trust boundaries.
 - [Prototype limitations](prototype-limitations.md) — claims that must not be made.
@@ -26,10 +27,10 @@ See:
 At the time this record was reconciled:
 
 - Default branch: `main`.
-- Latest verified main commit: `d5f5e36ebdca7c64699b8c683dbee4eedce19b60`.
-- PR #73, `test(vex): cover complete signed and approved export flow`, was merged on 2026-11-10.
+- Latest verified main commit at this documentation change: `4ba7b4f8289dbbf2bbbf7b617d52f8b2d8c6378e`.
+- PR #74, `docs: add project continuity and handoff record`, was merged on 2026-11-10.
 - PR #73 added an API-level end-to-end test for evidence artifact upload, revision-bound evidence manifest, author Ed25519 signature, independent second-person approval and deterministic CycloneDX 1.5 VEX export.
-- All 12 check runs queried for PR #73's exact head completed successfully before merge.
+- PR #74 added this continuity record and its README link; its exact-head checks passed before merge.
 - PR #72 implemented the conservative CycloneDX 1.5 VEX export slice and is already part of main.
 - PR #68 implemented resumable, idempotent release-wide reassessment.
 - PR #71 documented the VEX export contract in DEC-013.
@@ -62,9 +63,9 @@ For endpoint details and exact limitations, use the README and relevant implemen
 
 ## 4. Current workstream and next delivery
 
-**Workstream:** developer workflow and ecosystem support (Roadmap Milestone 5).
+**Workstream:** complete the CLI SBOM import increment, then deliver a coherent operator-facing vertical slice (see [Product Vision](product-vision.md) and [Roadmap](roadmap.md)).
 
-**Proposed next increment:** add authenticated CycloneDX SBOM import to the existing CLI, then allow a single CLI invocation to compose import, assessment and result retrieval. Only after this contract is implemented and tested should a GitHub Action be added as a thin wrapper.
+**Active PR:** #75 — authenticated CycloneDX SBOM import (`feat/cli-cyclonedx-import`). At reconciliation, PR #75 is open and unmerged; exact head `ecbc6ebfdd5c024de67b0d477589f5d1bd917e90`. The CI and CodeQL workflow runs queried for that exact SHA completed successfully. Re-check live PR state and exact-head checks before any merge; do not merge without explicit authorization. After this increment, verify the complete API/CLI walkthrough and proceed to the operator-facing vertical slice.
 
 Why this order:
 - The existing CLI exposes `assess`, `history` and `findings`, but expects an existing `import_id`.
@@ -84,7 +85,7 @@ Why this order:
 8. Do not place API tokens in command-line arguments, URLs, output or logs; read the token from the established environment variable or a safer supported credential mechanism.
 9. Update CLI help, README, test matrix and roadmap only when behavior is implemented and validated.
 
-After CLI import is merged, define the composed command and then the GitHub Action interface, including least-privilege token scopes, supported runner/platform assumptions, output contract and explicit policy behavior.
+After CLI import is merged, verify the complete API/CLI walkthrough. A composed CLI command and GitHub Action should be considered only after the operator workflow and policy semantics are clear.
 
 ## 5. Security and architecture invariants
 
