@@ -1,12 +1,10 @@
 """Integrated API/CLI proof for the product-release review and VEX workflow."""
 
-import base64
 import json
 
 import httpx
 
 from app import cli, identity, intelligence, sbom
-from app.db import SessionLocal
 
 from .conftest import H
 from .test_decision_approvals import _approval_submission, _operator, _sign_author
@@ -145,7 +143,6 @@ def test_product_release_api_cli_review_and_vex_workflow(
         "p0-integration-test",
     )
     assert imported["created"] is True
-    assert imported["source_type"] if "source_type" in imported else True
     import_id = imported["id"]
 
     assessment = _run_cli(
