@@ -4,7 +4,7 @@ import json
 
 import httpx
 
-from app import cli, identity, intelligence, sbom
+from app import cli, intelligence, sbom
 
 from .conftest import H
 from .test_decision_approvals import _approval_submission, _operator, _sign_author
