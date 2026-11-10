@@ -306,3 +306,89 @@ def test_reassessment_persists_osv_provider_reported_applicability(client, monke
     assert applicability["package_url"] == "pkg:generic/openssl"
     assert applicability["component_purl"] == "pkg:generic/openssl@3.0.0"
     assert applicability["queried_version"] == "3.0.0"
+
+
+def test_release_reassessment_covers_all_accepted_imports_and_is_resumable(client, monkeypatch):
+    product = client.post(
+        "/products",
+        json={"manufacturer": "Example Vendor", "product_name": "Release Batch Fixture"},
+        headers=H,
+    )
+    assert product.status_code == 201
+    release = client.post(
+        f"/products/{product.json()['id']}/releases",
+        json={"version": "2.0.0"},
+        headers=H,
+    )
+    assert release.status_code == 201
+    release_id = release.json()["id"]
+
+    documents = [
+        {"bomFormat": "CycloneDX", "specVersion": "1.5", "components": [{
+            "type": "library", "name": "openssl", "version": version,
+            "purl": f"pkg:generic/openssl@{version}",
+        }]}
+        for version in ("3.0.0", "3.0.1")
+    ]
+    for document in documents:
+        imported = client.post(
+            f"/product-releases/{release_id}/sbom", json=document, headers=H
+        )
+        assert imported.status_code == 201, imported.text
+
+    calls = []
+    async def fake_scan(components, *, include_component_index=False):
+        calls.append(components)
+        return [], {"status": "disabled", "source": "osv"}
+
+    async def fake_intelligence(findings):
+        return findings, {
+            "kev": {"status": "disabled", "source": "cisa-kev"},
+            "epss": {"status": "disabled", "source": "first-epss"},
+        }
+
+    monkeypatch.setattr(product_sbom.sbom, "scan_with_metadata_async", fake_scan)
+    monkeypatch.setattr(product_sbom.intelligence, "enrich_findings", fake_intelligence)
+    for name in ("DEVICETRUST_OSV", "DEVICETRUST_KEV", "DEVICETRUST_EPSS"):
+        monkeypatch.delenv(name, raising=False)
+
+    endpoint = f"/product-releases/{release_id}/assessments"
+    headers = {**H, "Idempotency-Key": "release-refresh-001"}
+    first = client.post(endpoint, headers=headers)
+    assert first.status_code == 200, first.text
+    payload = first.json()
+    assert payload["status"] == "disabled"
+    assert payload["import_count"] == payload["assessment_count"] == 2
+    assert payload["created_count"] == 2
+    assert payload["error_count"] == 0
+    assert len(calls) == 2
+
+    repeated = client.post(endpoint, headers=headers)
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json()["created_count"] == 0
+    assert len(calls) == 2
+
+    # A new request key deliberately appends a new historical run per import.
+    next_run = client.post(
+        endpoint, headers={**H, "Idempotency-Key": "release-refresh-002"}
+    )
+    assert next_run.status_code == 200, next_run.text
+    assert next_run.json()["created_count"] == 2
+    assert len(calls) == 4
+
+
+def test_release_reassessment_rejects_unauthenticated_requests(client):
+    product = client.post(
+        "/products",
+        json={"manufacturer": "Example Vendor", "product_name": "Auth Fixture"},
+        headers=H,
+    )
+    release = client.post(
+        f"/products/{product.json()['id']}/releases",
+        json={"version": "1.0.0"}, headers=H,
+    )
+    response = client.post(
+        f"/product-releases/{release.json()['id']}/assessments",
+        headers={"Idempotency-Key": "unauthenticated"},
+    )
+    assert response.status_code == 401
