@@ -83,9 +83,9 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 
 **Goal:** make the assessment workflow usable in engineering pipelines without duplicating business logic.
 
-- [ ] Add a CLI that calls the same application/domain services as the API.
-- [ ] Define stable machine-readable output and documented exit codes.
-- [ ] Fail closed or return an explicit incomplete/error state when required intelligence is unavailable.
+- [x] Add an authenticated CLI client that calls the existing API and preserves its authorization boundary (PR #67).
+- [x] Define stable JSON output, structured errors and documented process exit codes (PR #67).
+- [x] Preserve explicit incomplete assessment states and distinguish API/runtime errors from successful findings (PR #67; existing assessment contract).
 - [ ] Add a GitHub Action after the CLI contract is stable.
 - [ ] Evaluate SPDX ingestion after the canonical component model is established.
 - [ ] Test common embedded/Yocto SBOM cases and document identifier gaps, backports and vendor modifications.
