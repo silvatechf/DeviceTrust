@@ -76,7 +76,7 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Treat KEV and EPSS as prioritisation signals, not automatic CRA Article 14 triggers.
 - [ ] Support reviewed reporting drafts only; no automatic legal timer or ENISA submission.
 
-**Exit criteria:** every exported VEX statement is product-version scoped, attributable and justified; no unsupported not_affected claim can be emitted. Review records, detached decision signatures and independent second-person approval are implemented. Observation-linked artifact byte integrity and decision-revision manifest binding are implemented in separate pending PRs; source authentication, external audit anchoring and VEX export remain open.
+**Exit criteria:** every exported VEX statement is product-version scoped, attributable and justified; no unsupported not_affected claim can be emitted. Review records, detached decision signatures, independent second-person approval, observation-linked artifact byte integrity and decision-revision manifest binding are integrated through PRs #56, #58, #62, #64 and #65. Source authentication, external audit anchoring and VEX export remain open.
 
 ## Milestone 5 — Developer workflow and ecosystem support (P3)
 
@@ -109,8 +109,8 @@ Product/version/component domain modelling is intentionally tracked in Milestone
 - [ ] Record actor identity, decision, rationale and evidence references for every reviewed security decision.
 - [ ] Add a durable audit checkpoint design with protected signing keys and independently stored checkpoints. Transactional writer serialization does not replace this independent trust boundary.
 - [x] Serialize concurrent audit-chain updates and test tampering, deletion and transaction rollback scenarios.
-- [x] Add bounded evidence artifact storage linked to observations, server-computed SHA-256 and byte-length verification, fail-closed downloads and transactional audit metadata (current feature branch pending integration).
-- [x] Bind immutable evidence artifact manifests to exact vulnerability decision revisions and include the manifest digest in decision-signature and approval envelope v2 (current stacked PR; pending CI/review/integration).
+- [x] Add bounded evidence artifact storage linked to observations, server-computed SHA-256 and byte-length verification, fail-closed downloads and transactional audit metadata (integrated into `main` through PR #64).
+- [x] Bind immutable evidence artifact manifests to exact vulnerability decision revisions and include the manifest digest in decision-signature and approval envelope v2 (integrated into `main` through PR #65; exact-head CI and security checks passed).
 - [ ] Add artifact source authentication, optional evidence-signature verification and a documented evidence trust policy.
 - [ ] Define retention, backup/restore, operational monitoring, rate limits and deployment hardening.
 - [ ] Create an exportable Product Security File as a product concept, with clear provenance and limitations.
