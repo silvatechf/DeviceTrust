@@ -60,6 +60,8 @@ Evidence observations are currently stored separately from posture inputs. Actua
 
 The CLI is an authenticated client of the DeviceTrust API; it does not open the database or bypass route authorization. Configure `DEVICETRUST_API_KEY` and optionally `DEVICETRUST_API_URL` (default: `http://127.0.0.1:8000`). Non-loopback endpoints require HTTPS. Run `python -m app.cli --help` for usage. The `assess`, `history` and `findings` commands emit stable JSON on stdout; errors are emitted as JSON on stderr with documented process exit codes.
 
+The `import` command uploads a local CycloneDX JSON file to an existing product release through `POST /product-releases/{release_id}/sbom`. It enforces the API's 2 MiB request limit before upload, records the source as `pipeline`, and accepts an optional `--source-reference`. The API remains responsible for parsing, schema validation, authorization and digest-based duplicate handling. Example: `python -m app.cli import --release-id 9 --file ./bom.json --source-reference build-123`.
+
 ### Product-scoped SBOM API
 
 The persistent SBOM work introduces these authenticated endpoints:
