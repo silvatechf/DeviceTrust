@@ -223,3 +223,97 @@ def test_vex_export_rejects_service_principals(client, monkeypatch):
         headers={"X-API-Key": token},
     )
     assert response.status_code == 403
+
+
+
+
+
+def test_vex_export_end_to_end_with_evidence_signature_and_independent_approval(
+    client, monkeypatch
+):
+    from .test_decision_approvals import (
+        _approval_submission,
+        _operator,
+        _sign_author,
+    )
+    from .test_decision_evidence import _artifact
+
+    release_id, import_id, assessment_id, finding_id = _release_with_import()
+    artifact_id, _artifact_digest = _artifact(client)
+    author_id, author_token = _token(
+        {
+            "assessment:review",
+            "assessment:sign",
+            "assessment:read",
+            "evidence:read",
+            "evidence:write",
+            "vex:export",
+        }
+    )
+    monkeypatch.setenv("DEVICETRUST_AUTH_MODE", "managed")
+    author_headers = {"X-API-Key": author_token}
+    decision_response = client.post(
+        f"/sbom/assessment-findings/{finding_id}/decisions",
+        headers={
+            **author_headers,
+            "Idempotency-Key": f"vex-e2e-{finding_id}",
+        },
+        json={
+            "state": "in_triage",
+            "detail": "Synthetic review completed for the end-to-end VEX export test.",
+            "evidence_references": [artifact_id],
+        },
+    )
+    assert decision_response.status_code == 201, decision_response.text
+    decision_id = decision_response.json()["id"]
+
+    manifest_response = client.post(
+        f"/sbom/decisions/{decision_id}/evidence-manifest",
+        headers=author_headers,
+        json={"artifact_ids": [artifact_id]},
+    )
+    assert manifest_response.status_code == 201, manifest_response.text
+    assert manifest_response.json()["integrity_valid"] is True
+
+    _sign_author(client, author_token, decision_id, author_id)
+
+    approver_id, approver_token = _operator(
+        "Independent VEX integration approver",
+        scopes={"assessment:approve", "assessment:read"},
+    )
+    approval_payload = _approval_submission(
+        client, decision_id, approver_id, approver_token
+    )
+    approval_response = client.post(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers={"X-API-Key": approver_token},
+        json=approval_payload,
+    )
+    assert approval_response.status_code == 201, approval_response.text
+    approval_status = client.get(
+        f"/sbom/decisions/{decision_id}/approval",
+        headers=author_headers,
+    )
+    assert approval_status.status_code == 200
+    assert approval_status.json()["approval_policy_satisfied"] is True
+
+    export_url = f"/product-releases/{release_id}/sbom/{import_id}/vex"
+    export_params = {"assessment_id": assessment_id}
+    first_export = client.post(
+        export_url, params=export_params, headers=author_headers
+    )
+    assert first_export.status_code == 200, first_export.text
+    exported = first_export.json()
+    assert exported["decision_count"] == 1
+    assert exported["vulnerability_count"] == 1
+    vulnerability = exported["bom"]["vulnerabilities"][0]
+    assert vulnerability["id"] == "CVE-2026-12345"
+    assert vulnerability["analysis"]["state"] == "in_triage"
+    assert vulnerability["affects"] == [{"ref": "openssl-3"}]
+
+    retry_export = client.post(
+        export_url, params=export_params, headers=author_headers
+    )
+    assert retry_export.status_code == 200, retry_export.text
+    assert retry_export.json()["bom"] == exported["bom"]
+    assert retry_export.json()["bom_sha256"] == exported["bom_sha256"]
