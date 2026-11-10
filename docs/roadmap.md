@@ -148,7 +148,8 @@ The strategic direction and customer/problem hypotheses are maintained in [Produ
 
 ### P0 — Consolidate the current workflow
 - [x] Complete and merge authenticated CLI SBOM import after exact-head CI and CodeQL checks (PR #77).
-- [ ] Verify the full API sequence: product/release, SBOM import, assessment, findings, decision, evidence manifest, signature, independent approval, VEX and history.
+- [x] Add an automated integrated API/CLI test for product/release creation, SBOM import, assessment, findings, evidence, decision, manifest, signature, independent approval, VEX export and audit history (PR #80; exact-head CI and CodeQL passed; synthetic fixtures and external-enrichment stubs).
+- [ ] Perform and record the full operator walkthrough of the API sequence: product/release, SBOM import, assessment, findings, decision, evidence manifest, signature, independent approval, VEX and history.
 - [ ] Keep README, test matrix, API contracts and continuity record consistent with the verified implementation.
 - **Gate:** reproducible API/CLI walkthrough with known limitations and validation evidence.
 
