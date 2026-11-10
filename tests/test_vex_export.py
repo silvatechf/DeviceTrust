@@ -12,7 +12,6 @@ from app.db import (
     SBOMComponent,
     SBOMImport,
     SessionLocal,
-    VulnerabilityDecision,
 )
 
 from .conftest import H
@@ -184,7 +183,6 @@ def test_vex_export_fails_closed_without_source_identity(
                 import_id=import_id,
                 assessment_id=assessment_id,
             )
-    assert json.loads(str(error.value)) if str(error.value).startswith("{") else expected_code
     assert expected_code in str(error.value)
 
 
@@ -211,3 +209,20 @@ def test_vex_export_blocks_review_without_evidence_manifest(client, monkeypatch)
             )
     assert "evidence_manifest_missing_or_invalid" in str(error.value)
     assert principal_id
+
+def test_vex_export_rejects_service_principals(client, monkeypatch):
+    release_id, import_id, assessment_id, _finding_id = _release_with_import()
+    _principal_id, token = _token({"vex:export"})
+    with SessionLocal() as db:
+        credential = db.query(identity.APICredential).filter_by(prefix=token.split("_")[1]).one()
+        principal = db.get(identity.Principal, credential.principal_id)
+        principal.kind = "service"
+        db.commit()
+    monkeypatch.setenv("DEVICETRUST_AUTH_MODE", "managed")
+
+    response = client.post(
+        f"/product-releases/{release_id}/sbom/{import_id}/vex",
+        params={"assessment_id": assessment_id},
+        headers={"X-API-Key": token},
+    )
+    assert response.status_code == 403
