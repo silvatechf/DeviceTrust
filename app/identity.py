@@ -27,6 +27,7 @@ ALLOWED_SCOPES = frozenset(
         "assessment:approve",
         "audit:read",
         "credentials:manage",
+        "vex:export",
     }
 )
 _TOKEN_PATTERN = re.compile(r"\Adtk_([0-9a-f]{12})_([A-Za-z0-9_-]{43})\Z")
@@ -57,6 +58,7 @@ _ROUTE_SCOPES = (
     ("POST", re.compile(r"/product-releases/[^/]+/sbom"), frozenset({"sbom:write"})),
     ("GET", re.compile(r"/product-releases/[^/]+/sbom"), frozenset({"sbom:read"})),
     ("GET", re.compile(r"/product-releases/[^/]+/sbom/diff"), frozenset({"sbom:read"})),
+    ("POST", re.compile(r"/product-releases/[^/]+/sbom/[^/]+/vex"), frozenset({"vex:export"})),
     ("POST", re.compile(r"/product-releases/[^/]+/assessments"), frozenset({"assessment:write"})),
     ("POST", re.compile(r"/sbom/imports/[^/]+/assessments"), frozenset({"assessment:write"})),
     ("GET", re.compile(r"/sbom/imports/[^/]+/assessments"), frozenset({"assessment:read"})),
