@@ -763,6 +763,10 @@ async def reassess_release(
             f"Release contains more than {max_imports} accepted SBOM imports; assess imports individually."
         )
 
+    # Release enumeration is read-only; end its transaction before each
+    # reassessment acquires the serialized audit writer lock (SQLite BEGIN IMMEDIATE).
+    db.rollback()
+
     results = []
     for import_id in import_ids:
         per_import_key = hashlib.sha256(
