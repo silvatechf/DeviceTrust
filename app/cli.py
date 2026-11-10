@@ -161,6 +161,8 @@ def main(argv: list[str] | None = None, *, transport: httpx.BaseTransport | None
 
     if response.status_code in {401, 403}:
         return _emit_error(EXIT_AUTH, f"DeviceTrust API rejected the request (HTTP {response.status_code}).")
+    if response.is_redirect:
+        return _emit_error(EXIT_API, f"DeviceTrust API returned an unexpected redirect (HTTP {response.status_code}).")
     if response.status_code >= 500:
         return _emit_error(EXIT_SERVER, f"DeviceTrust API failed (HTTP {response.status_code}).")
     if response.is_error:
