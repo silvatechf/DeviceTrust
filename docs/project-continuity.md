@@ -64,10 +64,10 @@ For endpoint details and exact limitations, use the README and relevant implemen
 
 **Workstream:** developer workflow and ecosystem support (Roadmap Milestone 5).
 
-**Proposed next increment:** add authenticated CycloneDX SBOM import to the existing CLI, then allow a single CLI invocation to compose import, assessment and result retrieval. Only after this contract is implemented and tested should a GitHub Action be added as a thin wrapper.
+**Current increment:** authenticated CycloneDX SBOM import is being added to the existing CLI. The next increment is to compose import, assessment and result retrieval. Only after this contract is implemented and tested should a GitHub Action be added as a thin wrapper.
 
 Why this order:
-- The existing CLI exposes `assess`, `history` and `findings`, but expects an existing `import_id`.
+- The existing CLI exposes `assess`, `history` and `findings`; the import command is being added to remove the need to create an import outside the CLI.
 - A pipeline integration that requires users to pre-create an import outside the pipeline is not a complete SBOM-to-assessment workflow.
 - Import, authorization and parsing must remain owned by the API; the CLI must not open the database or duplicate parser/business logic.
 - The future Action must not silently turn every finding into a failed build. Policy thresholds and incomplete intelligence need explicit semantics.
