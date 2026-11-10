@@ -15,6 +15,7 @@ The prototype connects product/release context, declared SBOM data, vulnerabilit
 
 See:
 - [README](../README.md) — public product and capability summary.
+- [Product vision](product-vision.md) — product direction, target users, principles and delivery phase gates.
 - [Market positioning](market-positioning.md) — target users, buyer hypotheses and claims boundaries.
 - [Architecture](architecture.md) — modules, data flow and trust boundaries.
 - [Prototype limitations](prototype-limitations.md) — claims that must not be made.
