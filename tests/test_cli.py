@@ -219,3 +219,22 @@ def test_import_network_failure_has_network_exit_code(monkeypatch, capsys, tmp_p
     error = capsys.readouterr().err
     assert "could not be reached" in error
     assert "sensitive transport detail" not in error
+
+
+def test_import_api_validation_error_has_api_exit_code(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("DEVICETRUST_API_KEY", "test-token")
+    sbom = tmp_path / "invalid.json"
+    sbom.write_text("{}", encoding="utf-8")
+
+    def handler(_request):
+        return httpx.Response(422, json={"detail": "Unsupported CycloneDX document"})
+
+    code = cli.main(
+        ["import", "--release-id", "9", "--file", str(sbom)],
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert code == cli.EXIT_API
+    error = json.loads(capsys.readouterr().err)
+    assert error["exit_code"] == cli.EXIT_API
+    assert "422" in error["error"]
