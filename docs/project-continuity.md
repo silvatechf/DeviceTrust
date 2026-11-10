@@ -27,8 +27,10 @@ See:
 At the time this record was reconciled:
 
 - Default branch: `main`.
-- Latest verified main commit at this documentation change: `4ba7b4f8289dbbf2bbbf7b617d52f8b2d8c6378e`.
+- Latest verified main commit at this reconciliation: `2f210663ab5e424795d4884e5febf8e398d09a1f`.
 - PR #74, `docs: add project continuity and handoff record`, was merged on 2026-11-10.
+- PR #77, `feat(cli): add authenticated CycloneDX SBOM import`, was merged on 2026-11-10; exact-head CI and CodeQL both completed successfully. Merge commit: `2f210663ab5e424795d4884e5febf8e398d09a1f`.
+- PR #75 was closed as superseded by PR #77.
 - PR #73 added an API-level end-to-end test for evidence artifact upload, revision-bound evidence manifest, author Ed25519 signature, independent second-person approval and deterministic CycloneDX 1.5 VEX export.
 - PR #74 added this continuity record and its README link; its exact-head checks passed before merge.
 - PR #72 implemented the conservative CycloneDX 1.5 VEX export slice and is already part of main.
@@ -55,7 +57,7 @@ The following capabilities are documented as implemented in the current prototyp
 - Independent second-person approval.
 - Immutable evidence manifests bound to decision revisions and signature/approval envelope v2.
 - Conservative CycloneDX 1.5 VEX export under DEC-013, with fail-closed eligibility and schema validation.
-- Authenticated CLI client for assessment, history and findings; CycloneDX import is under validation on a rebased candidate branch.
+- Authenticated CLI client for CycloneDX import, assessment, history and findings; import is a thin API client with a bounded 2 MiB file read and redirect following disabled.
 - Managed API principals and scoped credentials, while legacy shared-key mode remains backwards-compatible default.
 - Audit hash-chain verification and transactional serialization of concurrent writers.
 
@@ -63,9 +65,9 @@ For endpoint details and exact limitations, use the README and relevant implemen
 
 ## 4. Current workstream and next delivery
 
-**Workstream:** complete the CLI SBOM import increment, then deliver a coherent operator-facing vertical slice (see [Product Vision](product-vision.md) and [Roadmap](roadmap.md)).
+**Workstream:** validate the complete API/CLI walkthrough, then deliver a coherent operator-facing vertical slice (see [Product Vision](product-vision.md) and [Roadmap](roadmap.md)).
 
-**Active work:** authenticated CycloneDX SBOM import. Original PR #75 (`feat/cli-cyclonedx-import`) has successful CI and CodeQL runs on exact head `ecbc6ebfdd5c024de67b0d477589f5d1bd917e90`, but became non-mergeable after the product-vision/roadmap documentation merge changed overlapping files. A rebased candidate branch `feat/cli-cyclonedx-import-rebased` was created from current main (`e211d9636508e4edaaa66126d1d3fefdd9cd6717`) and includes a bounded-read hardening adjustment. Candidate tests and exact-head CI are pending. Do not treat either PR as merged. After validation, replace the stale PR with a focused PR and verify the complete API/CLI walkthrough.
+**Latest increment:** authenticated CycloneDX SBOM import is `MERGED` through PR #77. The candidate head `c58357d739a03818bd04f2aa1ab5abb11f7cb40f` passed CI and CodeQL; merge commit `2f210663ab5e424795d4884e5febf8e398d09a1f` is the verified baseline. Original PR #75 was closed as superseded. The CLI now uploads bounded local CycloneDX JSON to an existing product release through the authenticated API. Next: verify the full API/CLI walkthrough and then scope the minimal operator-facing vertical slice.
 
 Why this order:
 - The existing CLI exposes `assess`, `history` and `findings`, but expects an existing `import_id`.
@@ -85,7 +87,7 @@ Why this order:
 8. Do not place API tokens in command-line arguments, URLs, output or logs; read the token from the established environment variable or a safer supported credential mechanism.
 9. Update CLI help, README, test matrix and roadmap only when behavior is implemented and validated.
 
-After CLI import is merged, verify the complete API/CLI walkthrough. A composed CLI command and GitHub Action should be considered only after the operator workflow and policy semantics are clear.
+CLI import is merged. Verify the complete API/CLI walkthrough before beginning the operator-facing vertical slice. A composed CLI command and GitHub Action should be considered only after the operator workflow and policy semantics are clear.
 
 ## 5. Security and architecture invariants
 
