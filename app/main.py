@@ -32,6 +32,7 @@ from .db import (
     EvidenceObservation,
     ProductFinding,
     ProductRelease,
+    Principal,
     SBOMComponent,
     SBOMImport,
     SessionLocal,
@@ -306,6 +307,9 @@ def export_product_release_vex(
 ):
     if not actor.startswith("principal:"):
         raise HTTPException(403, "VEX export requires a managed operator principal")
+    principal = db.get(Principal, actor.removeprefix("principal:"))
+    if principal is None or principal.status != "active" or principal.kind != "operator":
+        raise HTTPException(403, "VEX export requires an active operator principal")
     try:
         result = vex_export.export_cyclonedx_vex(
             db, release_id=release_id, import_id=import_id, assessment_id=assessment_id
