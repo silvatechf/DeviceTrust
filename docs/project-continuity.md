@@ -65,7 +65,7 @@ For endpoint details and exact limitations, use the README and relevant implemen
 
 **Workstream:** complete the CLI SBOM import increment, then deliver a coherent operator-facing vertical slice (see [Product Vision](product-vision.md) and [Roadmap](roadmap.md)).
 
-**Proposed next increment:** add authenticated CycloneDX SBOM import to the existing CLI, then allow a single CLI invocation to compose import, assessment and result retrieval. Only after this contract is implemented and tested should a GitHub Action be added as a thin wrapper.
+**Active PR:** #75 — authenticated CycloneDX SBOM import (`feat/cli-cyclonedx-import`). At reconciliation, PR #75 is open and unmerged; exact head `ecbc6ebfdd5c024de67b0d477589f5d1bd917e90`. The CI and CodeQL workflow runs queried for that exact SHA completed successfully. Re-check live PR state and exact-head checks before any merge; do not merge without explicit authorization. After this increment, verify the complete API/CLI walkthrough and proceed to the operator-facing vertical slice.
 
 Why this order:
 - The existing CLI exposes `assess`, `history` and `findings`, but expects an existing `import_id`.
