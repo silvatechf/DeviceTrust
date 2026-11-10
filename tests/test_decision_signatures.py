@@ -1,4 +1,5 @@
 import base64
+import hashlib
 from datetime import timedelta
 
 import pytest
@@ -79,7 +80,8 @@ def test_signing_envelope_is_domain_separated_and_deterministic(client, monkeypa
         second = decision_signatures.signing_envelope(decision)
     assert first == second
     assert first.startswith(decision_signatures.DOMAIN_SEPARATOR)
-    assert b'"envelope_version":"devicetrust.decision-signature.v1"' in first
+    assert b'"envelope_version":"devicetrust.decision-signature.v2"' in first
+    assert b'"evidence_manifest_sha256":null' in first
 
 def test_ed25519_signature_is_verified_and_persisted(client, monkeypatch):
     principal_id, token = _operator()
@@ -416,3 +418,37 @@ def test_corrupted_registered_key_fails_closed_when_requesting_signing_payload(
     )
     assert response.status_code == 503
     assert response.json()["detail"] == "Registered signing key integrity validation failed"
+
+
+def test_historical_v1_signature_remains_verifiable_after_envelope_v2(client, monkeypatch):
+    principal_id, token = _operator()
+    decision_id = _decision(client, monkeypatch, principal_id, token)
+    private_key, public_pem = _keypair()
+    key_id, _fingerprint = _register(principal_id, public_pem)
+
+    with SessionLocal() as db:
+        decision = db.get(VulnerabilityDecision, decision_id)
+        envelope = decision_signatures.legacy_signing_envelope(decision)
+        signature = base64.b64encode(private_key.sign(envelope)).decode("ascii")
+        db.add(
+            SignedDecision(
+                decision_id=decision_id,
+                signing_key_id=key_id,
+                principal_id=principal_id,
+                envelope_version=decision_signatures.LEGACY_ENVELOPE_VERSION,
+                envelope_sha256=hashlib.sha256(envelope).hexdigest(),
+                signature_b64=signature,
+                verified_at=utcnow(),
+            )
+        )
+        db.commit()
+
+    verified = client.get(
+        f"/sbom/decisions/{decision_id}/signature", headers={"X-API-Key": token}
+    )
+    assert verified.status_code == 200
+    assert verified.json()["signature_valid"] is True
+    assert verified.json()["trust_valid"] is True
+    assert verified.json()["signatures"][0]["envelope_version"] == (
+        decision_signatures.LEGACY_ENVELOPE_VERSION
+    )

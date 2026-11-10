@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, load_only
 from . import (
     audit,
     decision_approvals,
+    decision_evidence,
     decision_signatures,
     evidence_artifacts,
     identity,
@@ -38,6 +39,7 @@ from .db import (
 from .evidence_normalization import NORMALIZER_VERSION, normalize_observation
 from .schemas import (
     DecisionApprovalIn,
+    DecisionEvidenceManifestIn,
     DecisionSignatureIn,
     DeviceIn,
     EvidenceObservationIn,
@@ -395,6 +397,62 @@ def list_vulnerability_decisions(
         raise HTTPException(404, str(error)) from None
 
 
+@app.post("/sbom/decisions/{decision_id}/evidence-manifest", status_code=201)
+def create_decision_evidence_manifest(
+    decision_id: int,
+    body: DecisionEvidenceManifestIn,
+    response: Response,
+    db: Session = Depends(get_write_db),
+    actor: str = Depends(auth),
+):
+    if not actor.startswith("principal:"):
+        raise HTTPException(403, "Evidence manifest binding requires a managed operator principal")
+    principal_id = actor.removeprefix("principal:")
+    try:
+        _manifest, created = decision_evidence.create_manifest(
+            db,
+            decision_id=decision_id,
+            principal_id=principal_id,
+            artifact_ids=body.artifact_ids,
+        )
+        db.commit()
+        response.status_code = 201 if created else 200
+        return decision_evidence.get_manifest(db, decision_id)
+    except LookupError as error:
+        db.rollback()
+        raise HTTPException(404, str(error)) from None
+    except PermissionError as error:
+        db.rollback()
+        raise HTTPException(403, str(error)) from None
+    except decision_evidence.EvidenceManifestConflict as error:
+        db.rollback()
+        raise HTTPException(409, str(error)) from None
+    except decision_evidence.EvidenceManifestIntegrityError:
+        db.rollback()
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(422, str(error)) from None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Decision evidence manifest conflicts with existing metadata") from None
+
+
+@app.get("/sbom/decisions/{decision_id}/evidence-manifest")
+def get_decision_evidence_manifest(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(auth),
+):
+    try:
+        result = decision_evidence.get_manifest(db, decision_id)
+    except decision_evidence.EvidenceManifestIntegrityError:
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
+    if result is None:
+        raise HTTPException(404, "Decision evidence manifest not found")
+    return result
+
+
 @app.get("/sbom/decisions/{decision_id}/signing-payload")
 def get_decision_signing_payload(
     decision_id: int,
@@ -413,6 +471,8 @@ def get_decision_signing_payload(
         raise HTTPException(404, str(error)) from None
     except PermissionError as error:
         raise HTTPException(403, str(error)) from None
+    except decision_evidence.EvidenceManifestIntegrityError:
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     except ValueError:
         # A malformed or fingerprint-mismatched registry entry is server-side
         # trust-store corruption, not a client validation error.
@@ -447,6 +507,9 @@ def create_decision_signature(
     except PermissionError as error:
         db.rollback()
         raise HTTPException(403, str(error)) from None
+    except decision_evidence.EvidenceManifestIntegrityError:
+        db.rollback()
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     except decision_signatures.SignatureConflict as error:
         db.rollback()
         raise HTTPException(409, str(error)) from None
@@ -464,7 +527,10 @@ def get_decision_signature(
     db: Session = Depends(get_db),
     _: str = Depends(auth),
 ):
-    result = decision_signatures.get_decision_signature(db, decision_id)
+    try:
+        result = decision_signatures.get_decision_signature(db, decision_id)
+    except decision_evidence.EvidenceManifestIntegrityError:
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     if result is None:
         raise HTTPException(404, "Decision signature not found")
     return result
@@ -488,6 +554,8 @@ def get_decision_approval_payload(
         raise HTTPException(404, str(error)) from None
     except PermissionError as error:
         raise HTTPException(403, str(error)) from None
+    except decision_evidence.EvidenceManifestIntegrityError:
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     except decision_approvals.ApprovalTrustStoreError:
         raise HTTPException(503, "Registered approval key integrity validation failed") from None
 
@@ -524,6 +592,9 @@ def create_decision_approval(
     except decision_approvals.ApprovalConflict as error:
         db.rollback()
         raise HTTPException(409, str(error)) from None
+    except decision_evidence.EvidenceManifestIntegrityError:
+        db.rollback()
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     except decision_approvals.ApprovalTrustStoreError:
         db.rollback()
         raise HTTPException(503, "Registered approval key integrity validation failed") from None
@@ -543,6 +614,8 @@ def get_decision_approval(
 ):
     try:
         return decision_approvals.get_decision_approval(db, decision_id)
+    except decision_evidence.EvidenceManifestIntegrityError:
+        raise HTTPException(503, "Stored decision evidence manifest integrity validation failed") from None
     except LookupError as error:
         raise HTTPException(404, str(error)) from None
 

@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Literal
 from urllib.parse import parse_qsl, urlsplit
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -189,6 +190,25 @@ class VulnerabilityDecisionIn(BaseModel):
         if self.state == "resolved_with_pedigree" and not self.evidence_references:
             raise ValueError("resolved_with_pedigree requires a pedigree evidence reference")
         return self
+
+
+class DecisionEvidenceManifestIn(BaseModel):
+    """Bind existing evidence artifact IDs to one immutable decision revision."""
+
+    model_config = ConfigDict(extra="forbid")
+    artifact_ids: list[str] = Field(min_length=1, max_length=10)
+
+    @field_validator("artifact_ids")
+    @classmethod
+    def artifact_ids_must_be_unique_uuids(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("artifact IDs must be unique")
+        try:
+            for value in values:
+                UUID(value)
+        except ValueError:
+            raise ValueError("artifact IDs must be UUIDs") from None
+        return values
 
 
 class DecisionSignatureIn(BaseModel):

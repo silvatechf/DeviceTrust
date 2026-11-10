@@ -39,7 +39,7 @@ The artifact record contains a UUID, observation ID, server-computed SHA-256, by
 - Declared media type is metadata, not content sniffing or malware analysis.
 - SHA-256 proves byte consistency with the stored digest, not origin, authenticity, safety or claim truth.
 - Artifact records are append-only through the exposed API; privileged database operators can still modify or delete both bytes and metadata.
-- Evidence artifacts are linked to observations, not yet to a specific vulnerability decision revision. Existing decision evidence references remain opaque.
+- Evidence artifacts are linked to observations. A separate immutable decision evidence manifest can bind selected artifact IDs already present in a decision's original evidence references to that exact decision/finding/revision. The manifest digest is included in signature and approval envelope v2. The manifest must be created before signing/approval; it cannot be replaced afterward.
 - The legacy observation `evidence_hash` field is client-supplied metadata and is not treated as the server-computed artifact digest.
 
 ## Persistence

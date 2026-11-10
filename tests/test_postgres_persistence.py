@@ -16,13 +16,23 @@ from sqlalchemy import create_engine, delete, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app import audit, decision_approvals, decision_signatures, evidence_artifacts, identity, product_sbom, vulnerability_decisions
+from app import (
+    audit,
+    decision_approvals,
+    decision_evidence,
+    decision_signatures,
+    evidence_artifacts,
+    identity,
+    product_sbom,
+    vulnerability_decisions,
+)
 from app.audit import record, verify
 from app.db import (
     APICredential,
     AuditChainState,
     AuditEntry,
     DecisionApproval,
+    DecisionEvidenceManifest,
     Device,
     EvidenceArtifact,
     EvidenceObservation,
@@ -1113,6 +1123,101 @@ def test_evidence_artifact_blob_and_digest_persist_postgres():
                 delete(EvidenceObservation).where(
                     EvidenceObservation.id == observation_id
                 )
+            )
+            session.commit()
+        verification_engine.dispose()
+
+
+def test_decision_evidence_manifest_persists_postgres(monkeypatch):
+    api_key = os.getenv("DEVICETRUST_API_KEY", "test-key")
+    monkeypatch.setenv("DEVICETRUST_AUTH_MODE", "legacy")
+    with TestClient(app) as client:
+        observation = client.post(
+            "/evidence",
+            headers={"X-API-Key": api_key},
+            json={
+                "source_type": "manual",
+                "attribute": "firmware_note",
+                "value": "PostgreSQL decision evidence manifest persistence fixture",
+            },
+        )
+        assert observation.status_code == 201, observation.text
+        observation_id = observation.json()["id"]
+        raw = b"postgresql decision evidence manifest"
+        artifact = client.post(
+            f"/evidence/{observation_id}/artifacts",
+            headers={"X-API-Key": api_key, "Content-Type": "application/octet-stream"},
+            content=raw,
+        )
+        assert artifact.status_code == 201, artifact.text
+        artifact_id = artifact.json()["id"]
+
+        with Session(application_engine) as session:
+            _principal, _credential, token = identity.create_principal(
+                session,
+                name="PostgreSQL decision evidence author",
+                kind="operator",
+                scopes={
+                    "assessment:review",
+                    "assessment:read",
+                    "assessment:sign",
+                    "evidence:read",
+                    "evidence:write",
+                },
+            )
+            session.commit()
+
+        from .test_vulnerability_decisions import _finding
+
+        finding_id = _finding()
+        monkeypatch.setenv("DEVICETRUST_AUTH_MODE", "managed")
+        decision = client.post(
+            f"/sbom/assessment-findings/{finding_id}/decisions",
+            headers={
+                "X-API-Key": token,
+                "Idempotency-Key": f"pg-evidence-manifest-{finding_id}",
+            },
+            json={
+                "state": "not_affected",
+                "justification": "code_not_present",
+                "detail": "The affected component is absent from this release.",
+                "evidence_references": [artifact_id],
+            },
+        )
+        assert decision.status_code == 201, decision.text
+        decision_id = decision.json()["id"]
+        manifest = client.post(
+            f"/sbom/decisions/{decision_id}/evidence-manifest",
+            headers={"X-API-Key": token},
+            json={"artifact_ids": [artifact_id]},
+        )
+        assert manifest.status_code == 201, manifest.text
+        digest = manifest.json()["manifest_sha256"]
+
+    application_engine.dispose()
+    verification_engine = create_engine(os.environ["DATABASE_URL"])
+    try:
+        with Session(verification_engine) as session:
+            stored = session.scalar(
+                select(DecisionEvidenceManifest).where(
+                    DecisionEvidenceManifest.decision_id == decision_id
+                )
+            )
+            assert stored is not None
+            assert stored.manifest_sha256 == digest
+            assert decision_evidence.get_manifest(session, decision_id)["integrity_valid"] is True
+    finally:
+        with Session(verification_engine) as session:
+            session.execute(
+                delete(DecisionEvidenceManifest).where(
+                    DecisionEvidenceManifest.decision_id == decision_id
+                )
+            )
+            session.execute(
+                delete(EvidenceArtifact).where(EvidenceArtifact.id == artifact_id)
+            )
+            session.execute(
+                delete(EvidenceObservation).where(EvidenceObservation.id == observation_id)
             )
             session.commit()
         verification_engine.dispose()
