@@ -40,6 +40,7 @@ The route-to-scope policy is explicit in app/identity.py. A protected route with
 - sbom:read, sbom:write
 - assessment:read, assessment:write, assessment:review, assessment:sign, assessment:approve
 - audit:read
+- vex:export
 - credentials:manage (reserved for future API-based credential administration)
 
 Decision-signature submission requires the separate assessment:sign scope and the same active operator principal that authored the decision. The signing key must be registered to that principal and use the decision-signing purpose. Independent approval requires assessment:approve, a distinct active operator principal and a separately registered key with the decision-approval purpose. Approval status reads require assessment:read. Signature reads require assessment:read. Reports require inventory:read, assessment:read and audit:read. Human review routes require the dedicated assessment:review scope and an active operator principal; service principals and legacy shared-key actors are rejected. Read permissions do not imply write permissions. The policy test checks that all routes depending on authentication have an explicit mapping.
