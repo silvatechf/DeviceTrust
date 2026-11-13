@@ -18,7 +18,7 @@ The intended workflow is to connect:
 1. Product, asset and version context.
 2. Software-component inventories and their provenance.
 3. Vulnerability intelligence and affected-version assessment.
-4. Reviewed security decisions, including future VEX support.
+4. Reviewed security decisions and a narrowly scoped CycloneDX 1.5 VEX export.
 5. Evidence, audit history and exportable assessment records.
 
 This direction is relevant to product-security workflows under the EU Cyber Resilience Act (CRA), but DeviceTrust currently supports only a small subset of the underlying engineering activities. CRA obligations extend beyond SBOMs and vulnerability triage. Legal applicability and manufacturer responsibilities must be assessed for each product and organisation.
@@ -27,7 +27,7 @@ See [Product Vision](docs/product-vision.md) for the product direction and phase
 
 ## The current prototype
 
-The application is built with Python, FastAPI, Pydantic and SQLAlchemy. It is a modular monolith intended for local evaluation and technical learning.
+The application is built with Python, FastAPI, Pydantic and SQLAlchemy. It is a modular monolith intended for local evaluation and technical learning. The same-origin operator console supports Product / Release SBOM import, assessment, findings inspection and (on this branch) attributable human-review decisions; evidence manifests, signing, independent approval and VEX export remain API workflows rather than a complete browser experience.
 
 Implemented prototype workflows:
 
