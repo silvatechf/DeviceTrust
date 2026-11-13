@@ -479,7 +479,7 @@
             const findings = await api("/sbom/imports/" + encodeURIComponent(importId) + "/assessments/" + encodeURIComponent(item.id) + "/findings");
             const box = $("product-findings"); box.replaceChildren(node("b", "", "Assessment #" + item.id + " findings (" + findings.length + ")"));
             if (!findings.length) box.append(node("p", "", "No findings were returned for this assessment."));
-            findings.forEach((finding) => box.append(node("p", "", [finding.vuln_id, finding.severity, finding.source, finding.status, finding.component_name || finding.component].filter(Boolean).join(" · "))));
+            findings.forEach((finding) => box.append(node("p", "", [finding.vuln_id, finding.severity, finding.source, "Component #" + finding.sbom_component_id, finding.applicability].filter(Boolean).join(" · "))));
             box.hidden = false;
           } catch (error) { notice("Findings could not be loaded: " + error.message, true); }
         });
