@@ -262,6 +262,7 @@ text-transform:uppercase}
 .upload{max-width:760px}
 .upload form{gap:10px}
 .upload input[type=file]{padding:8px}
+.finding{display:grid;gap:5px;padding:10px 0;border-top:1px solid #223146;font-size:10px}.finding b{font-size:10px}.finding small{display:block;color:var(--muted);line-height:1.5}.finding-note{margin:2px 0 0;color:#b8c7d8;font-size:10px;line-height:1.5}
 .result{margin-top:15px;
 background:#0c1723;
 border:1px solid #304259;
