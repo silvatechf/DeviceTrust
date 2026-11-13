@@ -31,7 +31,7 @@
 <label for="product-source-reference">Source reference <span>(optional)</span></label><input id="product-source-reference" maxlength="500" placeholder="CI run, build URL or operator note">
 <div class="inline"><button class="primary" id="product-sbom-submit" disabled>Import product SBOM</button><small>Maximum size: 2 MiB</small></div></form>
 <div id="product-import-result" class="result" hidden></div></article>
-<article class="panel"><div class="panel-head"><div><p class="eyebrow">04 / ASSESSMENT</p><h3>Imports and assessment history</h3></div><button class="secondary" id="product-refresh-imports" disabled>Load imports</button></div>
+<article class="panel"><div class="panel-head"><div><p class="eyebrow">04 / ASSESSMENT</p><h3>Imports and assessment history</h3></div></div>
 <div class="inline workflow-select"><label for="imports-release-id">Release ID</label><input id="imports-release-id" type="number" min="1" placeholder="Release ID"><button class="secondary" id="product-load-imports" disabled>Load</button></div>
 <div id="product-imports" class="empty">Load imports for a product release.</div>
 <div class="assessment-actions"><label for="assessment-import-id">SBOM import ID</label><input id="assessment-import-id" type="number" min="1" placeholder="Accepted import ID"><button class="primary" id="run-assessment" disabled>Run assessment</button><button class="secondary" id="load-assessments" disabled>View history</button></div>
