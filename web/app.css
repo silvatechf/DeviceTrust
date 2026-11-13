@@ -361,3 +361,15 @@ font-size:9px}
 #connection.connected{color:var(--accent)}
 .audit strong{color:var(--accent)}
 .audit strong.broken{color:#ff8585}
+
+.workflow-form{display:grid;gap:8px;margin-top:13px}
+.workflow-form label,.assessment-actions label,.workflow-select label{font-size:10px;font-weight:700;color:#c4d0df}
+.workflow-form label span{color:#8294aa;font-weight:400}
+.workflow-form button{justify-self:start;margin-top:5px}
+.product-workflow{grid-template-columns:1fr 1fr}
+.product-upload{max-width:none}
+.workflow-select,.assessment-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:10px 0 14px}
+.workflow-select input,.assessment-actions input{max-width:180px}
+.assessment-actions{border-top:1px solid var(--border);padding-top:14px}
+.product-imports .device-row{align-items:center}
+@media(max-width:900px){.product-workflow{grid-template-columns:1fr}}
