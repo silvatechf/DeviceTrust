@@ -476,6 +476,120 @@
       notice("Assessment request completed. Inspect its findings and enrichment metadata.");
     } catch (error) { notice("Assessment failed: " + error.message, true); }
   });
+  const decisionOptions = [
+    ["resolved", "Resolved"],
+    ["resolved_with_pedigree", "Resolved with pedigree"],
+    ["exploitable", "Exploitable"],
+    ["in_triage", "In triage"],
+    ["false_positive", "False positive"],
+    ["not_affected", "Not affected"],
+  ];
+  const justificationOptions = [
+    ["code_not_present", "Code not present"],
+    ["code_not_reachable", "Code not reachable"],
+    ["requires_configuration", "Requires configuration"],
+    ["requires_dependency", "Requires dependency"],
+    ["requires_environment", "Requires environment"],
+    ["protected_by_compiler", "Protected by compiler"],
+    ["protected_at_runtime", "Protected at runtime"],
+    ["protected_at_perimeter", "Protected at perimeter"],
+    ["protected_by_mitigating_control", "Protected by mitigating control"],
+  ];
+  const loadFindingDecisions = async (findingId, target) => {
+    const rows = await api("/sbom/assessment-findings/" + encodeURIComponent(findingId) + "/decisions");
+    target.replaceChildren();
+    if (!rows.length) {
+      target.append(node("p", "empty", "No review decisions recorded."));
+      return;
+    }
+    rows.forEach((item) => {
+      const row = node("article", "decision-entry");
+      row.append(
+        node("b", "", "Revision " + item.revision + " · " + item.state.replaceAll("_", " ")),
+        node("small", "", "Decision #" + item.id + " · " + item.created_at + " · Principal " + item.principal_id),
+        node("p", "", item.detail),
+      );
+      if (item.justification) row.append(node("small", "", "Justification: " + item.justification));
+      if (item.evidence_references && item.evidence_references.length) {
+        row.append(node("small", "", "Evidence references: " + item.evidence_references.join(", ")));
+      }
+      target.append(row);
+    });
+  };
+  const renderFindingReview = (finding, parent) => {
+    const section = node("details", "decision-review");
+    section.append(node("summary", "", "Human review and decision history"));
+    const form = node("form", "decision-form");
+    const stateLabel = node("label", "", "Decision state");
+    const decisionState = node("select", "");
+    decisionOptions.forEach(([value, label]) => {
+      const option = node("option", "", label); option.value = value; decisionState.append(option);
+    });
+    stateLabel.append(decisionState);
+    const justificationLabel = node("label", "", "CycloneDX justification (required for Not affected)");
+    const justification = node("select", "");
+    const emptyOption = node("option", "", "Not specified"); emptyOption.value = ""; justification.append(emptyOption);
+    justificationOptions.forEach(([value, label]) => {
+      const option = node("option", "", label); option.value = value; justification.append(option);
+    });
+    justificationLabel.append(justification);
+    const detailLabel = node("label", "", "Review rationale (minimum 20 characters)");
+    const detail = node("textarea", ""); detail.required = true; detail.minLength = 20; detail.maxLength = 4000;
+    detailLabel.append(detail);
+    const evidenceLabel = node("label", "", "Evidence references (one per line)");
+    const evidence = node("textarea", ""); evidence.maxLength = 5000;
+    evidenceLabel.append(evidence);
+    const help = node("small", "footnote", "Not affected requires a valid justification and at least one evidence reference. Resolved with pedigree also requires an evidence reference. Use traceable references; do not include credentials or signed URLs.");
+    const submit = node("button", "primary", "Record decision"); submit.type = "submit";
+    form.append(stateLabel, justificationLabel, detailLabel, evidenceLabel, help, submit);
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const selectedState = decisionState.value;
+      const references = evidence.value.split(/\\r?\\n/).map((value) => value.trim()).filter(Boolean);
+      if (selectedState === "not_affected" && (!justification.value || !references.length)) {
+        notice("Not affected requires a CycloneDX justification and at least one evidence reference.", true);
+        return;
+      }
+      if (selectedState === "resolved_with_pedigree" && !references.length) {
+        notice("Resolved with pedigree requires at least one evidence reference.", true);
+        return;
+      }
+      submit.disabled = true;
+      try {
+        await api("/sbom/assessment-findings/" + encodeURIComponent(finding.id) + "/decisions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+          body: JSON.stringify({
+            state: selectedState,
+            justification: justification.value || null,
+            detail: detail.value.trim(),
+            evidence_references: references,
+            responses: [],
+          }),
+        });
+        form.reset();
+        await loadFindingDecisions(finding.id, history);
+        notice("Human review decision recorded in the audit trail.");
+      } catch (error) {
+        notice("Decision could not be recorded: " + error.message, true);
+      } finally {
+        submit.disabled = false;
+      }
+    });
+    const historyHeader = node("div", "decision-history-head");
+    const historyTitle = node("b", "", "Decision history");
+    const refresh = node("button", "secondary", "Load history"); refresh.type = "button";
+    const history = node("div", "decision-history empty", "Load decision history to inspect prior revisions.");
+    refresh.addEventListener("click", async () => {
+      refresh.disabled = true;
+      try { await loadFindingDecisions(finding.id, history); }
+      catch (error) { notice("Decision history could not be loaded: " + error.message, true); }
+      finally { refresh.disabled = false; }
+    });
+    historyHeader.append(historyTitle, refresh);
+    section.append(form, historyHeader, history);
+    parent.append(section);
+  };
   const loadProductAssessments = async () => {
     const importId = $("assessment-import-id").value.trim();
     if (!importId) { notice("Enter an SBOM import ID.", true); return; }
@@ -517,6 +631,7 @@
               }
 
               box.append(entry);
+              renderFindingReview(finding, box);
             });
             box.hidden = false;
           } catch (error) { notice("Findings could not be loaded: " + error.message, true); }
