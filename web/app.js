@@ -36,7 +36,7 @@
       "refresh-audit",
       "sbom-submit",
       "product-submit", "release-submit", "product-sbom-submit",
-      "product-refresh-imports", "product-load-imports",
+      "product-load-imports",
       "run-assessment", "load-assessments",
     ].forEach((id) => ($(id).disabled = !on));
     $("run-assessment").disabled = !on || !state.selectedImportAccepted;
@@ -461,7 +461,6 @@
     } catch (error) { notice("Import history failed: " + error.message, true); }
   };
   $("product-load-imports").addEventListener("click", loadProductImports);
-  $("product-refresh-imports").addEventListener("click", loadProductImports);
   $("run-assessment").addEventListener("click", async () => {
     const importId = $("assessment-import-id").value.trim();
     if (!importId) return;
