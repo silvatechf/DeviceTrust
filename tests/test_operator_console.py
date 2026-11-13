@@ -26,3 +26,19 @@ def test_api_docs_remain_available_outside_console_csp(client):
     assert response.status_code == 200
     assert "swagger-ui" in response.text.lower()
     assert "content-security-policy" not in response.headers
+
+def test_product_sbom_console_workflow_is_exposed_without_inline_scripts(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    assert 'data-view="product-sbom"' in html
+    assert 'id="view-product-sbom"' in html
+    assert 'id="product-form"' in html
+    assert 'id="release-form"' in html
+    assert 'id="product-sbom-form"' in html
+    assert 'id="run-assessment"' in html
+    assert "/products" in script
+    assert "/product-releases/" in script
+    assert "/sbom/imports/" in script
+    assert "Idempotency-Key" in script
+    assert "localStorage" not in script
+    assert "sessionStorage" not in script
