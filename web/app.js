@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const state = { key: "" };
+  const state = { key: "", selectedImportAccepted: false };
   const $ = (id) => document.getElementById(id);
   const node = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -39,6 +39,8 @@
       "product-refresh-imports", "product-load-imports",
       "run-assessment", "load-assessments",
     ].forEach((id) => ($(id).disabled = !on));
+    $("run-assessment").disabled = !on || !state.selectedImportAccepted;
+    $("load-assessments").disabled = !on || !state.selectedImportAccepted;
   };
   const view = (name) => {
     document
@@ -308,6 +310,8 @@
   $("connect-toggle").addEventListener("click", () => {
     if (state.key) {
       state.key = "";
+      state.selectedImportAccepted = false;
+      $("assessment-import-id").value = "";
       $("api-key").value = "";
       $("connect-panel").hidden = false;
       $("connect-toggle").textContent = "Connect API";
@@ -419,6 +423,9 @@
       const result = await api("/product-releases/" + encodeURIComponent(releaseId) + "/sbom?" + query.toString(), {
         method: "POST", headers: { "Content-Type": "application/json" }, body: await file.text() });
       $("assessment-import-id").value = result.id;
+      state.selectedImportAccepted = result.status === "accepted";
+      $("run-assessment").disabled = !state.key || !state.selectedImportAccepted;
+      $("load-assessments").disabled = !state.key || !state.selectedImportAccepted;
       productResult("product-import-result", { title: "Product SBOM imported", values: {
         "Import ID": result.id, Status: result.status, Components: result.component_count,
         "SHA-256": String(result.content_sha256 || "").slice(0, 16) + "…" } });
@@ -439,7 +446,15 @@
         left.append(node("b", "", "Import #" + item.id + " · " + item.status),
           node("small", "", item.component_count + " components · " + item.format + " · " + item.content_sha256.slice(0, 16) + "…"));
         const choose = node("button", "secondary", "Select");
-        choose.addEventListener("click", () => { $("assessment-import-id").value = item.id; $("product-findings").hidden = true; });
+        choose.disabled = item.status !== "accepted";
+        choose.title = item.status === "accepted" ? "Select accepted import" : "Only accepted imports can be assessed";
+        choose.addEventListener("click", () => {
+          $("assessment-import-id").value = item.id;
+          state.selectedImportAccepted = true;
+          $("run-assessment").disabled = !state.key;
+          $("load-assessments").disabled = !state.key;
+          $("product-findings").hidden = true;
+        });
         row.append(left, choose); root.append(row);
       });
       notice(imports.length + " product SBOM import(s) loaded.");
@@ -488,6 +503,11 @@
       notice(rows.length + " assessment(s) loaded.");
     } catch (error) { notice("Assessment history failed: " + error.message, true); }
   };
+  $("assessment-import-id").addEventListener("input", () => {
+    state.selectedImportAccepted = false;
+    $("run-assessment").disabled = true;
+    $("load-assessments").disabled = true;
+  });
   $("load-assessments").addEventListener("click", loadProductAssessments);
 
   view("overview");
