@@ -53,7 +53,7 @@ A successful operator workflow should make it possible to:
 - Export a narrowly scoped, schema-valid VEX artifact only when all eligibility checks pass.
 - Retrieve assessment, decision and audit history.
 
-The existing API and CLI provide parts of this flow. A coherent operator-facing experience remains a delivery objective, not an implemented capability.
+The existing API and CLI provide the underlying contracts. The same-origin console now covers product/release registration, SBOM import, assessment, findings and a first human-review interface. Evidence artifact handling, revision-bound manifests, signing, independent approval and VEX export still need a coherent operator-facing workflow.
 
 ## Product areas
 
@@ -93,7 +93,7 @@ The API owns authentication, validation, persistence and domain behavior. The CL
 
 Current intelligence integrations include bounded local advisories, optional OSV lookup, CISA KEV and FIRST EPSS enrichment. Ed25519 signatures use operator-controlled keys kept outside the application. The current VEX slice exports CycloneDX 1.5 only under strict decision, evidence, signature and approval checks.
 
-A minimal web UI and a GitHub Action are future delivery items. Neither should be built as a parallel business-logic layer.
+The existing same-origin console is the operator UI foundation. Its next increments should expose evidence, signature, approval and VEX workflows without duplicating domain logic. A GitHub Action remains a future delivery item and must use the existing API/CLI contracts.
 
 ## Delivery strategy and phase gates
 
