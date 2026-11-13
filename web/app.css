@@ -374,3 +374,15 @@ font-size:9px}
 .assessment-actions{border-top:1px solid var(--border);padding-top:14px}
 .product-imports .device-row{align-items:center}
 @media(max-width:900px){.product-workflow{grid-template-columns:1fr}}
+
+.decision-review{margin:10px 0 14px;padding:10px;border:1px solid var(--border);border-radius:8px;background:#0c1521}
+.decision-review summary{cursor:pointer;font-weight:700;color:#83d8cb;font-size:10px}
+.decision-form{display:grid;gap:8px;margin:12px 0}
+.decision-form label{display:grid;gap:5px;color:#c4d0df;font-size:10px;font-weight:700}
+.decision-form select,.decision-form textarea{width:100%;background:#0a1420;color:#dce6f2;border:1px solid #304259;border-radius:7px;padding:8px;font:inherit;font-size:10px}
+.decision-form textarea{min-height:66px;resize:vertical}
+.decision-form button{justify-self:start}
+.decision-history-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}
+.decision-entry{padding:9px 0;border-top:1px solid var(--border);display:grid;gap:5px}
+.decision-entry small{color:var(--muted);font-size:9px;overflow-wrap:anywhere}
+.decision-entry p{margin:2px 0;font-size:10px;line-height:1.5}

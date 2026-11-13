@@ -44,6 +44,15 @@ def test_product_sbom_console_workflow_is_exposed_without_inline_scripts(client)
     assert 'item.status !== "accepted"' in script
     assert "applicability.status" in script
     assert "applicability.interpretation" in script
+    assert "renderFindingReview" in script
+    assert "/decisions" in script
+    assert "Idempotency-Key" in script
+    assert "not_affected" in script
+    assert "evidence_references" in script
+    assert "loadFindingDecisions" in script
+    assert "pendingDecisionKey" in script
+    assert "decision-history" in script
+    assert "minimum 20 characters" in script
     assert "finding.applicability].filter(Boolean)" not in script
     assert "localStorage" not in script
     assert "sessionStorage" not in script

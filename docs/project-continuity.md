@@ -27,8 +27,8 @@ See:
 At the time this record was reconciled:
 
 - Default branch: `main`.
-- Latest verified main commit at this reconciliation: `d8587e0a97059e666d2ad2841f9be5fee8a6a946` (PR #82 merge commit, 2026-11-11).
-- PR #82, `docs: add managed identity operations guide`, is the latest observed merge on `main`; exact-commit CI and CodeQL both completed successfully. The `main` branch had no newer commit when this record was reconciled on 2026-11-13.
+- Latest verified main commit at this reconciliation: `1e37a2e76f20e949faa5c7d7b109390cc39ad825` (PR #85 merge commit, 2026-11-13).
+- PR #85, `Fix Product SBOM applicability rendering`, is merged; its branch CI and post-merge CI and CodeQL completed successfully. The Product SBOM console now renders structured applicability metadata instead of coercing objects to `[object Object]`.
 - PR #74, `docs: add project continuity and handoff record`, was merged on 2026-11-10.
 - PR #77, `feat(cli): add authenticated CycloneDX SBOM import`, was merged on 2026-11-10; exact-head CI and CodeQL both completed successfully. Merge commit: `2f210663ab5e424795d4884e5febf8e398d09a1f`.
 - PR #80, `test: cover complete product SBOM review and VEX workflow`, was merged on 2026-11-10. Exact-head CI and CodeQL passed for head `3075e71e01ef259cb7894b66c13e716752ccef4f`; merge commit: `825e008312eca5fb16ffc64b3f4321bdd90b7da6`. The integration test exercises the product/release API, authenticated CLI import/assessment/history/findings, evidence, decision, manifest, author signature, independent approval, VEX export and audit history using synthetic fixtures and stubbed external enrichment.
@@ -70,11 +70,11 @@ For endpoint details and exact limitations, use the README and relevant implemen
 
 **Workstream:** deliver a coherent operator-facing product/release SBOM vertical slice (see [Product Vision](product-vision.md) and [Roadmap](roadmap.md)).
 
-**Latest increment:** PR #82 (`docs: add managed identity operations guide`) is merged; current baseline is `d8587e0a97059e666d2ad2841f9be5fee8a6a946`, with exact-commit CI and CodeQL successful. The integrated product SBOM review-to-VEX test from PR #80 remains part of `main`.
+**Latest merged increment:** PR #85 (`Fix Product SBOM applicability rendering`) is merged into `main` at `1e37a2e76f20e949faa5c7d7b109390cc39ad825`; branch CI and post-merge CI/CodeQL succeeded. PR #86 (`Add Product SBOM human review controls`) is open on `feat/product-sbom-review-console`; its CI and CodeQL are pending. The PR adds a first browser interface for attributable decisions and decision history; it does not yet expose evidence artifact handling, signatures, independent approval or VEX export.
 
-A manual local product SBOM walkthrough was completed on 2026-11-13 against the current `main` code using a disposable SQLite database and a localhost-only API process. Product creation, release creation, CycloneDX import and assessment completed through the API/CLI flow. The official `GET /audit/verify` endpoint returned `valid: true` and `entries: 4`; `GET /audit` returned four events. The demo API was stopped, the temporary API key was removed from the shell environment, and the temporary database and process logs were preserved outside the repository. This is user-reported execution evidence, not a CI run or production validation. The run did not exercise human decision/signature/approval/VEX export, external intelligence enrichment, or the browser console.
+A manual local validation was reported on 2026-11-13 against the merged `main` Console and a localhost-only API. The operator connected successfully, loaded the existing product-release import, inspected assessment history (#1 and #2), and viewed three synthetic findings with structured applicability details. The audit endpoint returned `valid: true` with 12 entries. This is user-reported browser/API evidence, not a CI run or production validation. The local run did not exercise managed-mode human review, evidence artifact upload, decision manifests, signatures, independent approval, VEX export or external intelligence enrichment.
 
-**Next delivery:** a focused operator-facing product/release SBOM workflow in the existing console. Preserve the API as the authorization and domain boundary; do not duplicate parsing, persistence or assessment logic in JavaScript. Start with product/release discovery and creation, SBOM import, assessment initiation and result/history inspection. Keep the legacy device-scoped workflow clearly separated.
+**Current delivery:** complete the operator-facing product/release SBOM governance workflow in focused increments. PR #86 begins with attributable human-review submission and decision history. Preserve the API as the authorization and domain boundary; do not duplicate parsing, persistence, signing policy or decision logic in JavaScript. Keep the legacy device-scoped workflow clearly separated.
 
 Why this order:
 - The existing CLI exposes `assess`, `history` and `findings`, but expects an existing `import_id`.
