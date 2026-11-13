@@ -493,7 +493,31 @@
             const findings = await api("/sbom/imports/" + encodeURIComponent(importId) + "/assessments/" + encodeURIComponent(item.id) + "/findings");
             const box = $("product-findings"); box.replaceChildren(node("b", "", "Assessment #" + item.id + " findings (" + findings.length + ")"));
             if (!findings.length) box.append(node("p", "", "No findings were returned for this assessment."));
-            findings.forEach((finding) => box.append(node("p", "", [finding.vuln_id, finding.severity, finding.source, "Component #" + finding.sbom_component_id, finding.applicability].filter(Boolean).join(" · "))));
+            findings.forEach((finding) => {
+              const applicability = finding.applicability;
+              const entry = node("div", "finding");
+              entry.append(
+                node("b", "", finding.vuln_id + " · " + String(finding.severity || "unknown").toUpperCase()),
+                node("small", "", [finding.source, "Component #" + finding.sbom_component_id].filter(Boolean).join(" · ")),
+              );
+
+              if (applicability && typeof applicability === "object" && !Array.isArray(applicability)) {
+                const details = [
+                  applicability.status ? "Applicability: " + applicability.status : null,
+                  applicability.basis ? "Basis: " + applicability.basis : null,
+                  applicability.component_version ? "Component version: " + applicability.component_version : null,
+                  applicability.fixed_in ? "Fixed in: " + applicability.fixed_in : null,
+                ].filter(Boolean);
+                if (details.length) entry.append(node("small", "", details.join(" · ")));
+                if (applicability.interpretation) {
+                  entry.append(node("p", "finding-note", applicability.interpretation));
+                }
+              } else if (applicability !== null && applicability !== undefined) {
+                entry.append(node("small", "", "Applicability: " + String(applicability)));
+              }
+
+              box.append(entry);
+            });
             box.hidden = false;
           } catch (error) { notice("Findings could not be loaded: " + error.message, true); }
         });
