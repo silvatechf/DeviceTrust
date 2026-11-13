@@ -541,7 +541,9 @@
     evidenceLabel.append(evidence);
     const help = node("small", "footnote", "Not affected requires a valid justification and at least one evidence reference. Resolved with pedigree also requires an evidence reference. Use traceable references; do not include credentials or signed URLs.");
     const submit = node("button", "primary", "Record decision"); submit.type = "submit";
+    let pendingDecisionKey = null;
     form.append(stateLabel, justificationLabel, detailLabel, evidenceLabel, help, submit);
+    form.addEventListener("input", () => { pendingDecisionKey = null; });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const selectedState = decisionState.value;
@@ -558,7 +560,7 @@
       try {
         await api("/sbom/assessment-findings/" + encodeURIComponent(finding.id) + "/decisions", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+          headers: { "Content-Type": "application/json", "Idempotency-Key": (pendingDecisionKey ||= crypto.randomUUID()) },
           body: JSON.stringify({
             state: selectedState,
             justification: justification.value || null,
@@ -567,6 +569,7 @@
             responses: [],
           }),
         });
+        pendingDecisionKey = null;
         form.reset();
         await loadFindingDecisions(finding.id, history);
         notice("Human review decision recorded in the audit trail.");
