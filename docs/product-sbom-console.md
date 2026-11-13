@@ -15,7 +15,7 @@ The same-origin operator console exposes the Product / Release SBOM workflow. It
 7. Retrieve findings for a selected assessment and inspect source-aware applicability metadata.
 8. Submit an attributable human-review decision for an individual finding and retrieve its append-only decision history.
 
-The API enforces the 2 MiB SBOM request limit; the console checks the selected file size before upload. API validation remains authoritative. Assessment and decision writes use fresh cryptographically generated idempotency keys for each explicit operator action. A retry after a lost response is a new request, not an automatic replay of the original key.
+The API enforces the 2 MiB SBOM request limit; the console checks the selected file size before upload. API validation remains authoritative. Assessment requests use a fresh cryptographically generated idempotency key per explicit click. Decision submission retains its generated key after an ambiguous network failure so an unchanged retry replays the same request; editing the form resets that pending key, and successful submission clears it. The API remains authoritative for idempotency and conflict handling.
 
 ## Human review contract
 
