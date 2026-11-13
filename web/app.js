@@ -545,7 +545,7 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const selectedState = decisionState.value;
-      const references = evidence.value.split(/\\r?\\n/).map((value) => value.trim()).filter(Boolean);
+      const references = evidence.value.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
       if (selectedState === "not_affected" && (!justification.value || !references.length)) {
         notice("Not affected requires a CycloneDX justification and at least one evidence reference.", true);
         return;
