@@ -35,6 +35,9 @@
       "refresh-inventory",
       "refresh-audit",
       "sbom-submit",
+      "product-submit", "release-submit", "product-sbom-submit",
+      "product-refresh-imports", "product-load-imports",
+      "run-assessment", "load-assessments",
     ].forEach((id) => ($(id).disabled = !on));
   };
   const view = (name) => {
@@ -368,6 +371,125 @@
       notice("SBOM import failed: " + err.message, true);
     }
   });
+
+  const productResult = (id, payload) => {
+    const box = $(id);
+    box.replaceChildren(node("b", "", payload.title));
+    const details = Object.entries(payload.values).map(([key, value]) => key + ": " + value).join(" · ");
+    box.append(node("p", "", details));
+    box.hidden = false;
+  };
+  $("product-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const result = await api("/products", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manufacturer: $("product-manufacturer").value.trim(),
+          product_name: $("product-name").value.trim(),
+          external_reference: $("product-reference").value.trim() || null }) });
+      $("product-id").value = result.id;
+      productResult("product-result", { title: "Product registered", values: { ID: result.id, Manufacturer: result.manufacturer, Product: result.product_name } });
+      notice("Product registered through the DeviceTrust API.");
+    } catch (error) { notice("Product registration failed: " + error.message, true); }
+  });
+  $("release-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const productId = $("product-id").value;
+    try {
+      const result = await api("/products/" + encodeURIComponent(productId) + "/releases", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: $("release-version").value.trim(),
+          hardware_revision: $("release-hardware").value.trim() || null,
+          release_reference: $("release-reference").value.trim() || null }) });
+      $("product-release-id").value = result.id;
+      $("imports-release-id").value = result.id;
+      productResult("release-result", { title: "Release registered", values: { ID: result.id, "Product ID": result.product_id, Version: result.version } });
+      notice("Product release registered through the DeviceTrust API.");
+    } catch (error) { notice("Release registration failed: " + error.message, true); }
+  });
+  $("product-sbom-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const file = $("product-sbom-file").files[0], releaseId = $("product-release-id").value;
+    if (!file) return;
+    if (file.size > 2097152) { notice("File exceeds the 2 MiB upload limit.", true); return; }
+    try {
+      const sourceType = $("product-source-type").value;
+      const sourceReference = $("product-source-reference").value.trim();
+      const query = new URLSearchParams({ source_type: sourceType });
+      if (sourceReference) query.set("source_reference", sourceReference);
+      const result = await api("/product-releases/" + encodeURIComponent(releaseId) + "/sbom?" + query.toString(), {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: await file.text() });
+      $("assessment-import-id").value = result.id;
+      productResult("product-import-result", { title: "Product SBOM imported", values: {
+        "Import ID": result.id, Status: result.status, Components: result.component_count,
+        "SHA-256": String(result.content_sha256 || "").slice(0, 16) + "…" } });
+      $("imports-release-id").value = releaseId;
+      await loadProductImports();
+      notice("Product SBOM imported. Review its validation status before assessment.");
+    } catch (error) { notice("Product SBOM import failed: " + error.message, true); }
+  });
+  const loadProductImports = async () => {
+    const releaseId = $("imports-release-id").value.trim();
+    if (!releaseId) { notice("Enter a product release ID.", true); return; }
+    try {
+      const imports = await api("/product-releases/" + encodeURIComponent(releaseId) + "/sbom");
+      const root = $("product-imports"); root.replaceChildren();
+      if (!imports.length) root.append(node("p", "empty", "No SBOM imports for this release."));
+      imports.forEach((item) => {
+        const row = node("div", "device-row"), left = node("span", "");
+        left.append(node("b", "", "Import #" + item.id + " · " + item.status),
+          node("small", "", item.component_count + " components · " + item.format + " · " + item.content_sha256.slice(0, 16) + "…"));
+        const choose = node("button", "secondary", "Select");
+        choose.addEventListener("click", () => { $("assessment-import-id").value = item.id; $("product-findings").hidden = true; });
+        row.append(left, choose); root.append(row);
+      });
+      notice(imports.length + " product SBOM import(s) loaded.");
+    } catch (error) { notice("Import history failed: " + error.message, true); }
+  };
+  $("product-load-imports").addEventListener("click", loadProductImports);
+  $("product-refresh-imports").addEventListener("click", loadProductImports);
+  $("run-assessment").addEventListener("click", async () => {
+    const importId = $("assessment-import-id").value.trim();
+    if (!importId) return;
+    try {
+      const key = crypto.randomUUID();
+      const result = await api("/sbom/imports/" + encodeURIComponent(importId) + "/assessments", {
+        method: "POST", headers: { "Idempotency-Key": key } });
+      productResult("product-findings", { title: "Assessment completed", values: {
+        "Assessment ID": result.id, Status: result.status, Components: result.component_count,
+        Findings: result.finding_count, Created: result.created } });
+      $("product-findings").hidden = false;
+      await loadProductAssessments();
+      notice("Assessment request completed. Inspect its findings and enrichment metadata.");
+    } catch (error) { notice("Assessment failed: " + error.message, true); }
+  });
+  const loadProductAssessments = async () => {
+    const importId = $("assessment-import-id").value.trim();
+    if (!importId) { notice("Enter an SBOM import ID.", true); return; }
+    try {
+      const rows = await api("/sbom/imports/" + encodeURIComponent(importId) + "/assessments");
+      const root = $("product-assessments"); root.replaceChildren();
+      if (!rows.length) root.append(node("p", "empty", "No assessments recorded."));
+      rows.forEach((item) => {
+        const row = node("div", "device-row"), left = node("span", "");
+        left.append(node("b", "", "Assessment #" + item.id + " · " + item.status),
+          node("small", "", item.component_count + " components · " + item.finding_count + " findings · " + (item.completed_at || item.started_at)));
+        const choose = node("button", "secondary", "View findings");
+        choose.addEventListener("click", async () => {
+          try {
+            const findings = await api("/sbom/imports/" + encodeURIComponent(importId) + "/assessments/" + encodeURIComponent(item.id) + "/findings");
+            const box = $("product-findings"); box.replaceChildren(node("b", "", "Assessment #" + item.id + " findings (" + findings.length + ")"));
+            if (!findings.length) box.append(node("p", "", "No findings were returned for this assessment."));
+            findings.forEach((finding) => box.append(node("p", "", [finding.vuln_id, finding.severity, finding.source, finding.status, finding.component_name || finding.component].filter(Boolean).join(" · "))));
+            box.hidden = false;
+          } catch (error) { notice("Findings could not be loaded: " + error.message, true); }
+        });
+        row.append(left, choose); root.append(row);
+      });
+      notice(rows.length + " assessment(s) loaded.");
+    } catch (error) { notice("Assessment history failed: " + error.message, true); }
+  };
+  $("load-assessments").addEventListener("click", loadProductAssessments);
+
   view("overview");
   connected(false);
 })();
