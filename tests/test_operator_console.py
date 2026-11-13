@@ -40,5 +40,7 @@ def test_product_sbom_console_workflow_is_exposed_without_inline_scripts(client)
     assert "/product-releases/" in script
     assert "/sbom/imports/" in script
     assert "Idempotency-Key" in script
+    assert "state.selectedImportAccepted" in script
+    assert 'item.status !== "accepted"' in script
     assert "localStorage" not in script
     assert "sessionStorage" not in script
