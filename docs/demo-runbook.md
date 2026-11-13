@@ -302,3 +302,20 @@ python -m app.cli findings --import-id IMPORT_ID --assessment-id ASSESSMENT_ID
 ```
 
 All successful responses are JSON on stdout. Errors are JSON on stderr. Exit codes: `0` success, `2` local configuration/usage, `3` network/timeout, `4` authentication/authorization, `5` API request rejection, and `6` API server/unexpected response. Non-loopback endpoints must use HTTPS. Use `python -m app.cli --help` for command options.
+
+
+## 9. Verified local product SBOM walkthrough (2026-11-13)
+
+A manual run against `main` commit `d8587e0` completed using the API and CLI with a disposable SQLite database under the operating-system temporary directory and a localhost-only API process on port 8766.
+
+Observed results:
+
+- Product, product release, CycloneDX SBOM import and assessment were created successfully in the disposable database.
+- The official `GET /audit/verify` endpoint returned `valid: true` with four verified entries.
+- `GET /audit` returned four audit events.
+- The API process was stopped after the run. The temporary API key was removed from the PowerShell process environment.
+- The temporary SQLite database and API stdout/stderr logs were preserved outside the repository.
+
+The record IDs (`1` for product, release, import and assessment) are local to that disposable database and must not be treated as shared or production identifiers.
+
+This manual run did not test the browser console, external vulnerability-intelligence providers, human decision/signature/approval, VEX export, production deployment or recovery procedures. It does not establish production readiness. The integrated automated API/CLI review-to-VEX test remains the evidence for the decision, evidence-manifest, signature, independent-approval and VEX path.

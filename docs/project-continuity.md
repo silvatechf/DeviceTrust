@@ -1,6 +1,6 @@
 # Project Continuity Record
 
-**Last reconciled:** 2026-11-10  
+**Last reconciled:** 2026-11-13  
 **Repository:** `silvatechf/DeviceTrust`  
 **Authoritative branch:** `main`  
 **Purpose:** recover the project's verified state after a chat, session or contributor handoff.
@@ -27,7 +27,8 @@ See:
 At the time this record was reconciled:
 
 - Default branch: `main`.
-- Latest verified main commit at this reconciliation: `2f210663ab5e424795d4884e5febf8e398d09a1f`.
+- Latest verified main commit at this reconciliation: `d8587e0a97059e666d2ad2841f9be5fee8a6a946` (PR #82 merge commit, 2026-11-11).
+- PR #82, `docs: add managed identity operations guide`, is the latest observed merge on `main`; exact-commit CI and CodeQL both completed successfully. The `main` branch had no newer commit when this record was reconciled on 2026-11-13.
 - PR #74, `docs: add project continuity and handoff record`, was merged on 2026-11-10.
 - PR #77, `feat(cli): add authenticated CycloneDX SBOM import`, was merged on 2026-11-10; exact-head CI and CodeQL both completed successfully. Merge commit: `2f210663ab5e424795d4884e5febf8e398d09a1f`.
 - PR #80, `test: cover complete product SBOM review and VEX workflow`, was merged on 2026-11-10. Exact-head CI and CodeQL passed for head `3075e71e01ef259cb7894b66c13e716752ccef4f`; merge commit: `825e008312eca5fb16ffc64b3f4321bdd90b7da6`. The integration test exercises the product/release API, authenticated CLI import/assessment/history/findings, evidence, decision, manifest, author signature, independent approval, VEX export and audit history using synthetic fixtures and stubbed external enrichment.
@@ -67,9 +68,13 @@ For endpoint details and exact limitations, use the README and relevant implemen
 
 ## 4. Current workstream and next delivery
 
-**Workstream:** validate the complete API/CLI walkthrough, then deliver a coherent operator-facing vertical slice (see [Product Vision](product-vision.md) and [Roadmap](roadmap.md)).
+**Workstream:** deliver a coherent operator-facing product/release SBOM vertical slice (see [Product Vision](product-vision.md) and [Roadmap](roadmap.md)).
 
-**Latest increment:** the integrated product SBOM review-to-VEX workflow test is `MERGED` through PR #80. Exact-head CI and CodeQL passed for `3075e71e01ef259cb7894b66c13e716752ccef4f`; merge commit `825e008312eca5fb16ffc64b3f4321bdd90b7da6` is the verified baseline. The test exercises product/release creation, authenticated CLI import/assessment/history/findings, evidence artifact upload, attributable decision, fail-closed manifest precondition, revision-bound evidence manifest, author signature, independent approval, deterministic VEX export and audit history. It uses FastAPI TestClient, synthetic local advisory data and stubbed external enrichment; it is not a manual/browser/production walkthrough. Next: perform and record a reproducible operator walkthrough, then reassess the P0 gate before scoping the minimal operator-facing vertical slice.
+**Latest increment:** PR #82 (`docs: add managed identity operations guide`) is merged; current baseline is `d8587e0a97059e666d2ad2841f9be5fee8a6a946`, with exact-commit CI and CodeQL successful. The integrated product SBOM review-to-VEX test from PR #80 remains part of `main`.
+
+A manual local product SBOM walkthrough was completed on 2026-11-13 against the current `main` code using a disposable SQLite database and a localhost-only API process. Product creation, release creation, CycloneDX import and assessment completed through the API/CLI flow. The official `GET /audit/verify` endpoint returned `valid: true` and `entries: 4`; `GET /audit` returned four events. The demo API was stopped, the temporary API key was removed from the shell environment, and the temporary database and process logs were preserved outside the repository. This is user-reported execution evidence, not a CI run or production validation. The run did not exercise human decision/signature/approval/VEX export, external intelligence enrichment, or the browser console.
+
+**Next delivery:** a focused operator-facing product/release SBOM workflow in the existing console. Preserve the API as the authorization and domain boundary; do not duplicate parsing, persistence or assessment logic in JavaScript. Start with product/release discovery and creation, SBOM import, assessment initiation and result/history inspection. Keep the legacy device-scoped workflow clearly separated.
 
 Why this order:
 - The existing CLI exposes `assess`, `history` and `findings`, but expects an existing `import_id`.
@@ -89,7 +94,7 @@ Why this order:
 8. Do not place API tokens in command-line arguments, URLs, output or logs; read the token from the established environment variable or a safer supported credential mechanism.
 9. Update CLI help, README, test matrix and roadmap only when behavior is implemented and validated.
 
-CLI import is merged. Verify the complete API/CLI walkthrough before beginning the operator-facing vertical slice. A composed CLI command and GitHub Action should be considered only after the operator workflow and policy semantics are clear.
+CLI import is merged and the manual API/CLI walkthrough has now been exercised locally with a disposable database. The next scope is the operator-facing product/release vertical slice; a composed CLI command and GitHub Action should be considered only after the operator workflow and policy semantics are clear.
 
 ## 5. Security and architecture invariants
 
@@ -154,3 +159,18 @@ At the beginning of a resumed session or new chat:
 - [ ] Continue from the next incomplete acceptance criterion; do not recreate already merged work.
 
 At the end of a material delivery, update the baseline, PR/commit evidence, status and next action in this file.
+
+
+## 9. Verified manual product SBOM walkthrough — 2026-11-13
+
+This execution was performed locally against the current `main` baseline (`d8587e0`) using the existing API and CLI, not a direct database write from the CLI.
+
+- Database: disposable SQLite file under the operating-system temporary directory; no production/shared database was used.
+- API: localhost-only process on port 8766; stopped after verification.
+- Authentication: temporary local legacy API key, removed from the PowerShell process environment after the run; no key was recorded in the repository or evidence summary.
+- Records created: product ID `1`, release ID `1`, SBOM import ID `1`, assessment ID `1` within that disposable database only.
+- Audit verification: `GET /audit/verify` returned `valid: true` and `entries: 4`; `GET /audit` returned four events.
+- Preserved artifacts: temporary SQLite database and API stdout/stderr logs outside the repository.
+- Not covered: browser console, external OSV/KEV/EPSS enrichment, human decision/signature/approval, VEX export, production deployment or backup recovery.
+
+This is a manually observed local demonstration, not a substitute for automated tests, independent security review or production-readiness evidence. The exact procedure and limitations are recorded in [Local Demonstration Runbook](demo-runbook.md).
